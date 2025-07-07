@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Set monitor resolution and layout
+hc set_monitors 1920x1080
+
+# Set the default layout algorithm
+hc set layout_algorithm 1 # 0=vertical, 1=horizontal, 2=max, 3=grid
+
+# Set window gap and frame gap
+hc set window_gap 5
+hc set frame_gap 5
+hc set frame_padding 5
+
+# Set colors
+hc attr theme.tiling.reset 1
+hc attr theme.floating.reset 1
+hc attr theme.tiling.outer_color '#1a1b26'
+hc attr theme.tiling.inner_color '#1a1b26'
+hc attr theme.tiling.outer_width 1
+hc attr theme.tiling.inner_width 0
+hc attr theme.active.color '#7aa2f7'
+hc attr theme.normal.color '#414868'
+hc attr theme.urgent.color '#f7768e'
+
+# Start polybar
+~/.config/polybar/launch.sh &
+
+# Start compositor for transparency
+picom --experimental-backends -b &
+
+# Set wallpaper
+feh --bg-fill ~/Pictures/wallpaper.jpg &
+
+# Other autostart applications
+dunst & # notification daemon
+nm-applet & # network manager
+blueman-applet & # bluetooth
+
+# Mod key (Mod4 is usually the Super/Windows key)
+Mod=Mod4
+
+# Basic window movement
+hc keybind $Mod-Shift-q close
+hc keybind $Mod-Shift-r reload
+hc keybind $Mod-Return spawn alacritty
+hc keybind $Mod-d spawn rofi -show drun
+hc keybind $Mod-p spawn rofi -show run
+
+# Window focus
+hc keybind $Mod-h focus left
+hc keybind $Mod-j focus down
+hc keybind $Mod-k focus up
+hc keybind $Mod-l focus right
+
+# Window movement
+hc keybind $Mod-Shift-h shift left
+hc keybind $Mod-Shift-j shift down
+hc keybind $Mod-Shift-k shift up
+hc keybind $Mod-Shift-l shift right
+
+# Layout modification
+hc keybind $Mod-u split vertical 0.5
+hc keybind $Mod-o split horizontal 0.5
+hc keybind $Mod-space cycle_layout 1
+hc keybind $Mod-f fullscreen toggle
+
+# Workspaces
+hc keybind $Mod-1 use_index 0
+hc keybind $Mod-2 use_index 1
+hc keybind $Mod-3 use_index 2
+hc keybind $Mod-4 use_index 3
+hc keybind $Mod-5 use_index 4
+hc keybind $Mod-6 use_index 5
+hc keybind $Mod-7 use_index 6
+hc keybind $Mod-8 use_index 7
+hc keybind $Mod-9 use_index 8
+hc keybind $Mod-0 use_index 9
+
+# Move window to workspace
+hc keybind $Mod-Shift-1 move_index 0
+hc keybind $Mod-Shift-2 move_index 1
+hc keybind $Mod-Shift-3 move_index 2
+hc keybind $Mod-Shift-4 move_index 3
+hc keybind $Mod-Shift-5 move_index 4
+hc keybind $Mod-Shift-6 move_index 5
+hc keybind $Mod-Shift-7 move_index 6
+hc keybind $Mod-Shift-8 move_index 7
+hc keybind $Mod-Shift-9 move_index 8
+hc keybind $Mod-Shift-0 move_index 9
