@@ -128,6 +128,15 @@ hc rule class=Steam tag=5 floating=on floatplacement=center
 hc rule title=weechat tag=6
 hc rule title=Music tag=7 #fix me
 
+# programs
+hc spawn nitrogen --restore &
+hc spawn sh $HOME/.config/polybar/launch.sh
+hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+hc spawn plank
+hc spawn nm-applet &
+hc spawn trayer --edge bottom --align right --height 15
+hc spawn --no-startup-id dunst
+
 # unlock, just to be sure
 for i in seq $(hc get monitors_locked); do
     hc unlock
