@@ -29,22 +29,23 @@ Mod=Mod4
 Alt=Mod1
 
 # minimize and unminimise windows
-bash /home/pyratebeard/.local/bin/herbstluftwm-min_max
+bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-min_max
 
-hc keybind $Mod-Control-s spawn bash /home/pyratebeard/.local/bin/herbstluftwm-miniscratch
+hc keybind $Mod-Control-s spawn bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-miniscratch
 
 # run menu
-hc keybind $Mod-w	spawn /usr/bin/zsh /home/pyratebeard/.local/bin/rundmc
+hc keybind $Mod-w spawn rofi -show 
+
 
 # lock screen
-hc keybind $Mod-z	spawn bash /home/pyratebeard/.local/bin/lock
+hc keybind $Mod-z	spawn bash /home/nana/.config/herbstluftwm/.local/bin/lock
 
 # dynamic window gap
-hc keybind $Mod-9	spawn bash /home/pyratebeard/.local/bin/herbstluftwm-remove-gap
-hc keybind $Mod-0	spawn bash /home/pyratebeard/.local/bin/herbstluftwm-add-gap
+hc keybind $Mod-9	spawn bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-remove-gap
+hc keybind $Mod-0	spawn bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-add-gap
 
 # scrot
-hc keybind $Mod-q spawn scrot -e 'mv $f ~trove/images/misc/scrots/pyratebeard/'
+hc keybind $Mod-q spawn scrot -e 'mv $f ~trove/images/misc/scrots/nana/.config/herbstluftwm/'
 
 # generic actions
 hc keybind $Mod-Shift-q quit
@@ -91,6 +92,16 @@ hc keybind $Mod-Control-Down    resize down +$resizestep
 hc keybind $Mod-Control-Up      resize up +$resizestep
 hc keybind $Mod-Control-Right   resize right +$resizestep
 
+# programs
+hc spawn nitrogen --restore &
+hc spawn sh $HOME/.config/polybar/launch.sh
+hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+hc spawn plank
+hc spawn nm-applet &
+hc spawn trayer --edge bottom --align right --height 15
+hc spawn --no-startup-id dunst
+hc spawn xfce4-power-manager &
+
 # tags
 tag_names=( {0..4} )
 tag_keys=( {1..5} 0 )
@@ -100,7 +111,7 @@ hc rename default "${tag_names[0]}" || true
 for i in ${!tag_names[@]} ; do
     hc add "${tag_names[$i]}"
 	key="${tag_keys[$i]}"
-	layoutfile=/home/pyratebeard/dot/herbstluftwm/layout-${key}
+	layoutfile=/home/nana/.config/herbstluftwm/dot/herbstluftwm/layout-${key}
     if ! [ -z "$key" ] ; then
         hc keybind "$Mod-$key" \
 			chain , silent substitute M tags."$i".my_monitor \
