@@ -22,7 +22,7 @@ hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              
 hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
 
 # Window info/wm ctrls
-hc keybind Mod4-w spawn rofi -show window                               #Switch windows
+hc keybind Mod4-w spawn rofi -show                            #Switch windows
 hc keybind Mod4-Control-w spawn ~/.config/herbstluftwm/toggle_titles.sh #Toggle window titles
 hc keybind Mod4-Shift-r reload                                          #Reload hlwm
 
