@@ -18,8 +18,6 @@ hc emit_hook reload
 # remove all existing keybindings
 hc keyunbind --all
 
-# close tray if reloading
-killall stalonetray
 
 # gap counter
 echo 30 > /tmp/herbstluftwm-gap
@@ -33,10 +31,8 @@ bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-min_max
 
 hc keybind $Mod-Control-s spawn bash /home/nana/.config/herbstluftwm/.local/bin/herbstluftwm-miniscratch
 
-# run menu
+# run menu                         #Switch windows
 hc keybind $Mod-w spawn rofi -show 
-
-
 # lock screen
 hc keybind $Mod-z	spawn bash /home/nana/.config/herbstluftwm/.local/bin/lock
 
@@ -51,7 +47,7 @@ hc keybind $Mod-q spawn scrot -e 'mv $f ~trove/images/misc/scrots/nana/.config/h
 hc keybind $Mod-Shift-q quit
 hc keybind $Mod-Shift-r reload
 hc keybind $Mod-Shift-c close
-hc keybind $Mod-Return spawn urxvtc
+hc keybind $Mod-Return spawn alacritty
 
 # basic movement
 # focusing clients
@@ -101,7 +97,6 @@ hc spawn nm-applet &
 hc spawn trayer --edge bottom --align right --height 15
 hc spawn --no-startup-id dunst
 hc spawn xfce4-power-manager &
-
 # tags
 tag_names=( {0..4} )
 tag_keys=( {1..5} 0 )
@@ -141,11 +136,11 @@ lock_tag_to_monitor() {
 		, set_attr tags.by-name."$1".my_monitor "$2"
 }
 
-lock_tag_to_monitor 0 1
-lock_tag_to_monitor 1 0
-lock_tag_to_monitor 2 1
+lock_tag_to_monitor 0 0
+lock_tag_to_monitor 1 1
+lock_tag_to_monitor 2 0
 lock_tag_to_monitor 3 1
-lock_tag_to_monitor 4 1
+lock_tag_to_monitor 4 0
 
 # cycle through tags
 hc keybind $Mod-$Alt-Left use_index -1 --skip-visible
@@ -185,16 +180,16 @@ hc set frame_bg_transparent 1
 hc set frame_transparent_width 0
 hc set frame_gap 2
 
-hc attr theme.active.color '#60928f' #6A8C8C
-hc attr theme.normal.color '#121212'
-hc attr theme.urgent.color '#515978'
-hc attr theme.inner_width 6
-hc attr theme.inner_color '#2c2c2c'
-hc attr theme.border_width 10
+hc attr theme.active.color '#14894c' #orp: 9c353e, zuke: bdc030, electronomicon: 7d3624
+hc attr theme.normal.color '#070606'
+hc attr theme.urgent.color '#58333e'
+hc attr theme.inner_width 8
+hc attr theme.inner_color '#2a2f33'
+hc attr theme.border_width 12
 hc attr theme.floating.border_width 3
 hc attr theme.floating.outer_width 1
 hc attr theme.floating.outer_color black
-hc attr theme.active.inner_color '#2c2c2c'
+hc attr theme.active.inner_color '#2a2f33'
 hc attr theme.active.outer_color '#131313'
 hc attr theme.background_color '#1e1b1c'
 #hc attr theme.padding_left 14
