@@ -2,42 +2,43 @@
 *.font: xft:Hack Nerd Font:style=Regular:size=12
 
 
-! special
-*.foreground:   #f0f0f0
-*.background:   #0f0f0f
-*.cursorColor:  #f0f0f0
+! Gruvbox color scheme
+URxvt*background: #282828
+URxvt*foreground: #ebdbb2
 
 ! black
-*.color0:       #262626
-*.color8:       #4c4c4c
+URxvt*color0: #282828
+URxvt*color8: #928374
 
 ! red
-*.color1:       #ac8a8c
-*.color9:       #c49ea0
+URxvt*color1: #cc241d
+URxvt*color9: #fb4934
 
 ! green
-*.color2:       #8aac8b
-*.color10:      #9ec49f
+URxvt*color2: #98971a
+URxvt*color10: #b8bb26
 
 ! yellow
-*.color3:       #aca98a
-*.color11:      #c4c19e
+URxvt*color3: #d79921
+URxvt*color11: #fabd2f
 
 ! blue
-*.color4:       #8f8aac
-*.color12:      #a39ec4
+URxvt*color4: #458588
+URxvt*color12: #83a598
 
 ! magenta
-*.color5:       #ac8aac
-*.color13:      #c49ec4
+URxvt*color5: #b16286
+URxvt*color13: #d3869b
 
 ! cyan
-*.color6:       #8aabac
-*.color14:      #9ec3c4
+URxvt*color6: #689d6a
+URxvt*color14: #8ec07c
 
 ! white
-*.color7:       #e7e7e7
-*.color15:      #f5f5f5
+URxvt*color7: #a89984
+URxvt*color15: #ebdbb2
+*.cursorColor:  #f0f0f0
+
 
 
 Xft.dpi: 96
@@ -63,10 +64,11 @@ URxvt.urgentOnBell: true
 URxvt.scrollTtyOutput: true
 URxvt.scrollWithBuffer: true
 URxvt.scrollTtyKeypress: true
-URxvt.transparent:true
 URxvt.depth: 32
 URxvt.iso14755:        false
 URxvt.iso14755_52:     false
+urxvt*transparent: true
+urxvt*shading: 30
 
 URxvt.perl-ext-common: default,matcher,clipboard,keyboard-select,url-select
 URxvt.url-launcher: /usr/bin/xdg-open
