@@ -1,5 +1,5 @@
 
-*.font: xft:Hack Nerd Font:style=Regular:size=12
+*.font: xft:trigon:style=Regular:size=12
 
 
 ! Gruvbox color scheme
