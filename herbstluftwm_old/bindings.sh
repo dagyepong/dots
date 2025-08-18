@@ -13,7 +13,8 @@ hc keyunbind --all
 # Basics
 hc keybind Mod4-Return or ',' and '.' compare tags.focus.frame_count = 1 '.' compare tags.focus.curframe_wcount = 0 '.' spawn alacritty ',' and '_' compare tags.focus.curframe_wcount = 0 '_' spawn alacritty ',' chain '-' split auto '-' cycle_frame '-' spawn alacritty #bsp-like spawning of terminal
 
-hc keybind Mod4-Shift-Return spawn alacritty                                    #Spawn terminal
+#hc keybind Mod4-Shift-Return spawn alacritty   
+hc keybind Mod4-Return spawn urxvt                                 #Spawn terminal
 hc keybind Mod4-e spawn launch                                                  #Launcher
 hc keybind Mod4-Shift-e spawn power                                             #Power menu
 hc keybind Mod4-d spawn hlscrthpd.sh                                            #Dropdown terminal
