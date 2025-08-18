@@ -20,57 +20,14 @@ hc keybind Mod4-Shift-e spawn power                                             
 hc keybind Mod4-d spawn hlscrthpd.sh                                            #Dropdown terminal
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
 hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
-hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
 
 # Window info/wm ctrls
 hc keybind Mod4-w spawn rofi -show                            #Switch windows
 hc keybind Mod4-Control-w spawn ~/.config/herbstluftwm/toggle_titles.sh #Toggle window titles
 hc keybind Mod4-Shift-r reload                                          #Reload hlwm
 
-# Toggles
-hc keybind Mod4-b spawn togglebar.sh            #Toggle bar
-hc keybind Mod4-Shift-p spawn togglepicom       #Toggle compositor
-hc keybind XF86Launch1 spawn toggle_touchpad.sh #Toggle touchpad
-hc keybind XF86Display spawn caffeine.sh        #Toggle caffeine
-hc keybind XF86Tools spawn kb_variant.sh        #Toggles between qwerty and colemak
-#hc keybind Mod4-Shift-n spawn toggledunst     #Toggle notifications
-#hc keybind XF86Tools spawn toggle_redshift.sh #Toggle redshift
 
-# Utilities
-hc keybind Mod4-u spawn unmount.sh                       #Unmount drives
-hc keybind XF86Favorites spawn prtscr                    #Print Screen
-hc keybind Mod4-XF86Favorites spawn prtregion            #Print region
-hc keybind Mod4-x spawn clipmenu -i -p 'Clipboard:' -l 0 #Clipboard manager
-hc keybind Mod4-Shift-c spawn colorpicker.sh             #Colorpicker
-hc keybind Mod4-Shift-z spawn mag.sh                     #Zoom
-hc keybind Mod4-Shift-m spawn emote                      #Kaomoji selector
-hc keybind Mod4-z spawn mwarp.sh                         #Warp mouse
-hc keybind Mod4-n spawn noise                            #Toggle brown noise
-hc keybind Mod4-Shift-w spawn wttr                       #Current Weather Information
 
-# Notification controls
-hc keybind Control-grave spawn notif_hist.sh -q #Query last notification
-hc keybind Control-space spawn notif_hist.sh -c #Close all notification history
-
-# Volume/Brightness keys
-hc keybind XF86MonBrightnessUp spawn bright up     #Increase brightness
-hc keybind XF86MonBrightnessDown spawn bright down #Decrease brightness
-
-hc keybind XF86AudioRaiseVolume spawn vol alsa up           #Increase Volume
-hc keybind XF86AudioLowerVolume spawn vol alsa down         #Decrease volume
-hc keybind XF86AudioMute spawn vol alsa mute                #Mute audio
-hc keybind Mod4-XF86AudioLowerVolume spawn vol alsamic down #Decrease mic volume
-hc keybind XF86AudioMicMute spawn vol alsamic mute          #mute mic
-
-# Player controls
-hc keybind Mod4-Control-Mod1-Left spawn playerctl previous #Previous audio
-hc keybind Mod4-Control-Mod1-Right spawn playerctl next    #Next audio
-hc keybind Mod4-Control-Mod1-Up spawn playerctl play-pause #Toggle play/pause audio
-hc keybind Mod4-Control-Mod1-Down spawn playerctl stop     #Stop audio
-hc keybind Mod4-Control-Mod1-h spawn playerctl previous    #Previous audio
-hc keybind Mod4-Control-Mod1-l spawn playerctl next        #Next audio
-hc keybind Mod4-Control-Mod1-k spawn playerctl play-pause  #Toggle play/pause audio
-hc keybind Mod4-Control-Mod1-j spawn playerctl stop        #Stop audio
 
 # Window/frame controls
 hc keybind Mod4-q close                                                    #Close focused window
