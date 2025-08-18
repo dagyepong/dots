@@ -136,6 +136,8 @@ hc spawn plank
 hc spawn nm-applet &
 hc spawn trayer --edge bottom --align right --height 15
 hc spawn --no-startup-id dunst
+hc spawn xfce4-power-manager &
+
 
 # unlock, just to be sure
 for i in seq $(hc get monitors_locked); do

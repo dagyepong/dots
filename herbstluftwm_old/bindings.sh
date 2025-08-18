@@ -18,7 +18,7 @@ hc keybind Mod4-e spawn launch                                                  
 hc keybind Mod4-Shift-e spawn power                                             #Power menu
 hc keybind Mod4-d spawn hlscrthpd.sh                                            #Dropdown terminal
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
-hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
+hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help          #Keybinding help
 hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
 
 # Window info/wm ctrls
