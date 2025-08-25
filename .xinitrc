@@ -49,5 +49,6 @@ if [ -d /etc/X11/xinit/xinitrc.d ] ; then
 fi
 
 [[ -f ~/.Xresources ]] && xrdb -merge -I$HOME ~/.Xresources
+exec dbus-launch --exit-with-session nemo   
 
 exec herbstluftwm
