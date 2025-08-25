@@ -57,8 +57,10 @@ done
 
 # theme
 hc set hide_covered_windows false
-hc set frame_border_active_color '#af875f'
-hc set frame_border_normal_color '#1c1c1c'
+hc set frame_border_active_color '#807b64'
+hc set frame_border_normal_color '#131313'
+hc set frame_bg_normal_color '#202020'
+hc set frame_bg_active_color '#131313'
 hc set frame_border_inner_color '#424242'
 hc set frame_border_inner_width 5
 hc set frame_border_width 8
@@ -84,18 +86,22 @@ hc attr theme.border_width 0
 hc attr theme.tab_color '#424242'
 #hc attr theme.inner_width 5
 #hc attr theme.outer_width 3
-hc attr theme.color '#1c1c1c'
-hc attr theme.active.color '#1c1c1c'
+hc attr theme.normal.color '#594646'
+hc attr theme.active.color '#9c353e' #6A8C8C
 hc attr theme.normal.outer_color '#1c1c1c'
 hc attr theme.active.outer_color '#af875f'
-hc attr theme.inner_color '#424242'
+hc attr theme.urgent.color '#58333e'
+hc attr theme.inner_color '#111'
 hc attr theme.floating.border_width 8
 hc attr theme.floating.inner_width 5
 hc attr theme.floating.outer_width 3
 hc attr theme.floating.inner_color '#3a3a3a'
+hc attr theme.active.inner_color '#111'
+hc attr theme.active.outer_color '#131313'
 hc attr theme.floating.active.outer_color '#af875f'
-hc attr theme.floating.normal.outer_color '#1c1c1c'
-hc attr theme.urgent.outer_color '#af5f5f'
+#hc attr theme.floating.normal.outer_color '#1c1c1c'
+hc attr theme.background_color '#1e1b1c'
+#hc attr theme.urgent.outer_color '#af5f5f'
 
 #To hide frame at startup
 hc set frame_active_opacity 0
