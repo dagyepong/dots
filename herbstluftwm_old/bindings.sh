@@ -13,16 +13,16 @@ hc keyunbind --all
 # Basics
 hc keybind Mod4-Return or ',' and '.' compare tags.focus.frame_count = 1 '.' compare tags.focus.curframe_wcount = 0 '.' spawn alacritty ',' and '_' compare tags.focus.curframe_wcount = 0 '_' spawn alacritty ',' chain '-' split auto '-' cycle_frame '-' spawn alacritty #bsp-like spawning of terminal
 
-hc keybind Mod4-Shift-Return spawn urxvt                                    #Spawn terminal
+hc keybind Mod4-Shift-Return spawn alacritty                                    #Spawn terminal
 hc keybind Mod4-e spawn launch                                                  #Launcher
 hc keybind Mod4-Shift-e spawn power                                             #Power menu
 hc keybind Mod4-d spawn hlscrthpd.sh                                            #Dropdown terminal
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
-hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help          #Keybinding help
+hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
 hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
 
 # Window info/wm ctrls
-hc keybind Mod4-w spawn rofi -show                            #Switch windows
+hc keybind Mod4-w spawn rofi -show window                               #Switch windows
 hc keybind Mod4-Control-w spawn ~/.config/herbstluftwm/toggle_titles.sh #Toggle window titles
 hc keybind Mod4-Shift-r reload                                          #Reload hlwm
 
