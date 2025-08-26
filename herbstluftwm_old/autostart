@@ -110,6 +110,17 @@ hc set swap_monitors_to_get_tag 0
 hc set raise_on_focus 1
 #hc pad 0 0 0 0 0
 
+# programs
+hc spawn nitrogen --restore &
+hc spawn sh $HOME/.config/polybar/launch.sh
+hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+hc spawn plank
+hc spawn nm-applet &
+hc spawn trayer --edge bottom --align right --height 15
+hc spawn --no-startup-id dunst
+hc spawn xfce4-power-manager &
+
+
 # rules
 hc unrule -F
 hc rule focus=on # normally focus new clients
