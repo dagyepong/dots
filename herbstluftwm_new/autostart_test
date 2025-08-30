@@ -58,8 +58,8 @@ done
 # theme
 hc set hide_covered_windows false
 hc set frame_border_active_color '#60928f' #6A8C8C
-hc set frame_border_normal_color #121212'
-hc set frame_border_inner_color '#2c2c2c'
+hc set frame_border_normal_color '#515978'
+hc set frame_border_inner_color '#515978''
 hc set frame_border_inner_width 5
 hc set frame_border_width 8
 hc set always_show_frame 0
@@ -89,7 +89,7 @@ hc attr theme.outer_width 3
 
 
 hc attr theme.inner_color #424242'
-hc attr theme.floating.outer_color black
+hc attr theme.floating.outer_color magenta
 hc attr theme.active.inner_color '#424242'
 hc attr theme.active.outer_color '#070606'
 hc attr theme.background_color '#1e1b1c'
