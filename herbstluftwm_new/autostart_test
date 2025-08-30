@@ -173,7 +173,7 @@ hc attr theme.active.tab_color '#af875f'    # Active tab color
 
 #hc attr theme.inner_width 5
 #hc attr theme.outer_width 3
-
+hc set hide_covered_windows false
 hc attr theme.tiling.reset 1
 hc attr theme.floating.reset 1
 hc set frame_border_active_color '#807b64'
