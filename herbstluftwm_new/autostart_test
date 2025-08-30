@@ -81,9 +81,9 @@ hc attr theme.title_font 'monospace'
 hc attr theme.title_height 25
 hc attr theme.title_depth 18
 hc attr theme.border_width 0
-#hc attr theme.tab_color '#424242'
-#hc attr theme.inner_width 5
-#hc attr theme.outer_width 3
+hc attr theme.tab_color '#424242'
+hc attr theme.inner_width 5
+hc attr theme.outer_width 3
 
 
 
