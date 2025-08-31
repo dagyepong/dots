@@ -123,7 +123,6 @@ hc spawn sh $HOME/.config/polybar/launch.sh
 hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
 hc spawn plank
 hc spawn nm-applet &
-hc spawn trayer --edge bottom --align right --height 15
 hc spawn --no-startup-id dunst
 hc spawn xfce4-power-manager &
 
