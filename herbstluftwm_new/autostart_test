@@ -90,8 +90,8 @@ hc attr theme.outer_width 3
 
 
 hc attr theme.active.color '#60928f'
-hc attr theme.normal.color '#594646'
-hc attr theme.urgent.color '#58333e'
+hc attr theme.normal.color '#ED9C8C'
+hc attr theme.urgent.color '#ED9C8C'
 hc attr theme.inner_width 4
 #hc attr theme.inner_color '#111'
 hc attr theme.border_width 6
