@@ -57,16 +57,17 @@ done
 
 # theme
 hc set hide_covered_windows false
-hc set frame_border_active_color '#af875f'
-hc set frame_border_normal_color '#1c1c1c'
-hc set frame_border_inner_color '#424242'
-hc set frame_border_inner_width 5
-hc set frame_border_width 8
+hc attr theme.tiling.reset 1
+hc attr theme.floating.reset 1
+hc set frame_border_active_color '#807b64'
+hc set frame_border_normal_color '#131313'
+hc set frame_bg_normal_color '#202020'
+hc set frame_bg_active_color '#131313'
+hc set frame_border_width 0
 hc set always_show_frame 0
 hc set frame_bg_transparent 1
 hc set frame_transparent_width 0
 hc set frame_gap 12
-hc set frame_padding 0
 hc set focus_follows_mouse 1
 hc set snap_gap 12
 
@@ -78,24 +79,30 @@ hc attr theme.title_when 'multiple_tabs'
 hc attr theme.title_align 'center'
 hc attr theme.title_color '#dfdfaf'
 hc attr theme.title_font 'monospace'
-hc attr theme.title_height 25
+hc attr theme.title_height 16
 hc attr theme.title_depth 18
 hc attr theme.border_width 0
 hc attr theme.tab_color '#424242'
-#hc attr theme.inner_width 5
-#hc attr theme.outer_width 3
-hc attr theme.color '#1c1c1c'
-hc attr theme.active.color '#1c1c1c'
-hc attr theme.normal.outer_color '#1c1c1c'
-hc attr theme.active.outer_color '#af875f'
-hc attr theme.inner_color '#424242'
-hc attr theme.floating.border_width 8
-hc attr theme.floating.inner_width 5
-hc attr theme.floating.outer_width 3
-hc attr theme.floating.inner_color '#3a3a3a'
-hc attr theme.floating.active.outer_color '#af875f'
-hc attr theme.floating.normal.outer_color '#1c1c1c'
-hc attr theme.urgent.outer_color '#af5f5f'
+hc attr theme.inner_width 5
+hc attr theme.outer_width 3
+
+
+
+
+hc attr theme.active.color '#60928f'
+hc attr theme.normal.color '#ED9C8C'
+hc attr theme.urgent.color '#ED9C8C'
+hc attr theme.inner_width 4
+#hc attr theme.inner_color '#111'
+hc attr theme.border_width 6
+hc attr theme.floating.border_width 3
+hc attr theme.floating.outer_width 1
+hc attr theme.floating.outer_color blue
+#hc attr theme.active.inner_color '#111'
+#hc attr theme.active.outer_color '#131313'
+#hc attr theme.background_color '#1e1b1c'
+hc attr theme.padding_left 9
+
 
 #To hide frame at startup
 hc set frame_active_opacity 0
@@ -116,7 +123,6 @@ hc spawn sh $HOME/.config/polybar/launch.sh
 hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
 hc spawn plank
 hc spawn nm-applet &
-hc spawn trayer --edge bottom --align right --height 15
 hc spawn --no-startup-id dunst
 hc spawn xfce4-power-manager &
 
