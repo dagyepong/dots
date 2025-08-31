@@ -93,7 +93,7 @@ hc attr theme.active.color '#60928f'
 hc attr theme.normal.color '#594646'
 hc attr theme.urgent.color '#58333e'
 hc attr theme.inner_width 4
-hc attr theme.inner_color '#111'
+#hc attr theme.inner_color '#111'
 hc attr theme.border_width 6
 hc attr theme.floating.border_width 3
 hc attr theme.floating.outer_width 1
