@@ -97,10 +97,10 @@ hc attr theme.inner_color '#111'
 hc attr theme.border_width 6
 hc attr theme.floating.border_width 3
 hc attr theme.floating.outer_width 1
-hc attr theme.floating.outer_color black
-hc attr theme.active.inner_color '#111'
-hc attr theme.active.outer_color '#131313'
-hc attr theme.background_color '#1e1b1c'
+hc attr theme.floating.outer_color blue
+#hc attr theme.active.inner_color '#111'
+#hc attr theme.active.outer_color '#131313'
+#hc attr theme.background_color '#1e1b1c'
 hc attr theme.padding_left 9
 
 
