@@ -79,7 +79,7 @@ hc attr theme.title_when 'multiple_tabs'
 hc attr theme.title_align 'center'
 hc attr theme.title_color '#dfdfaf'
 hc attr theme.title_font 'monospace'
-hc attr theme.title_height 25
+hc attr theme.title_height 16
 hc attr theme.title_depth 18
 hc attr theme.border_width 0
 hc attr theme.tab_color '#424242'
