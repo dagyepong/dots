@@ -51,4 +51,6 @@ fi
 [[ -f ~/.Xresources ]] && xrdb -merge -I$HOME ~/.Xresources
 
 
+#exec dbus-run-session -- herbstluftwm ##for gentoo dbus issue
+
 exec herbstluftwm
