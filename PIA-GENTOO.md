@@ -1,29 +1,15 @@
-### **Private Internet Access-Gentoo-INstall**
+#### **Private Internet Access-Gentoo-INstall**
 
 My OpenRC init script is below – this just goes in /etc/init.d/pia. I’m not expert on OpenRC, so it’s possible I’ve got something wrong; but this configuration seems to work for me.
 
-```py
+### **Create the OpenRC Init Script:**
 
-cd /etc/init.d/
-
-sudo nano pia-daemon
-
-sudo groupadd --system pia
-sudo useradd --system --gid pia --home-dir /opt/piavpn --no-create-home pia
-
-
-
-chown -R pia:pia /opt/piavpn
-
-
-rc-update add net.lo boot
-
-
-rc-service pia-daemon start   
-
+```bash
+sudo nano /etc/init.d/pia-daemon   
 ```
 
-### **Paste this script**
+
+### **Paste the following content:**
 
 ```bash
 
@@ -39,8 +25,6 @@ directory="/opt/piavpn"
 user="pia"
 group="pia"
 
-# Do not 'need net' — it does not exist as a service
-# Instead, want net (soft dependency) and depend on local filesystems
 want net
 depend() {
     after firewall
@@ -52,7 +36,6 @@ depend() {
 }
 
 start_pre() {
-    # Ensure runtime directory exists
     if [ ! -d "/run/pia-daemon" ]; then
         mkdir -p /run/pia-daemon
         chown pia:pia /run/pia-daemon
@@ -61,11 +44,35 @@ start_pre() {
 }   
 ```
 
-
-sudo chmod +x pia-daemon
-
-### **To make the daemon start at boot:**
+### **Make it executable:**
 
 ```bash
- sudo rc-update add pia default
- ```
+sudo chmod +x /etc/init.d/pia-daemon   
+```
+
+### **Ensure Required Dependencies Are Installed
+PIA requires libgssapi_krb5.so.2. Install MIT Kerberos:**
+
+```bash
+sudo emerge --ask app-crypt/mit-krb5   
+```
+
+#### **5. Enable the Service at Boot**
+
+```bash
+sudo rc-update add pia-daemon default   
+```
+#### **6. Start the Daemon:**
+
+```bash
+sudo rc-service pia-daemon start   
+```
+
+```bash
+sudo rc-service pia-daemon status   
+```
+
+
+
+
+
