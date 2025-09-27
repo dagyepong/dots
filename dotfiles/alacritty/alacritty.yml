@@ -1,0 +1,97 @@
+# items:
+#  - colors:
+#      name: Atelierlakeside (dark)
+#      author: Chris Kempson
+#      primary:
+#        background: "#161b1d"
+#        foreground: "#7ea2b4"
+#      cursor:
+#        text: "#161b1d"
+#        cursor: "#7ea2b4"
+#      normal:
+#        black: "#161b1d"
+#        red: "#d22d72"
+#        green: "#568c3b"
+#        yellow: "#8a8a0f"
+#        blue: "#257fad"
+#        magenta: "#5d5db1"
+#        cyan: "#2d8f6f"
+#        white: "#7ea2b4"
+#      bright:
+#        black: "#5a7b8c"
+#        red: "#d22d72"
+#        green: "#568c3b"
+#        yellow: "#8a8a0f"
+#        blue: "#257fad"
+#        magenta: "#5d5db1"
+#        cyan: "#2d8f6f"
+#        white: "#ebf8ff"
+
+selection:
+  save_to_clipboard: true
+
+live_config_reload: true
+
+window:
+  padding:
+    x: 10
+    y: 18
+  opacity: 0.60
+  class:
+    instance: Alacritty
+    general: Alacritty
+  dynamic_title: true
+
+cursor:
+  style:
+    shape: Block
+    blinking: On
+    blink_interval: 0.03
+
+scrolling:
+  history: 100000
+  multiplier: 4
+
+font:
+  normal:
+    family: Iosevka Term
+    style: Regular
+  bold:
+    family: Iosevka Term
+    style: Bold
+  italic:
+    family: Iosevka Term
+    style: Italic
+  bold_italic:
+    family: Iosevka Term
+    style: Bold Italic
+  size: 11
+
+theme: Bespin.dark
+colors:
+  name: Bespin (dark)
+  author: Chris Kempson
+  primary:
+    background: "#28211c"
+    foreground: "#8a8986"
+  cursor:
+    text: "#28211c"
+    cursor: "#8a8986"
+  normal:
+    black: "#28211c"
+    red: "#cf6a4c"
+    green: "#54be0d"
+    yellow: "#f9ee98"
+    blue: "#5ea6ea"
+    magenta: "#9b859d"
+    cyan: "#afc4db"
+    white: "#8a8986"
+  bright:
+    black: "#666666"
+    red: "#cf6a4c"
+    green: "#54be0d"
+    yellow: "#f9ee98"
+    blue: "#5ea6ea"
+    magenta: "#9b859d"
+    cyan: "#afc4db"
+    white: "#baae9e"

@@ -1,0 +1,80 @@
+
+[terminal.shell]
+program = "/bin/fish"
+
+[colors.bright]
+black = "#656565"
+blue = "#647396"
+cyan = "#505b6c"
+green = "#8ccd6c"
+magenta = "#cdb4c9"
+red = "#e85555"
+white = "#c0c0c0"
+yellow = "#c5d67d"
+
+[colors.cursor]
+cursor = "#ffffff"
+text = "#000000"
+
+[colors.normal]
+black = "#565656"
+blue = "#677088"
+cyan = "#445362"
+green = "#88ab77"
+magenta = "#cdcdb4"
+red = "#ac4f4f"
+white = "#ffffff"
+yellow = "#d0d9ad"
+
+[colors.primary]
+background = "#000000"
+foreground = "#ffffff"
+
+[cursor]
+style = { shape = "Block", blinking = "Always" }
+blink_interval = 500
+    
+unfocused_hollow = true
+
+[font]
+size = 9
+
+[font.bold]
+family = "RobotoMono Nerd Font Md"
+style = "Bold"
+
+[font.bold_italic]
+family = "RobotoMono Nerd Font Md"
+style = "Bold Italic"
+
+[font.italic]
+family = "RobotoMono Nerd Font Md"
+style = "Italic"
+
+[font.normal]
+family = "RobotoMono Nerd Font Md"
+style = "Regular"
+
+[scrolling]
+history = 100000
+multiplier = 4
+
+[selection]
+save_to_clipboard = true
+
+[window]
+dynamic_title = true
+opacity = 0.8
+
+[window.class]
+general = "Alacritty"
+instance = "Alacritty"
+
+[window.padding]
+x = 15
+y = 10
+
+[general]
+live_config_reload = true
+
+[terminal]
