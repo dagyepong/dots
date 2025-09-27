@@ -10,6 +10,8 @@ alias v='vim'
 alias ls='ls --file-type --color=auto'
 alias la='ls -A'
 alias ll='ls -l'
+alias cat="bat -p"
+alias pfetch="curl -s https://raw.githubusercontent.com/dylanaraps/pfetch/master/pfetch | sh"
 
 alias rm='rm -fr'
 
