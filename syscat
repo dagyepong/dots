@@ -162,7 +162,7 @@ printf "   $PUR%-4s $WHT%-5s %-25s \n" " ram" "$ram%" $(draw $ram 15 35)
 
 # temperature
 #temp=$(sensors | awk '/Core 0/ {gsub(/\+/,"",$3); gsub(/\..+/,"",$3)    ; print $3}')
-temp=$(cat /proc/acpi/ibm/thermal | awk '{print $2}')
+#temp=$(cat /proc/acpi/ibm/thermal | awk '{print $2}')
 printf "%b" "$RST$PADC"
 printf "   $PUR%-4s $WHT%-5s %-25s \n\n" " tmp" "$temp°c " $(draw $temp 15 35)
 
