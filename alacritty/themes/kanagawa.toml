@@ -1,32 +1,33 @@
-    colors:
-      # Default colors
-      primary:
-        background: '0x1F1F28' # SumiInk0
-        foreground: '0xDCD7BA' # OldWhite
+[colors]
+# The `draw_bold_text_with_bright_colors` option determines whether bold text uses
+# the "bright" color variants.
+draw_bold_text_with_bright_colors = true
 
-      # Cursor colors
-      cursor:
-        text: '0x1F1F28' # SumiInk0
-        cursor: '0xC8C093' # FaintGrey
 
-      # Normal colors
-      normal:
-        black:   '0x0C0C0C' # SumiInk0
-        red:     '0xEE6464' # AutumnRed
-        green:   '0x87C095' # SpringGreen
-        yellow:  '0xE6C384' # AutumnYellow
-        blue:    '0x7AA89F' # WaveBlue
-        magenta: '0x995F9C' # SakuraPink
-        cyan:    '0x7FC0BA' # WinterBlue
-        white:   '0xC8C093' # FaintGrey
+[colors.primary]
+background = '#1F1F28' # SumiInk0
+foreground = '#DCD7BA' # OldWhite
 
-      # Bright colors
-      bright:
-        black:   '0x54546D' # SumiInk1
-        red:     '0xEE6464' # AutumnRed (same as normal)
-        green:   '0x87C095' # SpringGreen (same as normal)
-        yellow:  '0xE6C384' # AutumnYellow (same as normal)
-        blue:    '0x7AA89F' # WaveBlue (same as normal)
-        magenta: '0x995F9C' # SakuraPink (same as normal)
-        cyan:    '0x7FC0BA' # WinterBlue (same as normal)
-        white:   '0xDCD7BA' # OldWhite (same as primary foreground)
+[colors.cursor]
+text = '#1F1F28'   # SumiInk0
+cursor = '#C8C093' # FaintGrey
+
+[colors.normal]
+black =   '#0C0C0C' # SumiInk0
+red =     '#EE6464' # AutumnRed
+green =   '#87C095' # SpringGreen
+yellow =  '#E6C384' # AutumnYellow
+blue =    '#7AA89F' # WaveBlue
+magenta = '#995F9C' # SakuraPink
+cyan =    '#7FC0BA' # WinterBlue
+white =   '#C8C093' # FaintGrey
+
+[colors.bright]
+black =   '#54546D' # SumiInk1
+red =     '#EE6464' # AutumnRed
+green =   '#87C095' # SpringGreen
+yellow =  '#E6C384' # AutumnYellow
+blue =    '#7AA89F' # WaveBlue
+magenta = '#995F9C' # SakuraPink
+cyan =    '#7FC0BA' # WinterBlue
+white =   '#DCD7BA' # OldWhite
