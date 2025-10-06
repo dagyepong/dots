@@ -1,0 +1,32 @@
+    colors:
+      # Default colors
+      primary:
+        background: '0x1F1F28' # SumiInk0
+        foreground: '0xDCD7BA' # OldWhite
+
+      # Cursor colors
+      cursor:
+        text: '0x1F1F28' # SumiInk0
+        cursor: '0xC8C093' # FaintGrey
+
+      # Normal colors
+      normal:
+        black:   '0x0C0C0C' # SumiInk0
+        red:     '0xEE6464' # AutumnRed
+        green:   '0x87C095' # SpringGreen
+        yellow:  '0xE6C384' # AutumnYellow
+        blue:    '0x7AA89F' # WaveBlue
+        magenta: '0x995F9C' # SakuraPink
+        cyan:    '0x7FC0BA' # WinterBlue
+        white:   '0xC8C093' # FaintGrey
+
+      # Bright colors
+      bright:
+        black:   '0x54546D' # SumiInk1
+        red:     '0xEE6464' # AutumnRed (same as normal)
+        green:   '0x87C095' # SpringGreen (same as normal)
+        yellow:  '0xE6C384' # AutumnYellow (same as normal)
+        blue:    '0x7AA89F' # WaveBlue (same as normal)
+        magenta: '0x995F9C' # SakuraPink (same as normal)
+        cyan:    '0x7FC0BA' # WinterBlue (same as normal)
+        white:   '0xDCD7BA' # OldWhite (same as primary foreground)
