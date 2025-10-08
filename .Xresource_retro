@@ -1,47 +1,44 @@
-
 *.font: xft:trigon:style=Regular:size=12
 
 
 
+! Synthwave Retro Colorscheme for URxvt
+URxvt*foreground: #fcfc3d
+URxvt*background: #19013c
+URxvt*cursorColor: #ea00d9
 
-! Cyberpunk Neon Colorscheme for URxvt
-! Define foreground, background, and cursor colors
-URxvt*foreground: #00ffff
-URxvt*background: #11001c
-URxvt*cursorColor: #ff00ff
-
-! Define the 16 base colors
-! Black (standard and bright)
+! Black
 URxvt*color0: #000000
-URxvt*color8: #1f1f1f
+URxvt*color8: #2a0066
 
-! Red (standard and bright)
-URxvt*color1: #ff005c
-URxvt*color9: #ff4a9e
+! Red
+URxvt*color1: #c4314c
+URxvt*color9: #ea456c
 
-! Green (standard and bright)
-URxvt*color2: #00e8c0
-URxvt*color10: #42ffd1
+! Green
+URxvt*color2: #65de88
+URxvt*color10: #a7f6b2
 
-! Yellow (standard and bright)
-URxvt*color3: #fff122
-URxvt*color11: #fff892
+! Yellow
+URxvt*color3: #fcfc3d
+URxvt*color11: #fffc6d
 
-! Blue (standard and bright)
-URxvt*color4: #0000ff
-URxvt*color12: #00ffff
+! Blue
+URxvt*color4: #333399
+URxvt*color12: #4a4af2
 
-! Magenta (standard and bright)
-URxvt*color5: #ff00ff
-URxvt*color13: #ff60ff
+! Magenta
+URxvt*color5: #ea00d9
+URxvt*color13: #ff46ee
 
-! Cyan (standard and bright)
-URxvt*color6: #00ffff
-URxvt*color14: #60ffff
+! Cyan
+URxvt*color6: #00a5d4
+URxvt*color14: #23e2fe
 
-! White (standard and bright)
-URxvt*color7: #c3c3c3
+! White
+URxvt*color7: #999999
 URxvt*color15: #ffffff
+
 
 
 Xft.dpi: 96
