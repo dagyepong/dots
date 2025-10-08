@@ -10,39 +10,44 @@
 ! Last Modified: 6 Sep 2014
 ! -----------------------------------------------------------------------------
 
-! hard contrast: *background: #1d2021
-*background: #282828
-! soft contrast: *background: #32302f
-*foreground: #ebdbb2
-*cursorColor: #ebdbb2
-! Black + DarkGrey
-*color0:  #3c3836
-*color8:  #928374
-! DarkRed + Red
-*color1:  #cc241d
-*color9:  #fb4934
-! DarkGreen + Green
-*color2:  #98971a
-*color10: #b8bb26
-! DarkYellow + Yellow
-*color3:  #d79921
-*color11: #fabd2f
-! DarkBlue + Blue
-*color4:  #458588
-*color12: #83a598
-! DarkMagenta + Magenta
-*color5:  #b16286
-*color13: #d3869b
-! DarkCyan + Cyan
-*color6:  #689d6a
-*color14: #8ec07c
-! LightGrey + White
-*color7:  #a89984
-*color15: #ebdbb2
+! Cyberpunk Neon Colorscheme for URxvt
+! Define foreground, background, and cursor colors
+URxvt*foreground: #00ffff
+URxvt*background: #11001c
+URxvt*cursorColor: #ff00ff
 
-! Greys for bar
-*color16: #504945
-*color17: #665c54
+! Define the 16 base colors
+! Black (standard and bright)
+URxvt*color0: #000000
+URxvt*color8: #1f1f1f
+
+! Red (standard and bright)
+URxvt*color1: #ff005c
+URxvt*color9: #ff4a9e
+
+! Green (standard and bright)
+URxvt*color2: #00e8c0
+URxvt*color10: #42ffd1
+
+! Yellow (standard and bright)
+URxvt*color3: #fff122
+URxvt*color11: #fff892
+
+! Blue (standard and bright)
+URxvt*color4: #0000ff
+URxvt*color12: #00ffff
+
+! Magenta (standard and bright)
+URxvt*color5: #ff00ff
+URxvt*color13: #ff60ff
+
+! Cyan (standard and bright)
+URxvt*color6: #00ffff
+URxvt*color14: #60ffff
+
+! White (standard and bright)
+URxvt*color7: #c3c3c3
+URxvt*color15: #ffffff
 
 
 Xft.dpi: 96
