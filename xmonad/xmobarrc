@@ -1,0 +1,19 @@
+-- ~/.xmobarrc
+Config {
+    font = "xft:Terminus:size=12:antialias=true",
+    bgColor = "#0f0f1b",
+    fgColor = "#c0c0d0",
+    position = Top,
+    commands = [
+        Run StdinReader,
+        Run Date "%a %b %_d %H:%M:%S" "date" 10,
+        Run Com "uptime" [] "uptime" 300,
+        Run Weather "EGPF" ["-t","<tempC>C | <station> | <skyCondition>","-L","18","-H","25","-n","#00d0ff","-h","#ff4040","-l","#ffff00"] 36000,
+        Run Memory ["-t","Mem: <usedratio>%","-H","80","-L","30","-h","#ff4040","-l","#00d0ff","-n","#e000ff"] 10,
+        Run Cpu ["-t","Cpu: <total>%","-H","75","-L","20","-h","#ff4040","-l","#00d0ff","-n","#e000ff"] 10,
+        Run Volume "default" "Master" ["-t","Vol: <volume>%"] 1
+    ],
+    sepChar = "%",
+    alignSep = "}{",
+    template = " %StdinReader% }{ %cpu% | %memory% | %vol% | %date% "
+}
