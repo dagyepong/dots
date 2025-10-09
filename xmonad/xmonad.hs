@@ -18,7 +18,7 @@ main = xmonad
      . withEasySB (statusBarProp "xmobar" (pure xmobarPP)) defToggleKey
      $ def
     { modMask            = mod4Mask -- Use the Super key as the main modifier
-    , terminal           = "xterm" -- Change to your preferred terminal
+    , terminal           = "urxvt" -- Change to your preferred terminal
     , normalBorderColor  = bg
     , focusedBorderColor = blue
     , workspaces         = myWorkspaces
