@@ -12,8 +12,6 @@ import colors
 
 from qtile_extras import widget
 from qtile_extras.widget.decorations import PowerLineDecoration
-from qtile_extras.widget import decorations
-from qtile_extras.widget.decorations import RectDecoration
 
 mod = "mod4"
 terminal = "kitty"
@@ -23,7 +21,6 @@ files = "krusader"
 discord = "webcord"
 todoist = "flatpak run com.todoist.Todoist"
 screenie = "flameshot gui"
-emacs = "emacs"
 
 colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.gruvbox()
 
@@ -78,59 +75,6 @@ slash_powerlineLeft = {
     ]
 }
 
-right_hand1 = {
-    "decorations": [
-        RectDecoration(colour=colors[11], radius=[0, 4, 4, 0], filled=True, padding_y=4, padding_x=0)
-    ],
-    "padding": 10,
-}
-
-
-left_hand1 = {
-    "decorations": [
-        RectDecoration(colour=colors[6], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand2 = {
-    "decorations": [
-        RectDecoration(colour=colors[4], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand3 = {
-    "decorations": [
-        RectDecoration(colour=colors[5], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
-left_hand4 = {
-    "decorations": [
-        RectDecoration(colour=colors[7], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
-left_hand5 = {
-    "decorations": [
-        RectDecoration(colour=colors[8], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand6 = {
-    "decorations": [
-        RectDecoration(colour=colors[3], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
 
 keys = [
 
@@ -149,7 +93,6 @@ keys = [
     Key([mod, "mod1"], "s", lazy.spawn(screenie)),
     Key(["mod1"], "s", lazy.spawn(todoist)),
     Key(["mod1"], "n", lazy.spawn(discord)),
-    Key([mod], "m", lazy.spawn(emacs)),
 
 
     # Movement Keys
@@ -239,6 +182,7 @@ keys.extend([
     Key([mod], "n", lazy.group['scratchpad'].dropdown_toggle('term')),
     Key([mod], "c", lazy.group['scratchpad'].dropdown_toggle('ranger')),
     Key([mod], "v", lazy.group['scratchpad'].dropdown_toggle('volume')),
+    Key([mod], "m", lazy.group['scratchpad'].dropdown_toggle('mus')),
     Key([mod], "b", lazy.group['scratchpad'].dropdown_toggle('news')),
     Key([mod, "shift"], "n", lazy.group['scratchpad'].dropdown_toggle('term2')),
 ])
@@ -269,10 +213,11 @@ layouts = [
 
 logo = widget.TextBox(text="  ", font="JetBrainsMono Nerd Font", mouse_callbacks={"Button1": open_rofi}, fontsize=20, background=colors[4], margin=4, padding=3)
 sep = widget.Sep(linewidth = 1, padding = 15, foreground = colors[0], background = colors[0])
-spacer1 = widget.Spacer(length=1, background=colors[4])
+spacer1 = widget.Spacer(length=1, background=colors[4], **arrow_powerlineLeft)
 spacer2 = widget.Spacer(length=1, background=colors[6], **arrow_powerlineLeft)
-spacer3 = widget.Spacer(background=colors[0])
-spacer4 = widget.Spacer(length=4, background=colors[0])
+spacer3 = widget.Spacer(background=colors[6])
+spacer4 = widget.Spacer(length=1, background=colors[6], **arrow_powerlineRight)
+spacer5 = widget.Spacer(length=1, background=colors[0], **arrow_powerlineRight)
 groupbox =  widget.GroupBox(
                 font="JetBrainsMono Nerd Font Mono",
                 fontsize=23,
@@ -293,6 +238,7 @@ groupbox =  widget.GroupBox(
                 other_current_screen_border=colors[3],
                 background=colors[0],
                 foreground=colors[3],
+                **arrow_powerlineLeft,
             )
 weather = widget.OpenWeather(
             app_key = "4cf3731a25d1d1f4e4a00207afd451a2",
@@ -304,23 +250,17 @@ weather = widget.OpenWeather(
             background = colors[0],
             foreground = colors[2],
         )
-cpu = widget.CPU(font="JetBrainsMono Nerd Font", format="{freq_current}GHz {load_percent}%", foreground=colors[2], background=colors[0], **right_hand1)
-cpuicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand1)
+cpu = widget.CPU(padding=5, font="JetBrainsMono Nerd Font", format="  {freq_current}GHz {load_percent}%", foreground=colors[7], background=colors[0], **slash_powerlineRight)
 
-temp = widget.ThermalSensor(font="JetBrainsMono Nerd Font", update_interval=1, format="{temp:.0f}{unit}", tag_sensor="Tctl", foreground=colors[2], background=colors[0], **right_hand1)
-tempicon = widget.TextBox(text = "󰔐", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand2)
+temp = widget.ThermalSensor(padding=5, font="JetBrainsMono Nerd Font", update_interval=1, format="󰔐 {temp:.0f}{unit}", tag_sensor="Tctl", foreground=colors[0], background=colors[4], **slash_powerlineRight)
 
-mem = widget.Memory(font="JetBrainsMono Nerd Font", format=" {MemUsed:.0f}{mm}", background=colors[0], foreground=colors[2], **right_hand1)
-memicon = widget.TextBox(text = "󰈀", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand3)
+mem = widget.Memory(padding=5, font="JetBrainsMono Nerd Font", format="󰈀 {MemUsed:.0f}{mm}", background=colors[3], foreground=colors[0], **slash_powerlineRight)
 
-clockicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand4)
-clock = widget.Clock(font="JetBrainsMono Nerd Font", format=" %a %d %b %I:%M:%S", foreground=colors[2], background=colors[0], **right_hand1)
+clock = widget.Clock(padding=5, font="JetBrainsMono Nerd Font", format="  %a %d %b %I:%M:%S", foreground=colors[6], background=colors[0], **slash_powerlineRight)
 
-volicon = widget.TextBox(text = "󰕾", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand5)
-vol = widget.Volume(fmt="{}", font="JetBrainsMono Nerd Font", foreground=colors[2], background=colors[0], **right_hand1)
+vol = widget.Volume(fmt="󰕾 {}", font="JetBrainsMono Nerd Font", foreground=colors[0], background=colors[6], padding=10, **slash_powerlineRight)
     
-curlayout= widget.CurrentLayoutIcon(scale=0.5, background = colors[0], **left_hand6)
-layoutname = widget.CurrentLayout(font = "JetBrainsMono Nerd Font", foreground=colors[2], background=colors[0], **right_hand1)
+curlayout= widget.CurrentLayoutIcon(padding=5, scale=0.5)
 
 tray = widget.Systray(background = colors[0])
 
@@ -330,27 +270,16 @@ screens = [
             logo,
             spacer1,
             groupbox,
+            spacer2,
             spacer3,
-            curlayout,
-            layoutname,
             spacer4,
-            cpuicon,
+            spacer5,
             cpu,
-            spacer4,
-            tempicon,
             temp,
-            spacer4,
-            memicon,
             mem,
-            spacer4,
-            clockicon,
             clock,
-            spacer4,
-            volicon,
             vol,
-            spacer4,
-            tray,
-            spacer4,
+            curlayout,
             ],
             margin=6,
             size=30),
@@ -360,19 +289,16 @@ screens = [
             logo,
             spacer1,
             groupbox,
+            spacer2,
             spacer3,
-            curlayout,
-            layoutname,
-            cpuicon,
+            spacer4,
+            spacer5,
             cpu,
-            tempicon,
             temp,
-            memicon,
             mem,
-            clockicon,
             clock,
-            volicon,
             vol,
+            curlayout,
             ],
             size=30,
             margin=6),
@@ -383,19 +309,16 @@ screens = [
             logo,
             spacer1,
             groupbox,
+            spacer2,
             spacer3,
-            curlayout,
-            layoutname,
-            cpuicon,
+            spacer4,
+            spacer5,
             cpu,
-            tempicon,
             temp,
-            memicon,
             mem,
-            clockicon,
             clock,
-            volicon,
             vol,
+            curlayout,
             ],
             size=30,
             margin=6),
@@ -405,19 +328,16 @@ screens = [
             logo,
             spacer1,
             groupbox,
+            spacer2,
             spacer3,
-            curlayout,
-            layoutname,
-            cpuicon,
+            spacer4,
+            spacer5,
             cpu,
-            tempicon,
             temp,
-            memicon,
             mem,
-            clockicon,
             clock,
-            volicon,
             vol,
+            curlayout,
             ],
             size=30,
             margin=6),
@@ -433,7 +353,7 @@ mouse = [
 
 dgroups_key_binder = None
 dgroups_app_rules = []  # type: list
-follow_mouse_focus = True
+#follow_mouse_focus = True
 bring_front_click = False
 floats_kept_above = True
 cursor_warp = True

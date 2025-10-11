@@ -10,11 +10,6 @@ from settings.path import qtile_path
 from extra import multiColorTag
 import colors
 
-from qtile_extras import widget
-from qtile_extras.widget.decorations import PowerLineDecoration
-from qtile_extras.widget import decorations
-from qtile_extras.widget.decorations import RectDecoration
-
 mod = "mod4"
 terminal = "kitty"
 mymenu = "rofi -show drun"
@@ -23,114 +18,8 @@ files = "krusader"
 discord = "webcord"
 todoist = "flatpak run com.todoist.Todoist"
 screenie = "flameshot gui"
-emacs = "emacs"
 
-colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.gruvbox()
-
-########## Powerline from extras ########
-
-arrow_powerlineRight = {
-    "decorations": [
-        PowerLineDecoration(
-            path="arrow_right",
-            size=11,
-        )
-    ]
-}
-arrow_powerlineLeft = {
-    "decorations": [
-        PowerLineDecoration(
-            path="arrow_left",
-            size=11,
-        )
-    ]
-}
-rounded_powerlineRight = {
-    "decorations": [
-        PowerLineDecoration(
-            path="rounded_right",
-            size=11,
-        )
-    ]
-}
-rounded_powerlineLeft = {
-    "decorations": [
-        PowerLineDecoration(
-            path="rouded_left",
-            size=11,
-        )
-    ]
-}
-slash_powerlineRight = {
-    "decorations": [
-        PowerLineDecoration(
-            path="forward_slash",
-            size=11,
-        )
-    ]
-}
-slash_powerlineLeft = {
-    "decorations": [
-        PowerLineDecoration(
-            path="back_slash",
-            size=11,
-        )
-    ]
-}
-
-right_hand1 = {
-    "decorations": [
-        RectDecoration(colour=colors[11], radius=[0, 4, 4, 0], filled=True, padding_y=4, padding_x=0)
-    ],
-    "padding": 10,
-}
-
-
-left_hand1 = {
-    "decorations": [
-        RectDecoration(colour=colors[6], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand2 = {
-    "decorations": [
-        RectDecoration(colour=colors[4], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand3 = {
-    "decorations": [
-        RectDecoration(colour=colors[5], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
-left_hand4 = {
-    "decorations": [
-        RectDecoration(colour=colors[7], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
-left_hand5 = {
-    "decorations": [
-        RectDecoration(colour=colors[8], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-left_hand6 = {
-    "decorations": [
-        RectDecoration(colour=colors[3], radius=[4, 0, 0, 4], filled=True, padding_y=4, group=True)
-    ],
-    "padding": 10,
-}
-
-
+colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.whitey()
 
 keys = [
 
@@ -149,7 +38,6 @@ keys = [
     Key([mod, "mod1"], "s", lazy.spawn(screenie)),
     Key(["mod1"], "s", lazy.spawn(todoist)),
     Key(["mod1"], "n", lazy.spawn(discord)),
-    Key([mod], "m", lazy.spawn(emacs)),
 
 
     # Movement Keys
@@ -186,8 +74,8 @@ groups = []
 
 group_names = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "minus", "equal", "F1", "F2", "F3", "F4", "F5"]
 
-group_labels = ["󰖟", "", "", "", "", "", "", "", "ﭮ", "", "", "﨣", "F1", "F2", "F3", "F4", "F5"]
-#group_labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+#group_labels = ["󰖟", "", "", "", "", "", "", "", "ﭮ", "", "", "﨣", "F1", "F2", "F3", "F4", "F5"]
+group_labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"]
 
 group_layouts = ["monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall", "monadtall"]
 
@@ -239,13 +127,10 @@ keys.extend([
     Key([mod], "n", lazy.group['scratchpad'].dropdown_toggle('term')),
     Key([mod], "c", lazy.group['scratchpad'].dropdown_toggle('ranger')),
     Key([mod], "v", lazy.group['scratchpad'].dropdown_toggle('volume')),
+    Key([mod], "m", lazy.group['scratchpad'].dropdown_toggle('mus')),
     Key([mod], "b", lazy.group['scratchpad'].dropdown_toggle('news')),
     Key([mod, "shift"], "n", lazy.group['scratchpad'].dropdown_toggle('term2')),
 ])
-
-
-def open_rofi():
-    qtile.cmd_spawn("rofi -show drun -show-icons")
 
 
 # Define layouts and layout themes
@@ -267,32 +152,34 @@ layouts = [
     layout.Max(**layout_theme)
 ]
 
-logo = widget.TextBox(text="  ", font="JetBrainsMono Nerd Font", mouse_callbacks={"Button1": open_rofi}, fontsize=20, background=colors[4], margin=4, padding=3)
-sep = widget.Sep(linewidth = 1, padding = 15, foreground = colors[0], background = colors[0])
-spacer1 = widget.Spacer(length=1, background=colors[4])
-spacer2 = widget.Spacer(length=1, background=colors[6], **arrow_powerlineLeft)
-spacer3 = widget.Spacer(background=colors[0])
-spacer4 = widget.Spacer(length=4, background=colors[0])
-groupbox =  widget.GroupBox(
-                font="JetBrainsMono Nerd Font Mono",
-                fontsize=23,
-                padding_x=5,
-                padding_y=5,
-                rounded=False,
-                center_aligned=True,
-                disable_drag=True,
-                borderwidth=3,
-                highlight_method="line",
-                hide_unused = True,
-                active=colors[6],
-                inactive=colors[1],
-                highlight_color=colors[0],
-                this_current_screen_border=colors[3],
-                this_screen_border=colors[7],
-                other_screen_border=colors[4],
-                other_current_screen_border=colors[3],
-                background=colors[0],
-                foreground=colors[3],
+sep = widget.Sep(linewidth = 1, paddog = 15, foreground = colors[0], background = colors[0])
+spacer = widget.Spacer(background=colors[0])
+groupbox = widget.GroupBox(
+                    font = "JetBrainsMono Nerd Font Mono",
+                    fontsize = 15,
+                    margin_y = 4,
+                    margin_x = 4,
+                    padding_y = 6,
+                    padding_x = 6,
+                    borderwidth = 2,
+                    disable_drag = True,
+                    active = colors[7],
+                    inactive = colors[0], #unfocused
+                    hide_unused = True,
+                    rounded = True,
+                    highlight_method = "block",
+                    highlight_color = colors[0],  #box color
+                    this_current_screen_border = colors[11],
+                    this_screen_border = colors[10],
+                    other_current_screen_border = colors[8],
+                    block_highlight_text_color = colors[0],
+                    other_screen_border = colors[6],
+                    urgent_alert_method = "line",
+                    urgent_border = colors[6],
+                    urgent_text = colors[1],
+                    foreground = colors[0],
+                    background = colors[0],
+                    use_mouse_wheel = False
             )
 weather = widget.OpenWeather(
             app_key = "4cf3731a25d1d1f4e4a00207afd451a2",
@@ -304,123 +191,105 @@ weather = widget.OpenWeather(
             background = colors[0],
             foreground = colors[2],
         )
-cpu = widget.CPU(font="JetBrainsMono Nerd Font", format="{freq_current}GHz {load_percent}%", foreground=colors[2], background=colors[0], **right_hand1)
-cpuicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand1)
-
-temp = widget.ThermalSensor(font="JetBrainsMono Nerd Font", update_interval=1, format="{temp:.0f}{unit}", tag_sensor="Tctl", foreground=colors[2], background=colors[0], **right_hand1)
-tempicon = widget.TextBox(text = "󰔐", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand2)
-
-mem = widget.Memory(font="JetBrainsMono Nerd Font", format=" {MemUsed:.0f}{mm}", background=colors[0], foreground=colors[2], **right_hand1)
-memicon = widget.TextBox(text = "󰈀", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand3)
-
-clockicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand4)
-clock = widget.Clock(font="JetBrainsMono Nerd Font", format=" %a %d %b %I:%M:%S", foreground=colors[2], background=colors[0], **right_hand1)
-
-volicon = widget.TextBox(text = "󰕾", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[0], **left_hand5)
-vol = widget.Volume(fmt="{}", font="JetBrainsMono Nerd Font", foreground=colors[2], background=colors[0], **right_hand1)
-    
-curlayout= widget.CurrentLayoutIcon(scale=0.5, background = colors[0], **left_hand6)
-layoutname = widget.CurrentLayout(font = "JetBrainsMono Nerd Font", foreground=colors[2], background=colors[0], **right_hand1)
-
+volicon = widget.TextBox(text = "󰕾", fontsize = 25, font = "JetBrainsMono Nerd Font Mono", foreground = colors[2], background = colors[0])
+volume = widget.Volume(foreground=colors[2], padding=10, background = colors[0])
+cpuicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono",  background = colors[0], foreground = colors[3])
+cpu = widget.CPU(font = "JetBrainsMono Nerd Font Mono", update_interval = 1.0, format = '{load_percent}%', foreground = colors[2], background = colors[0], padding = 5)
+memicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[6])
+mem = widget.Memory(font = "JetBrainsMono Nerd Font Mono", foreground = colors[2], background = colors[0], format = '{MemUsed: .0f}{mm} /{MemTotal: .0f}{mm}', measure_mem='G', padding = 5,)
+clockicon = widget.TextBox(text = "", fontsize = 20, font = "JetBrainsMono Nerd Font Mono", background = colors[0], foreground = colors[6])
+clock = widget.Clock(format='%I:%M %p', font = "JetBrainsMono Nerd Font Mono", padding = 10, background = colors[0], foreground = colors[2])
+curlayout = widget.CurrentLayoutIcon(scale = 0.5, foreground = colors[0], background = colors[4], padding = 10,)
 tray = widget.Systray(background = colors[0])
 
 screens = [
     Screen(
         top=bar.Bar([
-            logo,
-            spacer1,
             groupbox,
-            spacer3,
-            curlayout,
-            layoutname,
-            spacer4,
+            sep,
+            weather,
+            spacer,
+            sep,
+            volicon,
+            volume,
             cpuicon,
             cpu,
-            spacer4,
-            tempicon,
-            temp,
-            spacer4,
             memicon,
             mem,
-            spacer4,
             clockicon,
             clock,
-            spacer4,
-            volicon,
-            vol,
-            spacer4,
-            tray,
-            spacer4,
+            curlayout,
             ],
-            margin=6,
+            margin=0,
             size=30),
         ),
     Screen(
         top=bar.Bar([
-            logo,
-            spacer1,
             groupbox,
-            spacer3,
-            curlayout,
-            layoutname,
+            sep,
+            weather,
+            spacer,
+            sep,
+            volicon,
+            volume,
             cpuicon,
             cpu,
-            tempicon,
-            temp,
             memicon,
             mem,
             clockicon,
             clock,
-            volicon,
-            vol,
+            sep,
+            sep,
+            sep,
+            tray,
+            curlayout,
             ],
             size=30,
-            margin=6),
+            margin=0),
         ),
-
     Screen(
         top=bar.Bar([
-            logo,
-            spacer1,
             groupbox,
-            spacer3,
-            curlayout,
-            layoutname,
+            sep,
+            weather,
+            spacer,
+            sep,
+            volicon,
+            volume,
             cpuicon,
             cpu,
-            tempicon,
-            temp,
             memicon,
             mem,
             clockicon,
             clock,
-            volicon,
-            vol,
+            sep,
+            sep,
+            sep,
+            tray,
+            curlayout,
             ],
             size=30,
-            margin=6),
+            margin=0),
         ),
     Screen(
     top=bar.Bar([
-            logo,
-            spacer1,
             groupbox,
-            spacer3,
-            curlayout,
-            layoutname,
+            sep,
+            weather,
+            spacer,
+            sep,
+            volicon,
+            volume,
             cpuicon,
             cpu,
-            tempicon,
-            temp,
             memicon,
             mem,
             clockicon,
             clock,
-            volicon,
-            vol,
+            curlayout,
             ],
             size=30,
-            margin=6),
+            margin=0),
         )
 ]
 
@@ -433,7 +302,7 @@ mouse = [
 
 dgroups_key_binder = None
 dgroups_app_rules = []  # type: list
-follow_mouse_focus = True
+#follow_mouse_focus = True
 bring_front_click = False
 floats_kept_above = True
 cursor_warp = True

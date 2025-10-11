@@ -23,9 +23,8 @@ files = "krusader"
 discord = "webcord"
 todoist = "flatpak run com.todoist.Todoist"
 screenie = "flameshot gui"
-emacs = "emacs"
 
-colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.gruvbox()
+colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.catppuccin()
 
 ########## Powerline from extras ########
 
@@ -149,7 +148,6 @@ keys = [
     Key([mod, "mod1"], "s", lazy.spawn(screenie)),
     Key(["mod1"], "s", lazy.spawn(todoist)),
     Key(["mod1"], "n", lazy.spawn(discord)),
-    Key([mod], "m", lazy.spawn(emacs)),
 
 
     # Movement Keys
@@ -239,6 +237,7 @@ keys.extend([
     Key([mod], "n", lazy.group['scratchpad'].dropdown_toggle('term')),
     Key([mod], "c", lazy.group['scratchpad'].dropdown_toggle('ranger')),
     Key([mod], "v", lazy.group['scratchpad'].dropdown_toggle('volume')),
+    Key([mod], "m", lazy.group['scratchpad'].dropdown_toggle('mus')),
     Key([mod], "b", lazy.group['scratchpad'].dropdown_toggle('news')),
     Key([mod, "shift"], "n", lazy.group['scratchpad'].dropdown_toggle('term2')),
 ])
@@ -267,7 +266,7 @@ layouts = [
     layout.Max(**layout_theme)
 ]
 
-logo = widget.TextBox(text="  ", font="JetBrainsMono Nerd Font", mouse_callbacks={"Button1": open_rofi}, fontsize=20, background=colors[4], margin=4, padding=3)
+logo = widget.TextBox(text="  ", font="JetBrainsMono Nerd Font", mouse_callbacks={"Button1": open_rofi}, fontsize=20, background=colors[4], margin=4, padding=3, foreground = colors[0])
 sep = widget.Sep(linewidth = 1, padding = 15, foreground = colors[0], background = colors[0])
 spacer1 = widget.Spacer(length=1, background=colors[4])
 spacer2 = widget.Spacer(length=1, background=colors[6], **arrow_powerlineLeft)

@@ -23,7 +23,6 @@ files = "krusader"
 discord = "webcord"
 todoist = "flatpak run com.todoist.Todoist"
 screenie = "flameshot gui"
-emacs = "emacs"
 
 colors, backgroundColor, foregroundColor, workspaceColor, chordColor = colors.gruvbox()
 
@@ -149,7 +148,6 @@ keys = [
     Key([mod, "mod1"], "s", lazy.spawn(screenie)),
     Key(["mod1"], "s", lazy.spawn(todoist)),
     Key(["mod1"], "n", lazy.spawn(discord)),
-    Key([mod], "m", lazy.spawn(emacs)),
 
 
     # Movement Keys
@@ -239,6 +237,7 @@ keys.extend([
     Key([mod], "n", lazy.group['scratchpad'].dropdown_toggle('term')),
     Key([mod], "c", lazy.group['scratchpad'].dropdown_toggle('ranger')),
     Key([mod], "v", lazy.group['scratchpad'].dropdown_toggle('volume')),
+    Key([mod], "m", lazy.group['scratchpad'].dropdown_toggle('mus')),
     Key([mod], "b", lazy.group['scratchpad'].dropdown_toggle('news')),
     Key([mod, "shift"], "n", lazy.group['scratchpad'].dropdown_toggle('term2')),
 ])

@@ -1,31 +1,16 @@
 #!/bin/bash
-#   ___ _____ ___ _     _____   ____  _             _    
-#  / _ \_   _|_ _| |   | ____| / ___|| |_ __ _ _ __| |_  
-# | | | || |  | || |   |  _|   \___ \| __/ _` | '__| __| 
-# | |_| || |  | || |___| |___   ___) | || (_| | |  | |_  
-#  \__\_\|_| |___|_____|_____| |____/ \__\__,_|_|   \__| 
-#                                                        
-#  
-# by Stephan Raabe (2023) 
-# ----------------------------------------------------- 
+#
 
-# My screen resolution
-# xrandr --rate 120
+xrandr --output DP-1 --mode 1920x1080 --pos 3840x1080 --rotate normal --output DP-2 --mode 1920x1080 --pos 3840x0 --rotate normal --output DP-3 --primary --mode 1920x1080 --pos 1920x638 --rotate normal --output HDMI-1 --mode 1920x1080 --pos 0x638 --rotate normal &
 
-# For Virtual Machine 
-# xrandr --output Virtual-1 --mode 1920x1080
 
-# Keyboard layout
-setxkbmap us
-
-# Load picom
-# picom &
-
-# Load power manager
-xfce4-power-manager &
-
-# Load notification service
+~/.fehbg & 
+while pgrep -u $UID -x picom >/dev/null; do sleep 1; done
+picom --config /home/matt/.config/picom/picom.conf --vsync &
 dunst &
+flatpak run com.core447.StreamController &
+/usr/libexec/polkit-gnome-authentication-agent-1 &
+clipmenud &
 
-# Setup Wallpaper and update colors
-~/.config/qtile/scripts/wallpaper.sh init
+[ ! -s ~/.config/mpd/pid ] && mpd &
+sxhkd -c $HOME/myrepo/qtile/sxhkd/sxhkdrc &
