@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-## Copyright (C) 2020-2025 Aditya Shakya <adi1090x@gmail.com>
-
-# xmonad directory
-DIR="$HOME/.config/xmonad"
-
-# launch polybar
-bash "$DIR"/theme/polybar.sh
