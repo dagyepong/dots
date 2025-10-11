@@ -39,7 +39,7 @@ import System.Exit (exitSuccess)
 import System.IO (hPutStrLn)
 
 -- variables
-myTerminal = "kitty"                   -- default terminal
+myTerminal = "urxvt"                   -- default terminal
 
 myBorderWidth = 3                   -- width of window border
 myModMask = mod4Mask                -- default mod key
@@ -74,6 +74,17 @@ myManageHook = composeAll
 myStartupHook :: X ()
 myStartupHook = do
    spawnOnce "~/.config/xmonad/scripts/autostart.sh"
+   spawnOnce "nitrogen --restore &"
+   spawnOnce "xsetroot -cursor_name left_ptr"
+   spawnOnce "dropbox &"
+   spawnOnce "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &"
+   spawnOnce "picom --experimental-backends &"
+   spawnOnce "xset r rate 330 30"
+   spawnOnce "xfce4-power-manager &"
+   spawnOnce "nm-applet &"
+   spawnOnce "dunst &"
+   spawnOnce "trayer --edge top --align right --widthtype request --padding 6 --SetDockType true --SetPartialStrut true --expand true --monitor 1 --transparent true --alpha 0 --tint 0x282c34  --height 22 &"
+   spawnOnce "imwheel -kill"
 
 
 -- scratchPads
