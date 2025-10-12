@@ -166,9 +166,9 @@ myLayout = avoidStruts (tiled ||| full ||| grid ||| bsp)
 
 -- main
 main = do
-    xmproc0 <- spawnPipe ("xmobar -x 0 $HOME/.config/xmobar/" ++ colorscheme ++ "-xmobarrc")
-    xmproc1 <- spawnPipe ("xmobar -x 1 $HOME/.config/xmobar/" ++ colorscheme ++ "-xmobarrc")
-    xmproc2 <- spawnPipe ("xmobar -x 2 $HOME/.config/xmobar/" ++ colorscheme ++ "-xmobarrc")
+    xmproc0 <- spawnPipe ("xmobar -x 0 $HOME/.config/xmobar/kanagawa-xmobarrc")
+    xmproc1 <- spawnPipe ("xmobar -x 1 $HOME/.config/xmobar/kanagawa-xmobarrc")
+    xmproc2 <- spawnPipe ("xmobar -x 2 $HOME/.config/xmobar/kanagawa-xmobarrc")
     xmonad $ ewmh $ docks $ def
         { manageHook = ( isFullscreen --> doFullFloat ) <+> ( isDialog --> doF W.swapUp ) <+> myManageHook <+>  namedScratchpadManageHook scratchpads <+> manageHook desktopConfig <+> manageDocks <+> insertPosition End Newer
         , terminal = myTerminal
