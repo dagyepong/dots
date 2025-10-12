@@ -6,6 +6,7 @@ Config { font = "JetBrainsMono Nerd Font Bold 12"
         , position = TopHM 33 0 0 0 0
         , commands = [ Run Cpu ["-t","<total>%"] 10
                      , Run Memory ["-t","<usedratio>%"] 10
+                     , Run XPropertyLog "_XMONAD_TRAYPAD"
                      , Run WeatherX "KY70"
                         [ ("clear", "󰼷")
                         , ("sunny", "󰼷")
@@ -31,6 +32,6 @@ Config { font = "JetBrainsMono Nerd Font Bold 12"
                      ]
         , sepChar = "%"
         , alignSep = "}{"
-        , template = " <action=`rofi -show drun` button=1> <fc=#76946A,#16161D>  </fc></action>  |  %UnsafeStdinReader%  }{ %KY70%   <fc=#DCA561></fc>  %disku%   <fc=#E82424>󰗃</fc>  %subs%   <fc=#658594></fc>   %cpu%   <fc=#957FB8>󰒋</fc>  %memory%   <fc=#D27E88>󰥔 </fc> %date%  "
+        , template = " <action=`rofi -show drun` button=1> <fc=#76946A,#16161D>  </fc></action>  |  %UnsafeStdinReader%  }{ %KY70%   <fc=#DCA561></fc>  %disku%   <fc=#E82424>󰗃</fc>  %subs%   <fc=#658594></fc>   %cpu%   <fc=#957FB8>󰒋</fc>  %memory%   <fc=#D27E88>󰥔 </fc> %date%  %_XMONAD_TRAYPAD%  "
         }
 
