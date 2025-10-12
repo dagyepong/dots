@@ -176,6 +176,7 @@ main = do
         , borderWidth = myBorderWidth
         , startupHook = myStartupHook
         , normalBorderColor = myNormColor
+        , handleEventHook = handleEventHook def <> Hacks.trayerPaddingXmobarEventHook
         , focusedBorderColor = myFocusColor
         , layoutHook = smartBorders $ myLayout
         , logHook = dynamicLogWithPP . filterOutWsPP [scratchpadWorkspaceTag] $ xmobarPP  
