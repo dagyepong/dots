@@ -53,4 +53,5 @@ fi
 
 #exec dbus-run-session -- herbstluftwm ##for gentoo dbus issue
 
-exec herbstluftwm
+exec dbus-launch --sh-syntax --exit-with-session xmonad
+
