@@ -20,6 +20,7 @@ hc keybind Mod4-d spawn hlscrthpd.sh                                            
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
 hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
 hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
+hc keybind Mod4-Control-i chain , move_index +1 , use_index +1
 
 # Window info/wm ctrls
 hc keybind Mod4-w spawn rofi -show                                #Switch windows
