@@ -17,7 +17,7 @@ hc keybind Mod4-Shift-Return spawn urxvt                                    #Spa
 hc keybind Mod4-e spawn launch                                                  #Launcher
 # Scratchpads
 hc keybind Mod4-d spawn $HOME/.local/bin/hlscrthpd.sh
-hc keybind Mod4-Shift-e $HOME/.local/bin/power
+hc keybind Mod4-Shift-e spawn $HOME/.local/bin/power
 
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
 hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
