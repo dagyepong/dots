@@ -1,0 +1,93 @@
+# Two-line format
+add_newline = true
+
+# Custom cyberpunk neon colorscheme
+[palettes.cyberpunk]
+neon_blue = "#04acee"
+neon_purple = "#9d7cd8"
+neon_pink = "#f7768e"
+neon_green = "#9ece6a"
+neon_yellow = "#e0af68"
+dark_bg = "#1f2335"
+light_fg = "#c0caf5"
+
+# Main prompt format
+format = """
+[╭╴](bold neon_purple)$env_var:USER\
+[$hostname](bold neon_blue)[@](bold light_fg)\
+[](bold neon_yellow)$directory\
+$git_branch\
+$git_state\
+$git_status\
+$python\
+$rust\
+$nodejs\
+[╴](bold neon_purple)
+[╰╴](bold neon_purple)$cmd_duration\
+$jobs\
+$time\
+$character"""
+
+# Customize the prompt character
+[character]
+success_symbol = "[➜](bold neon_green)"
+error_symbol = "[✗](bold neon_pink)"
+
+# Customize the directory module
+[directory]
+truncation_length = 3
+style = "bold neon_yellow"
+truncate_to_repo = true
+format = "[](bold neon_yellow)[$path]($style)[$read_only]($read_only_style)"
+
+# Customize the host module
+[hostname]
+ssh_only = false
+style = "bold neon_blue"
+format = "[$hostname](bold neon_blue)[@](bold light_fg) "
+disabled = false
+
+# Git module configuration
+[git_branch]
+symbol = "" # A Nerd Font icon for Git
+style = "bold neon_green"
+format = "[$symbol $branch]($style) "
+
+[git_status]
+ahead = "🚀${count}"
+behind = "🐌${count}"
+diverged = "🔱🚀${ahead_count}🐌${behind_count}"
+untracked = "📦${count}"
+stashed = "🔒"
+modified = "📝${count}"
+staged = "📁${count}"
+renamed = "🚚"
+deleted = "🗑️"
+style = "bold neon_pink"
+format = "([$all_status]($style))"
+
+[python]
+symbol = "🐍"
+style = "bold neon_blue"
+format = "[$symbol ($virtualenv) ]($style) "
+python_binary = ["python3", "python"]
+
+[rust]
+symbol = "🦀"
+style = "bold neon_pink"
+format = "[$symbol ($version) ]($style) "
+
+[nodejs]
+symbol = "" # Nerd Font icon for Node.js
+style = "bold neon_green"
+format = "[$symbol ($version) ]($style) "
+
+# Command duration module
+[cmd_duration]
+min_time = 1_000
+format = "[$duration](bold neon_yellow) "
+
+# Time module
+[time]
+format = "[$time](bold neon_blue) "
+disabled = false
