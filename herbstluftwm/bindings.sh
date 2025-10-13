@@ -15,9 +15,10 @@ hc keybind Mod4-Return or ',' and '.' compare tags.focus.frame_count = 1 '.' com
 
 hc keybind Mod4-Shift-Return spawn urxvt                                    #Spawn terminal
 hc keybind Mod4-e spawn launch                                                  #Launcher
-hc keybind Mod4-Shift-e spawn power                                             #Power menu
 # Scratchpads
 hc keybind Mod4-d spawn $HOME/.local/bin/hlscrthpd.sh
+hc keybind Mod4-Shift-e $HOME/.local/bin/power
+
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
 hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
 hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
