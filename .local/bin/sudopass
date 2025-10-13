@@ -1,0 +1,3 @@
+#!/bin/sh
+
+dmenu -i -password -p "Password:"
