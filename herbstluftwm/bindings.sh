@@ -37,9 +37,7 @@ hc keybind XF86Display spawn caffeine.sh        #Toggle caffeine
 #hc keybind XF86Tools spawn toggle_redshift.sh #Toggle redshift
 
 # Utilities
-hc keybind Mod4-u spawn unmount.sh                       #Unmount drives
-hc keybind XF86Favorites spawn prtscr                    #Print Screen
-hc keybind Mod4-XF86Favorites spawn prtregion            #Print region
+
 hc keybind Mod4-x spawn clipmenu -i -p 'Clipboard:' -l 0 #Clipboard manager
 hc keybind Mod4-Shift-c spawn colorpicker.sh             #Colorpicker
 hc keybind Mod4-Shift-z spawn mag.sh                     #Zoom
