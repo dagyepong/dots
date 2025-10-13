@@ -12,7 +12,7 @@ betterlockscreen -u /path/to/your/wallpaper.jpg
 
 #### **Lock with a specific effect:**
 ```bash
-betterlockscreen -l --fx blur
+betterlockscreen -l blur
 ```
 #### **Lock the screen automatically on inactivity (optional):**
 
