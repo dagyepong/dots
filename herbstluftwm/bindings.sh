@@ -20,7 +20,7 @@ hc keybind Mod4-Shift-e spawn $HOME/.local/bin/power
 
 hc keybind Mod4-space spawn task.sh                                             #Tasklist
 hc keybind Mod4-a spawn ~/.config/herbstluftwm/scripts/key_help.sh              #Keybinding help
-hc keybind Mod4-Shift-a spawn alacritty -e vim ~/.config/herbstluftwm/autostart #Edit hlwm config
+hc keybind Mod4-Shift-a spawn alacritty -e nvim ~/.config/herbstluftwm/autostart #Edit hlwm config
 hc keybind Mod4-Control-i chain , move_index +1 , use_index +1
 hc keybind Mod4-Control-u chain , split right 0.5 , focus right , spawn urxvt
 # Window info/wm ctrls
