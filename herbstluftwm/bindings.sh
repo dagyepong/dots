@@ -50,15 +50,7 @@ hc keybind Mod4-Shift-w spawn wttr                       #Current Weather Inform
 hc keybind Control-grave spawn notif_hist.sh -q #Query last notification
 hc keybind Control-space spawn notif_hist.sh -c #Close all notification history
 
-# Volume/Brightness keys
-hc keybind XF86MonBrightnessUp spawn bright up     #Increase brightness
-hc keybind XF86MonBrightnessDown spawn bright down #Decrease brightness
 
-hc keybind XF86AudioRaiseVolume spawn vol alsa up           #Increase Volume
-hc keybind XF86AudioLowerVolume spawn vol alsa down         #Decrease volume
-hc keybind XF86AudioMute spawn vol alsa mute                #Mute audio
-hc keybind Mod4-XF86AudioLowerVolume spawn vol alsamic down #Decrease mic volume
-hc keybind XF86AudioMicMute spawn vol alsamic mute          #mute mic
 
 # Player controls
 hc keybind Mod4-Control-Mod1-Left spawn playerctl previous #Previous audio
