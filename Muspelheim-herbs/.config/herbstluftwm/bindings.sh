@@ -24,7 +24,7 @@ hc keybind Mod4-Shift-a spawn alacritty -e nvim ~/.config/herbstluftwm/autostart
 hc keybind Mod4-Control-i chain , move_index +1 , use_index +1
 hc keybind Mod4-Control-u chain , split right 0.5 , focus right , spawn urxvt
 # Window info/wm ctrls
-hc keybind Mod4-w spawn rofi -show                                #Switch windows
+hc keybind Mod4-w spawn rofi -show drun                               #Switch windows
 hc keybind Mod4-Control-w spawn ~/.config/herbstluftwm/toggle_titles.sh #Toggle window titles
 hc keybind Mod4-Shift-r reload                                          #Reload hlwm
 
