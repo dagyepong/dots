@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 ########################################################
 #
-#    ▄█    █▄     ▄█        ▄█     █▄    ▄▄▄▄███▄▄▄▄
-#   ███    ███   ███       ███     ███ ▄██▀▀▀███▀▀▀██▄
-#   ███    ███   ███       ███     ███ ███   ███   ███
-#  ▄███▄▄▄▄███▄▄ ███       ███     ███ ███   ███   ███
-# ▀▀███▀▀▀▀███▀  ███       ███     ███ ███   ███   ███
-#   ███    ███   ███       ███     ███ ███   ███   ███
-#   ███    ███   ███▌    ▄ ███ ▄█▄ ███ ███   ███   ███
-#   ███    █▀    █████▄▄██  ▀███▀███▀   ▀█   ███   █▀
-#                ▀
+#    в–„в–Ҳ    в–Ҳв–„     в–„в–Ҳ        в–„в–Ҳ     в–Ҳв–„    в–„в–„в–„в–„в–Ҳв–Ҳв–Ҳв–„в–„в–„в–„
+#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–„в–Ҳв–Ҳв–Җв–Җв–Җв–Ҳв–Ҳв–Ҳв–Җв–Җв–Җв–Ҳв–Ҳв–„
+#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
+#  в–„в–Ҳв–Ҳв–Ҳв–„в–„в–„в–„в–Ҳв–Ҳв–Ҳв–„в–„ в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
+# в–Җв–Җв–Ҳв–Ҳв–Ҳв–Җв–Җв–Җв–Җв–Ҳв–Ҳв–Ҳв–Җ  в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
+#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
+#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳв–Ң    в–„ в–Ҳв–Ҳв–Ҳ в–„в–Ҳв–„ в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
+#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Җ    в–Ҳв–Ҳв–Ҳв–Ҳв–Ҳв–„в–„в–Ҳв–Ҳ  в–Җв–Ҳв–Ҳв–Ҳв–Җв–Ҳв–Ҳв–Ҳв–Җ   в–Җв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Җ
+#                в–Җ
 #
 #######################################################
 # Make interrupt signals do nothing.
@@ -22,8 +22,9 @@ hc() {
 hc emit_hook reload
 hc lock
 
-# Dat wallpaper tho
-noisewall "#452f2f"
+# Cyberpunk neon wallpaper
+# Replace noisewall with your preferred wallpaper setter
+feh --bg-fill ~/Pictures/cyberpunk-wallpaper.jpg  # or use your preferred cyberpunk wallpaper
 
 #Load bindings sequentially, but lazily
 {
@@ -49,27 +50,28 @@ for i in "${!tag_names[@]}"; do
     hc add "${tag_names[$i]}"
     key="${tag_keys[$i]}"
     if [ -n "$key" ]; then
-        #hc keybind "$Mod-$key" use_index "$i" #Focus tag at number
-        hc keybind "Mod4-$key" substitute PRE tags.focus.index chain + use_index "$i" + or , compare tags.focus.index != PRE , use_previous #Focus tag at number
-        hc keybind "Mod4-Shift-$key" move_index "$i"                                                                                        #Move focus window to tag at number
+        hc keybind "Mod4-$key" substitute PRE tags.focus.index chain + use_index "$i" + or , compare tags.focus.index != PRE , use_previous
+        hc keybind "Mod4-Shift-$key" move_index "$i"
     fi
 done
 
-# theme
+# CYBERPUNK NEON THEME
 hc set hide_covered_windows false
 hc attr theme.tiling.reset 1
 hc attr theme.floating.reset 1
-hc set frame_border_active_color '#807b64'
-hc set frame_border_normal_color '#131313'
-hc set frame_bg_normal_color '#202020'
-hc set frame_bg_active_color '#131313'
-hc set frame_border_width 0
+
+# Cyberpunk color scheme - neon blues, magentas, and cyans
+hc set frame_border_active_color '#00ffff'    # Neon cyan
+hc set frame_border_normal_color '#1a1a2e'    # Dark blue-black
+hc set frame_bg_normal_color '#16213e'        # Dark blue
+hc set frame_bg_active_color '#0f3460'        # Medium blue
+hc set frame_border_width 2
 hc set always_show_frame 0
-hc set frame_bg_transparent 1
+hc set frame_bg_transparent 0
 hc set frame_transparent_width 0
-hc set frame_gap 12
+hc set frame_gap 8
 hc set focus_follows_mouse 1
-hc set snap_gap 12
+hc set snap_gap 8
 
 hc attr theme.tiling.reset 1
 hc attr theme.floating.reset 1
@@ -77,37 +79,30 @@ hc attr theme.minimal.reset 1
 
 hc attr theme.title_when 'multiple_tabs'
 hc attr theme.title_align 'center'
-hc attr theme.title_color '#dfdfaf'
-hc attr theme.title_font 'monospace'
-hc attr theme.title_height 16
-hc attr theme.title_depth 18
-hc attr theme.border_width 0
-hc attr theme.tab_color '#424242'
-hc attr theme.inner_width 5
-hc attr theme.outer_width 3
-
-
-
-
-hc attr theme.active.color '#60928f'
-hc attr theme.normal.color '#ED9C8C'
-hc attr theme.urgent.color '#ED9C8C'
+hc attr theme.title_color '#ff00ff'           # Neon magenta
+hc attr theme.title_font 'monospace:style=bold'
+hc attr theme.title_height 18
+hc attr theme.title_depth 20
+hc attr theme.border_width 2
+hc attr theme.tab_color '#1a1a2e'             # Dark blue-black
 hc attr theme.inner_width 4
-#hc attr theme.inner_color '#111'
-hc attr theme.border_width 6
+hc attr theme.outer_width 2
+
+# Cyberpunk neon colors for window states
+hc attr theme.active.color '#00ffff'          # Neon cyan for active windows
+hc attr theme.normal.color '#ff00ff'          # Neon magenta for normal windows  
+hc attr theme.urgent.color '#ffff00'          # Neon yellow for urgent windows
+hc attr theme.inner_width 3
+hc attr theme.border_width 4
 hc attr theme.floating.border_width 3
-hc attr theme.floating.outer_width 1
-hc attr theme.floating.outer_color blue
-#hc attr theme.active.inner_color '#111'
-#hc attr theme.active.outer_color '#131313'
-#hc attr theme.background_color '#1e1b1c'
-hc attr theme.padding_left 9
+hc attr theme.floating.outer_width 2
+hc attr theme.floating.outer_color '#ff00ff'  # Neon magenta for floating windows
+hc attr theme.padding_left 8
 
-
-#To hide frame at startup
+# Hide frame at startup for cleaner look
 hc set frame_active_opacity 0
 
-hc set window_gap 0
+hc set window_gap 6
 hc set smart_window_surroundings 0
 hc set smart_frame_surroundings 0
 hc set focus_stealing_prevention true
@@ -115,21 +110,31 @@ hc set mouse_recenter_gap 0
 hc set focus_crosses_monitor_boundaries 1
 hc set swap_monitors_to_get_tag 0
 hc set raise_on_focus 1
-#hc pad 0 0 0 0 0
 
-# programs
-hc spawn nitrogen --restore &
-hc spawn sh $HOME/.config/polybar/launch.sh
+
+# Dropdown scratchpad keybindings
+hc keybind Mod4-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh toggle
+hc keybind Mod4-Shift-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh menu
+hc keybind Mod4-Control-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh close
+
+# Rules for dropdown windows
+hc rule class='dropdown' tag=dropdown floating=on focus=on
+hc rule title='dropdown' tag=dropdown floating=on focus=on
+hc set_attr tags.by-name.dropdown.settings.floating on
+
+
+# programs - consider adding cyberpunk-themed applications
+hc spawn nitrogen --set-zoom-fill ~/Pictures/cyberpunk-wallpaper.jpg &
+hc spawn sh $HOME/.config/polybar/launch.sh  # Make sure polybar has cyberpunk theme
 hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
-hc spawn plank
+hc spawn plank &
 hc spawn nm-applet &
-hc spawn --no-startup-id dunst
+hc spawn --no-startup-id dunst &  # Configure dunst with cyberpunk colors
 hc spawn xfce4-power-manager &
-
 
 # rules
 hc unrule -F
-hc rule focus=on # normally focus new clients
+hc rule focus=on
 hc rule instance=dropdown floating=on focus=on
 hc rule class=Nsxiv floating=on floatplacement=center focus=on
 hc rule class=mpv floating=on floatplacement=center focus=on
@@ -143,18 +148,18 @@ hc rule title=ikhal tag=2
 hc rule class=Zathura tag=4
 hc rule class=Steam tag=5 floating=on floatplacement=center
 hc rule title=weechat tag=6
-hc rule title=Music tag=7 #fix me
+hc rule title=Music tag=7
 
 # unlock, just to be sure
 for i in seq $(hc get monitors_locked); do
     hc unlock
 done
 
-herbstclient set tree_style '■┃ ┣┗■━┓'
+herbstclient set tree_style 'в– в”ғ в”Јв”—в– в”Ғв”“'
 
 # Autostart
 if hc silent new_attr bool my_not_first_autostart; then
-    # Load previously saved session (if one was created)
+    # Load previously saved session
     if [ -f ~/.config/herbstluftwm/sessions/saved_session ]; then
         ~/.config/herbstluftwm/scripts/loadstate.sh &
     fi
@@ -169,7 +174,7 @@ if hc silent new_attr bool my_not_first_autostart; then
     pgrep -U $uid runsv && pkill -U $uid runsv
     setsid -f runsvdir -P ~/.local/service
 
-    # Launch bar
+    # Launch bar (make sure yambar has cyberpunk theme)
     ~/.config/yambar/launch.sh
 
     # Things that require an internet connection
@@ -186,13 +191,9 @@ if hc silent new_attr bool my_not_first_autostart; then
         ;;
     esac
 
-    #On startup, check for any new mails
+    # On startup, check for any new mails
     mailsync
-
 fi
 
-# do multi monitor setup here, e.g.:
-# Auto start only once
-#hc set_monitors 1366x768+0+0 1280x800+1366+0
-# or simply:
+# Monitor setup
 hc detect_monitors
