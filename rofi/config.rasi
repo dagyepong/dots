@@ -1,95 +1,92 @@
-configuration{
-    modi: "drun";
-    width: 40;
-    columns: 1;
-    lines: 5;
- 	font: "Iosevka 12";
+configuration {
+    modi: "drun,run,window";
     show-icons: true;
-	icon-theme: "Tela-blue";
-    terminal: "st";
+    icon-theme: "Tela-blue";
+    terminal: "alacritty";
     drun-display-format: "{icon} {name}";
-    display-drun: "Run";
-    location: 0;
-    separator-style: "solid";
+    display-drun: "󰀻 Apps";
+    display-run: " Run";
+    display-window: " Windows";
     disable-history: false;
     hide-scrollbar: true;
-
+    sidebar-mode: false;
 }
 
 * {
-    background-color:#1e222a 
-      ;
-    border-color: #D8DEE9  ;
+    background-color: #1e222a;
     text-color: #D8DEE9;
-    separator-color: @border-color;
-    font: "Iosevka 12";
-    show-icons: true;
+    border-color: #D8DEE9;
+    selected-background-color: #282c34;
+    selected-text-color: #ffffff;
+    urgent-background-color: #BF616A;
+    active-background-color: #EBCB8B;
+    active-text-color: #1e222a;
 }
 
 window {
+    background-color: @background-color;
+    border: 2px;
+    border-color: @border-color;
+    border-radius: 12px;
     padding: 20px;
-    height: 310px;
-   // fullscreen: true;
-
-
+    width: 40%;
+    height: 60%;
 }
 
 mainbox {
-    padding: 5px;
-            border-radius: 13px;
-
+    border: 0;
+    padding: 10px;
 }
 
 inputbar {
-    children: [prompt,entry];
+    background-color: @background-color;
+    border: 1px;
+    border-color: @border-color;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 0 0 10px 0;
+    children: [prompt, entry];
 }
 
 prompt {
     background-color: @border-color;
-    padding: 5px 5px 0px;
-
+    padding: 8px 12px;
     text-color: @background-color;
-}
-
-// Not used
-textbox-prompt-colon {
-    expand: false;
-    str: ":";
+    border-radius: 6px 0 0 6px;
+    margin: 0 2px 0 0;
 }
 
 entry {
-    padding: 5px;
+    padding: 8px;
+    background-color: transparent;
 }
 
 listview {
-    border: 0px 0px 0px;
-    padding: 6px 0px 0px;
-      columns: 2;
-
+    background-color: transparent;
+    border: 0;
+    padding: 8px 0;
+    columns: 1;
+    spacing: 4px;
 }
 
 element {
-    padding: 5px;
-}
-
-element-icon {
-size: 25px;
-
+    background-color: transparent;
+    padding: 12px;
+    border-radius: 8px;
+    text-color: @text-color;
 }
 
 element selected {
-    background-color: #282c34  ;
-    text-color: #fff ;
-        border-radius: 13px;
+    background-color: @selected-background-color;
+    text-color: @selected-text-color;
+    border-radius: 8px;
 }
 
-element urgent {
-    background-color: #BF616A;
-    text-color: @background-color;
+element-icon {
+    size: 24px;
+    vertical-align: 0.5;
 }
 
-element active {
-    background-color: #EBCB8B;
-    text-color: @background-color;
+element-text {
+    vertical-align: 0.5;
 }
-
