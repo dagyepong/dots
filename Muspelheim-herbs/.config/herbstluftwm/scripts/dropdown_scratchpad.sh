@@ -1,161 +1,124 @@
 #!/bin/bash
 
-# Dropdown Scratchpad for Herbstluftwm
-# Opens applications in a floating scratchpad on a dedicated tag
-
 SCRATCHPAD_TAG="dropdown"
 SCRATCHPAD_FILE="/tmp/herbstluftwm_dropdown_winid"
-APPS_LIST=(
-    "alacritty --class=dropdown --title=dropdown"
-    "kitty --class=dropdown --name=dropdown"
-    "urxvt -name dropdown"
-    "st -n dropdown"
-    "qutebrowser"
-    "thunar"
-    "nautilus"
-    "nemo"
-    "pcmanfm"
-    "ranger"
-    "nvim"
-    "vim"
-    "nano"
-    "htop"
-    "btop"
-    "bashtop"
-    "ncmpcpp"
-    "cmus"
-    "cava"
-    "pulsemixer"
-    "pavucontrol"
-    "gnome-calculator"
-    "galculator"
-    "feh"
-    "nsxiv"
-    "gimp"
-    "inkscape"
-    "libreoffice"
-    "obs"
-    "discord"
-    "telegram-desktop"
-    "signal-desktop"
-    "element-desktop"
+
+# Custom dropdown apps with icons
+DROPDOWN_APPS=(
+    "󰆍 Terminal|alacritty --class=dropdown --title=dropdown"
+    "󰉋 File Manager|thunar"
+    "󰈬 Text Editor|nvim"
+    "󰍛 System Monitor|htop"
+    "󰎄 Music Player|ncmpcpp"
+    "󰕾 Volume Control|pulsemixer"
+    "󰃬 Calculator|gnome-calculator"
+    "󰋩 Image Viewer|feh"
+    "󰇧 Browser|firefox-bin"
+    "󰎁 Video Player|mpv"
+    "󰊗 Task Manager|btop"
+    "󰦝 Network|nmtui"
+    "󰇮 PDF Viewer|zathura"
+    "󰙅 Screenshot|flameshot gui"
 )
 
-# Ensure dropdown tag exists
-herbstclient add "$SCRATCHPAD_TAG" 2>/dev/null
-
-# Function to show rofi menu
-show_app_menu() {
-    printf "%s\n" "${APPS_LIST[@]}" | rofi -dmenu -p "Dropdown App:" -theme-str '
-        * {
-            background: #0a0a12;
-            text-color: #00f3ff;
-            border-color: #ff00ff;
-        }
-        window {
-            background-color: #0a0a12;
-            border: 2px solid #00f3ff;
-            padding: 5px;
-        }
-        inputbar {
-            background-color: #1a1a2e;
-            padding: 5px;
-        }
-        listview {
-            background-color: #1a1a2e;
-            padding: 5px;
-        }
-        element {
-            background-color: #1a1a2e;
-            padding: 5px;
-        }
-        element selected {
-            background-color: #00f3ff;
-            text-color: #0a0a12;
-        }
-        element-text, element-icon {
-            background-color: inherit;
-            text-color: inherit;
-        }
-    '
+show_dropdown_menu() {
+    for app in "${DROPDOWN_APPS[@]}"; do
+        echo "${app%|*}"
+    done | rofi -dmenu -p "󰏊" -config ~/.config/rofi/dropdown.rasi
 }
 
-# Function to toggle scratchpad visibility
+get_app_command() {
+    local app_name="$1"
+    for app in "${DROPDOWN_APPS[@]}"; do
+        if [[ "${app%|*}" == "$app_name" ]]; then
+            echo "${app#*|}"
+            return
+        fi
+    done
+}
+
 toggle_scratchpad() {
     if [[ -f "$SCRATCHPAD_FILE" ]]; then
         winid=$(cat "$SCRATCHPAD_FILE")
         if herbstclient bring "$winid" 2>/dev/null; then
-            # Window exists, toggle it
             if xdotool search --onlyvisible --id "$winid" >/dev/null; then
-                # Hide
+                echo "Hiding dropdown"
                 xdotool windowunmap "$winid"
             else
-                # Show - move to current tag and show
-                current_tag=$(herbstclient attr tags.focus.name)
-                herbstclient chain , lock , move "$SCRATCHPAD_TAG" , floating on , set_attr clients."$winid".floating on , unlock
+                echo "Showing dropdown"
                 xdotool windowmap "$winid"
                 herbstclient bring "$winid"
             fi
         else
-            # Window doesn't exist anymore, remove the file
+            echo "Dropdown window not found, cleaning up"
             rm -f "$SCRATCHPAD_FILE"
         fi
+    else
+        echo "No dropdown session found"
     fi
 }
 
-# Function to create new scratchpad
 create_scratchpad() {
-    local app_cmd="$1"
+    local app_name="$1"
+    local app_cmd=$(get_app_command "$app_name")
     
-    # Parse the command to get the executable name for class matching
-    app_exec=$(echo "$app_cmd" | awk '{print $1}')
+    if [[ -z "$app_cmd" ]]; then
+        echo "Unknown application: $app_name"
+        return 1
+    fi
     
-    # Launch the application on the dropdown tag
-    herbstclient chain , lock , add "$SCRATCHPAD_TAG" , use "$SCRATCHPAD_TAG" , unlock
+    echo "Creating dropdown with: $app_cmd"
+    
+    # Ensure dropdown tag exists
+    herbstclient add "$SCRATCHPAD_TAG" 2>/dev/null
+    
+    # Launch application
     $app_cmd &
     local pid=$!
     
-    # Wait for the window to appear
+    # Wait for window to appear
     local winid=""
     local timeout=0
-    while [[ -z "$winid" && $timeout -lt 50 ]]; do
-        winid=$(xdotool search --pid "$pid" --class "$app_exec" 2>/dev/null | head -1)
-        sleep 0.1
+    while [[ -z "$winid" && $timeout -lt 30 ]]; do
+        winid=$(xdotool search --pid "$pid" | head -1)
+        sleep 0.2
         ((timeout++))
     done
     
     if [[ -n "$winid" ]]; then
-        # Configure the window as scratchpad
-        herbstclient chain , lock , \
-            sprintf WINID "%u" clients.focus.winid , \
-            set_attr clients."$WINID".floating on , \
-            set_attr clients."$WINID".title "dropdown" , \
-            set_attr clients."$WINID".tag "$SCRATCHPAD_TAG" , \
-            unlock
+        echo "Window created with ID: $winid"
         
+        # Configure window properties
+        herbstclient chain , lock , \
+            set_attr clients.focus.floating on , \
+            set_attr clients.focus.tag "$SCRATCHPAD_TAG" , \
+            set_attr clients.focus.title "dropdown" , unlock
+        
+        # Store window ID
         echo "$winid" > "$SCRATCHPAD_FILE"
         
-        # Set window properties for dropdown behavior
+        # Set window class
         xdotool set_window --class "dropdown" "$winid"
-        xprop -id "$winid" -f _NET_WM_WINDOW_TYPE 32a -set _NET_WM_WINDOW_TYPE "_NET_WM_WINDOW_TYPE_DIALOG"
         
-        echo "Scratchpad created with window ID: $winid"
+        echo "Dropdown setup complete"
     else
-        echo "Failed to create scratchpad window"
+        echo "Failed to create dropdown window"
         rm -f "$SCRATCHPAD_FILE"
+        return 1
     fi
 }
 
-# Function to close scratchpad
 close_scratchpad() {
     if [[ -f "$SCRATCHPAD_FILE" ]]; then
         winid=$(cat "$SCRATCHPAD_FILE")
+        echo "Closing dropdown window: $winid"
         xdotool windowclose "$winid" 2>/dev/null
         rm -f "$SCRATCHPAD_FILE"
+    else
+        echo "No active dropdown to close"
     fi
 }
 
-# Main logic
 case "${1:-}" in
     "toggle")
         toggle_scratchpad
@@ -177,24 +140,36 @@ case "${1:-}" in
         close_scratchpad
         ;;
     "menu")
-        selected_app=$(show_app_menu)
+        selected_app=$(show_dropdown_menu)
         if [[ -n "$selected_app" ]]; then
-            # Close existing scratchpad if open
+            echo "Selected: $selected_app"
             close_scratchpad
-            # Create new one
-            create_scratchpad "$selected_app"
-            # Show it
             sleep 0.5
+            create_scratchpad "$selected_app"
+            sleep 1
             toggle_scratchpad
         fi
         ;;
+    "status")
+        if [[ -f "$SCRATCHPAD_FILE" ]]; then
+            winid=$(cat "$SCRATCHPAD_FILE")
+            if xdotool search --id "$winid" >/dev/null; then
+                echo "Dropdown active (Window: $winid)"
+            else
+                echo "Dropdown file exists but window not found"
+            fi
+        else
+            echo "No active dropdown"
+        fi
+        ;;
     *)
-        echo "Usage: $0 {toggle|show|hide|close|menu}"
-        echo "  toggle - Toggle scratchpad visibility"
-        echo "  show   - Show scratchpad"
-        echo "  hide   - Hide scratchpad"
-        echo "  close  - Close scratchpad"
-        echo "  menu   - Show app menu to create new scratchpad"
+        echo "Usage: $0 {toggle|show|hide|close|menu|status}"
+        echo "  toggle - Toggle dropdown visibility"
+        echo "  menu   - Show app selection menu"
+        echo "  close  - Close current dropdown"
+        echo "  show   - Show dropdown"
+        echo "  hide   - Hide dropdown"
+        echo "  status - Check dropdown status"
         exit 1
         ;;
 esac
