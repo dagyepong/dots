@@ -1,0 +1,21 @@
+#!/bin/sh
+
+status=$(cat /sys/class/power_supply/BAT0/status)
+
+if [ "$status" = "Charging" ]; then
+	full_energy=$(echo "$(cat /sys/class/power_supply/BAT0/energy_full)/1000" | bc -l)
+	current_energy=$(echo "$(cat /sys/class/power_supply/BAT0/energy_now)/1000" | bc -l)
+	power_rate=$(echo "$(cat /sys/class/power_supply/BAT0/power_now)/1000" | bc -l)
+	secs=$(echo "3600 * ($full_energy - $current_energy)/$power_rate" | bc -l | awk '{printf("%d\n",$1 + 0.5)}')
+	time=$(printf '%02d:%02d:%02d\n' $((secs / 3600)) $((secs % 3600 / 60)) $((secs % 60)))
+	notify-send "Battery" " Roughly $time until fully charged"
+elif [ "$status" = "Not charging" ]; then
+	notify-send "Battery" " AC mode activated"
+elif [ "$status" = "Full" ]; then
+	notify-send "Battery" " Full"
+else
+	float=$(echo "$(cat /sys/class/power_supply/BAT0/energy_now)/$(cat /sys/class/power_supply/BAT0/power_now)" | bc -l)
+	secs=$(echo "3600 * $float" | bc -l | awk '{printf("%d\n",$1 + 0.5)}')
+	time=$(printf '%02d:%02d:%02d\n' $((secs / 3600)) $((secs % 3600 / 60)) $((secs % 60)))
+	notify-send "Battery" " Roughly $time remaining"
+fi

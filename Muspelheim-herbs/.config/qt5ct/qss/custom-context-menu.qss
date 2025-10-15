@@ -1,0 +1,7 @@
+QMenu {
+    background-color: #1c1c1c;
+    color: #dfdfaf;
+    border: 0px solid #000000;
+    border-radius 0px;
+    padding: 2px;
+}
