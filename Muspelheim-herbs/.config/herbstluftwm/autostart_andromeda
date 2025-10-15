@@ -112,6 +112,16 @@ hc set raise_on_focus 1
 #hc pad 0 0 0 0 0
 
 
+# Dropdown scratchpad keybindings
+hc keybind Mod4-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh toggle
+hc keybind Mod4-Shift-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh menu
+hc keybind Mod4-Control-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh close
+
+# Rules for dropdown windows
+hc rule class='dropdown' tag=dropdown floating=on focus=on
+hc rule title='dropdown' tag=dropdown floating=on focus=on
+hc set_attr tags.by-name.dropdown.settings.floating on
+
 # programs
 hc spawn nitrogen --restore &
 hc spawn sh $HOME/.config/polybar/launch.sh
