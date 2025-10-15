@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 ########################################################
 #
-#    в–„в–Ҳ    в–Ҳв–„     в–„в–Ҳ        в–„в–Ҳ     в–Ҳв–„    в–„в–„в–„в–„в–Ҳв–Ҳв–Ҳв–„в–„в–„в–„
-#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–„в–Ҳв–Ҳв–Җв–Җв–Җв–Ҳв–Ҳв–Ҳв–Җв–Җв–Җв–Ҳв–Ҳв–„
-#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
-#  в–„в–Ҳв–Ҳв–Ҳв–„в–„в–„в–„в–Ҳв–Ҳв–Ҳв–„в–„ в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
-# в–Җв–Җв–Ҳв–Ҳв–Ҳв–Җв–Җв–Җв–Җв–Ҳв–Ҳв–Ҳв–Җ  в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
-#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ       в–Ҳв–Ҳв–Ҳ     в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
-#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳв–Ң    в–„ в–Ҳв–Ҳв–Ҳ в–„в–Ҳв–„ в–Ҳв–Ҳв–Ҳ в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Ҳв–Ҳ
-#   в–Ҳв–Ҳв–Ҳ    в–Ҳв–Җ    в–Ҳв–Ҳв–Ҳв–Ҳв–Ҳв–„в–„в–Ҳв–Ҳ  в–Җв–Ҳв–Ҳв–Ҳв–Җв–Ҳв–Ҳв–Ҳв–Җ   в–Җв–Ҳ   в–Ҳв–Ҳв–Ҳ   в–Ҳв–Җ
-#                в–Җ
+#    ▄█    █▄     ▄█        ▄█     █▄    ▄▄▄▄███▄▄▄▄
+#   ███    ███   ███       ███     ███ ▄██▀▀▀███▀▀▀██▄
+#   ███    ███   ███       ███     ███ ███   ███   ███
+#  ▄███▄▄▄▄███▄▄ ███       ███     ███ ███   ███   ███
+# ▀▀███▀▀▀▀███▀  ███       ███     ███ ███   ███   ███
+#   ███    ███   ███       ███     ███ ███   ███   ███
+#   ███    ███   ███▌    ▄ ███ ▄█▄ ███ ███   ███   ███
+#   ███    █▀    █████▄▄██  ▀███▀███▀   ▀█   ███   █▀
+#                ▀
 #
 #######################################################
 # Make interrupt signals do nothing.
@@ -22,8 +22,8 @@ hc() {
 hc emit_hook reload
 hc lock
 
-# Dat wallpaper tho - Cyberpunk dark background
-noisewall "#0a0a12"
+# Dat wallpaper tho
+noisewall "#452f2f"
 
 #Load bindings sequentially, but lazily
 {
@@ -55,11 +55,11 @@ for i in "${!tag_names[@]}"; do
     fi
 done
 
-# theme - Cyberpunk Neon colors
+# theme
 hc set hide_covered_windows false
-hc set frame_border_active_color '#00f3ff'  # Electric cyan
-hc set frame_border_normal_color '#0a0a12'  # Deep space blue
-hc set frame_border_inner_color '#1a1a2e'   # Dark nebula
+hc set frame_border_active_color '#af875f'
+hc set frame_border_normal_color '#1c1c1c'
+hc set frame_border_inner_color '#424242'
 hc set frame_border_inner_width 5
 hc set frame_border_width 8
 hc set always_show_frame 0
@@ -76,26 +76,26 @@ hc attr theme.minimal.reset 1
 
 hc attr theme.title_when 'multiple_tabs'
 hc attr theme.title_align 'center'
-hc attr theme.title_color '#ff00ff'         # Hot pink
+hc attr theme.title_color '#dfdfaf'
 hc attr theme.title_font 'monospace'
 hc attr theme.title_height 25
 hc attr theme.title_depth 18
 hc attr theme.border_width 0
-hc attr theme.tab_color '#1a1a2e'           # Dark nebula
+hc attr theme.tab_color '#424242'
 #hc attr theme.inner_width 5
 #hc attr theme.outer_width 3
-hc attr theme.color '#0a0a12'               # Deep space blue
-hc attr theme.active.color '#0a0a12'        # Deep space blue
-hc attr theme.normal.outer_color '#0a0a12'  # Deep space blue
-hc attr theme.active.outer_color '#00f3ff'  # Electric cyan
-hc attr theme.inner_color '#1a1a2e'         # Dark nebula
+hc attr theme.color '#1c1c1c'
+hc attr theme.active.color '#1c1c1c'
+hc attr theme.normal.outer_color '#1c1c1c'
+hc attr theme.active.outer_color '#af875f'
+hc attr theme.inner_color '#424242'
 hc attr theme.floating.border_width 8
 hc attr theme.floating.inner_width 5
 hc attr theme.floating.outer_width 3
-hc attr theme.floating.inner_color '#1a1a2e'        # Dark nebula
-hc attr theme.floating.active.outer_color '#ff00ff' # Hot pink
-hc attr theme.floating.normal.outer_color '#0a0a12' # Deep space blue
-hc attr theme.urgent.outer_color '#ff003c'          # Neon red
+hc attr theme.floating.inner_color '#3a3a3a'
+hc attr theme.floating.active.outer_color '#af875f'
+hc attr theme.floating.normal.outer_color '#1c1c1c'
+hc attr theme.urgent.outer_color '#af5f5f'
 
 #To hide frame at startup
 hc set frame_active_opacity 0
@@ -110,6 +110,7 @@ hc set swap_monitors_to_get_tag 0
 hc set raise_on_focus 1
 #hc pad 0 0 0 0 0
 
+
 # Dropdown scratchpad keybindings
 hc keybind Mod4-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh toggle
 hc keybind Mod4-Shift-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchpad.sh menu
@@ -118,11 +119,7 @@ hc keybind Mod4-Control-s spawn ~/.config/herbstluftwm/scripts/dropdown_scratchp
 # Rules for dropdown windows
 hc rule class='dropdown' tag=dropdown floating=on focus=on
 hc rule title='dropdown' tag=dropdown floating=on focus=on
-
-# Ensure dropdown tag exists with proper settings
-hc add dropdown 2>/dev/null
 hc set_attr tags.by-name.dropdown.settings.floating on
-hc set_attr tags.by-name.dropdown.settings.default_floating on
 
 # programs
 hc spawn nitrogen --restore &
@@ -158,7 +155,7 @@ for i in seq $(hc get monitors_locked); do
     hc unlock
 done
 
-herbstclient set tree_style 'в– в”ғ в”Јв”—в– в”Ғв”“'
+herbstclient set tree_style '■┃ ┣┗■━┓'
 
 # Autostart
 if hc silent new_attr bool my_not_first_autostart; then
