@@ -130,7 +130,13 @@ hc spawn sh $HOME/.config/polybar/launch.sh
 hc spawn /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
 hc spawn plank
 hc spawn nm-applet &
-hc spawn --no-startup-id dunst
+# Dunst notifications with cyberpunk theme
+pkill dunst
+dunst -config ~/.config/dunst/dunstrc &
+
+# Optional: Test notifications on startup
+# sleep 5
+# ~/.config/dunst/test-notifications.sh &
 hc spawn xfce4-power-manager &
 
 
