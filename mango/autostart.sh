@@ -46,3 +46,9 @@ sway-audio-idle-inhibit >/dev/null 2>&1 &
 
 # change light value and volume value by swayosd-client in keybind
 swayosd-server >/dev/null 2>&1 &
+
+# lock
+
+swayidle -w \
+    timeout 300 'swaylock -f --effect-blur 5x5 --fade-in 1' \
+    before-sleep 'swaylock -f --effect-blur 5x5 --fade-in 1'  >/dev/null 2>&1 & 
