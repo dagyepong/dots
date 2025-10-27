@@ -1,0 +1,82 @@
+configuration {
+    modi: "dropdown";
+    show-icons: true;
+    icon-theme: "Tela-blue";
+    display-dropdown: "󰏊 Dropdown";
+    disable-history: false;
+    hide-scrollbar: true;
+}
+
+* {
+    background-color: #0a0a12;
+    text-color: #00f3ff;
+    border-color: #00f3ff;
+    selected-background-color: #00f3ff;
+    selected-text-color: #0a0a12;
+    urgent-background-color: #ff003c;
+}
+
+window {
+    background-color: @background-color;
+    border: 2px;
+    border-color: @border-color;
+    border-radius: 8px;
+    padding: 15px;
+    width: 300px;
+}
+
+mainbox {
+    border: 0;
+    padding: 5px;
+}
+
+inputbar {
+    background-color: #1a1a2e;
+    border: 1px;
+    border-color: @border-color;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 0 0 8px 0;
+    children: [prompt, entry];
+}
+
+prompt {
+    background-color: @border-color;
+    padding: 6px 10px;
+    text-color: @background-color;
+    border-radius: 3px 0 0 3px;
+    margin: 0 2px 0 0;
+}
+
+entry {
+    padding: 6px;
+    background-color: transparent;
+    text-color: @text-color;
+}
+
+listview {
+    background-color: #1a1a2e;
+    border: 0;
+    padding: 6px;
+    border-radius: 4px;
+    columns: 1;
+    spacing: 2px;
+}
+
+element {
+    background-color: transparent;
+    padding: 10px;
+    border-radius: 4px;
+    text-color: @text-color;
+}
+
+element selected {
+    background-color: @selected-background-color;
+    text-color: @selected-text-color;
+    border-radius: 4px;
+}
+
+element-icon {
+    size: 20px;
+    vertical-align: 0.5;
+}
