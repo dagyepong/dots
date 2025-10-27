@@ -20,7 +20,7 @@ waybar -c ~/.config/mango/waybar/config.jsonc -s ~/.config/mango/waybar/style.cs
 
 
 # xwayland dpi scale
-echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
+#echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
 # xrdb merge ~/.Xresources >/dev/null 2>&1
 
 # ime input
