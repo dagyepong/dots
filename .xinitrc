@@ -53,5 +53,6 @@ fi
 
 #exec dbus-run-session -- herbstluftwm ##for gentoo dbus issue
 
-exec dbus-launch --sh-syntax --exit-with-session xmonad
 
+
+exec mango
