@@ -1,0 +1,85 @@
+*.font: xft:trigon:style=Regular:size=12
+
+! Kanagawa Colorscheme for URxvt
+URxvt*foreground: #DCD7BA
+URxvt*background: #1F1F28
+URxvt*cursorColor: #C8C093
+
+! Black
+URxvt*color0: #090618
+URxvt*color8: #727169
+
+! Red
+URxvt*color1: #C34043
+URxvt*color9: #E82424
+
+! Green
+URxvt*color2: #76946A
+URxvt*color10: #98BB6C
+
+! Yellow
+URxvt*color3: #DCA561
+URxvt*color11: #FF9E3B
+
+! Blue
+URxvt*color4: #7E9CD8
+URxvt*color12: #7FB4CA
+
+! Magenta
+URxvt*color5: #957FB8
+URxvt*color13: #938AA9
+
+! Cyan
+URxvt*color6: #6A9589
+URxvt*color14: #7AA89F
+
+! White
+URxvt*color7: #C8C093
+URxvt*color15: #DCD7BA
+
+Xft.dpi: 96
+Xft.antialias: true
+Xft.hinting: true
+Xft.rgba: rgb
+Xft.autohint: false
+Xft.hintstyle: hintslight
+Xft.lcdfilter: lcddefault
+
+!URxvt.termname: xterm-256color
+URxvt.iconFile: /usr/share/icons/Papirus/48x48/apps/urxvt.svg
+URxvt.geometry: 84x22
+URxvt.internalBorder: 15
+URxvt.letterSpace: 0
+URxvt.antialias: true
+URxvt.pointerBlank: true
+URxvt.saveLines:    7000
+URxvt.scrollBar:    false
+URxvt.cursorBlink:  true
+URxvt.urgentOnBell: true
+URxvt.scrollTtyOutput: true
+URxvt.scrollWithBuffer: true
+URxvt.scrollTtyKeypress: true
+URxvt.depth: 32
+URxvt.iso14755:        false
+URxvt.iso14755_52:     false
+urxvt*transparent: true
+urxvt*shading: 30
+
+URxvt.perl-ext-common: default,matcher,clipboard,keyboard-select,url-select
+URxvt.url-launcher: /usr/bin/xdg-open
+URxvt.url-select.underline: true
+URxvt.matcher.button: 1
+URxvt.keysym.C-u: perl:url-select:select_next
+
+URxvt.keysym.C-Escape: perl:keyboard-select:activate
+URxvt.keysym.C-/: perl:keyboard-select:search
+
+URxvt.clipboard.autocopy: true
+URxvt.keysym.Shift-Control-V: eval:paste_clipboard
+URxvt.keysym.Shift-Control-C: eval:selection_to_clipboard
+
+! ctrl + arrows
+URxvt.keysym.Control-Up:    \033[1;5A
+URxvt.keysym.Control-Down:  \033[1;5B
+URxvt.keysym.Control-Left:  \033[1;5D
+URxvt.keysym.Control-Right: \033[1;5C
