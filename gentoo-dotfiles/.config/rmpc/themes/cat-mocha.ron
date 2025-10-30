@@ -1,0 +1,110 @@
+#![enable(implicit_some)]
+#![enable(unwrap_newtypes)]
+#![enable(unwrap_variant_newtypes)]
+(
+    album_art_position: Right,
+    album_art_width_percent: 20,
+    default_album_art_path: None,
+    draw_borders: false,
+    show_song_table_header: false,
+    symbols: (song: "🎵", dir: "📁", marker: "\u{e0b0}"),
+    progress_bar: (
+        symbols: ["", "⭘", " "],
+        track_style: (bg: "#181825"),
+        elapsed_style: (fg: "#a6e3a1", bg: "#181825"),
+        thumb_style: (fg: "#a6e3a1", bg: "#181825"),
+    ),
+    scrollbar: (
+        symbols: ["│", "█", "▲", "▼"],
+        track_style: (),
+        ends_style: (),
+        thumb_style: (fg: "#94e2d5"),
+    ),
+    browser_column_widths: [20, 38, 42],
+    text_color: "#cdd6f4",
+    background_color: "#1e1e2e",
+    header_background_color: "#181825",
+    modal_background_color: None,
+    tab_bar: (
+        enabled: false,
+        active_style: (fg: "black", bg: "#a6e3a1", modifiers: "Bold"),
+        inactive_style: (),
+    ),
+    borders_style: (fg: "#585b70"),
+    highlighted_item_style: (fg: "#a6e3a1", modifiers: "Bold"),
+    current_item_style: (fg: "black", bg: "#94e2d5", modifiers: "Bold"),
+    highlight_border_style: (fg: "#94e2d5"),
+    song_table_format: [
+        (
+            prop: (kind: Property(Artist), style: (fg: "#94e2d5"), default: (kind: Text("Unknown"))),
+            width: "30%",
+            alignment: Right,
+        ),
+        (
+            prop: (kind: Text("-"), style: (fg: "#94e2d5"), default: (kind: Text("Unknown"))),
+            width: "1",
+            alignment: Center,
+        ),
+        (
+            prop: (kind: Property(Title), style: (fg: "#89dceb"), default: (kind: Text("Unknown"))),
+            width: "30%",
+        ),
+        (
+            prop: (kind: Property(Album), style: (fg: "#fab387"), default: (kind: Text("Unknown"))),
+            width: "30%",
+        ),
+        (
+            prop: (kind: Property(Duration), style: (fg: "#cba6f7"), default: (kind: Text("Unknown"))),
+            width: "9%"
+        ),
+    ],
+    header: (
+        rows: [
+            (
+                left: [
+                    (kind: Text("["), style: (fg: "#89b4fa", modifiers: "Bold")),
+                    (kind: Property(Status(State)), style: (fg: "#7fbbb3", modifiers: "Bold")),
+                    (kind: Text("]"), style: (fg: "#89b4fa", modifiers: "Bold"))
+                ],
+                center: [
+                    (kind: Text(" 󰝚  "), style: (fg: "#89b4fa", modifiers: "Bold")),
+                    (kind: Property(Song(Title)), style: (fg: "#a6e3a1", modifiers: "Bold"),
+                        default: (kind: Text("No Song"), style: (fg: "#a6e3a1", modifiers: "Bold"))
+                    ),
+                    (kind: Text("  󰝚 "), style: (fg: "#89b4fa", modifiers: "Bold")),
+                ],
+                right: [
+                    (kind: Property(Widget(Volume)), style: (fg: "#89b4fa"))
+                ]
+            ),
+            (
+                left: [
+                    (kind: Property(Status(Elapsed))),
+                    (kind: Text(" / ")),
+                    (kind: Property(Status(Duration))),
+                    (kind: Text(" (")),
+                    (kind: Property(Status(Bitrate))),
+                    (kind: Text(" kbps)"))
+                ],
+                center: [
+                    (kind: Property(Song(Artist)), style: (fg: "#89b4fa", modifiers: "Bold"),
+                        default: (kind: Text("Unknown"), style: (fg: "#89b4fa", modifiers: "Bold"))
+                    ),
+                    (kind: Text(" - ")),
+                    (kind: Property(Song(Album)), style: (fg: "#e69875", modifiers: "Bold"),
+                        default: (kind: Text("Unknown"), style: (fg: "#fab387", modifiers: "Bold"))
+                    ),
+                ],
+                right: [
+                    (
+                        kind: Property(Widget(States(
+                            active_style: (fg: "white", modifiers: "Bold"),
+                            separator_style: (fg: "white")))
+                        ),
+                        style: (fg: "dark_gray")
+                    ),
+                ],
+	),
+        ],
+    ),
+)

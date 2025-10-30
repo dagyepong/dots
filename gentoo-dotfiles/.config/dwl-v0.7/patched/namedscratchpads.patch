@@ -1,0 +1,278 @@
+From bd83d56b3a268112b029961ad6ff4232b2d6f00d Mon Sep 17 00:00:00 2001
+From: Ben Collerson <benc@benc.cc>
+Date: Thu, 4 Jan 2024 16:35:05 +1000
+Subject: [PATCH 1/2] namedscratchpads
+
+---
+ config.def.h | 11 ++++++++---
+ dwl.c        | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 3 deletions(-)
+
+diff --git a/config.def.h b/config.def.h
+index 22d2171d..36a691a9 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -22,10 +22,11 @@ static int log_level = WLR_ERROR;
+ 
+ /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at least one example) */
+ static const Rule rules[] = {
+-	/* app_id             title       tags mask     isfloating   monitor */
++	/* app_id             title         tags mask     isfloating   monitor scratchkey */
+ 	/* examples: */
+-	{ "Gimp_EXAMPLE",     NULL,       0,            1,           -1 }, /* Start on currently visible tags floating, not tiled */
+-	{ "firefox_EXAMPLE",  NULL,       1 << 8,       0,           -1 }, /* Start on ONLY tag "9" */
++	{ "Gimp_EXAMPLE",     NULL,         0,            1,           -1,     0   }, /* Start on currently visible tags floating, not tiled */
++	{ "firefox_EXAMPLE",  NULL,         1 << 8,       0,           -1,     0   }, /* Start on ONLY tag "9" */
++	{ NULL,               "scratchpad", 0,            1,           -1,     's' },
+ };
+ 
+ /* layout(s) */
+@@ -122,11 +123,15 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
+ static const char *termcmd[] = { "foot", NULL };
+ static const char *menucmd[] = { "wmenu-run", NULL };
+ 
++/* named scratchpads - First arg only serves to match against key in rules*/
++static const char *scratchpadcmd[] = { "s", "alacritty", "-t", "scratchpad", NULL };
++
+ static const Key keys[] = {
+ 	/* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
+ 	/* modifier                  key                 function        argument */
+ 	{ MODKEY,                    XKB_KEY_p,          spawn,          {.v = menucmd} },
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Return,     spawn,          {.v = termcmd} },
++	{ MODKEY,                    XKB_KEY_grave,      togglescratch,  {.v = scratchpadcmd } },
+ 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = +1} },
+ 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = -1} },
+ 	{ MODKEY,                    XKB_KEY_i,          incnmaster,     {.i = +1} },
+diff --git a/dwl.c b/dwl.c
+index dc0437e0..eb0eb775 100644
+--- a/dwl.c
++++ b/dwl.c
+@@ -139,6 +139,7 @@ typedef struct {
+ 	unsigned int bw;
+ 	uint32_t tags;
+ 	int isfloating, isurgent, isfullscreen;
++	char scratchkey;
+ 	uint32_t resize; /* configure serial of a pending resize */
+ } Client;
+ 
+@@ -230,6 +231,7 @@ typedef struct {
+ 	uint32_t tags;
+ 	int isfloating;
+ 	int monitor;
++	const char scratchkey;
+ } Rule;
+ 
+ typedef struct {
+@@ -330,12 +332,14 @@ static void setpsel(struct wl_listener *listener, void *data);
+ static void setsel(struct wl_listener *listener, void *data);
+ static void setup(void);
+ static void spawn(const Arg *arg);
++static void spawnscratch(const Arg *arg);
+ static void startdrag(struct wl_listener *listener, void *data);
+ static void tag(const Arg *arg);
+ static void tagmon(const Arg *arg);
+ static void tile(Monitor *m);
+ static void togglefloating(const Arg *arg);
+ static void togglefullscreen(const Arg *arg);
++static void togglescratch(const Arg *arg);
+ static void toggletag(const Arg *arg);
+ static void toggleview(const Arg *arg);
+ static void unlocksession(struct wl_listener *listener, void *data);
+@@ -456,6 +460,7 @@ applyrules(Client *c)
+ 	Monitor *mon = selmon, *m;
+ 
+ 	c->isfloating = client_is_float_type(c);
++	c->scratchkey = 0;
+ 	if (!(appid = client_get_appid(c)))
+ 		appid = broken;
+ 	if (!(title = client_get_title(c)))
+@@ -465,6 +470,7 @@ applyrules(Client *c)
+ 		if ((!r->title || strstr(title, r->title))
+ 				&& (!r->id || strstr(appid, r->id))) {
+ 			c->isfloating = r->isfloating;
++			c->scratchkey = r->scratchkey;
+ 			newtags |= r->tags;
+ 			i = 0;
+ 			wl_list_for_each(m, &mons, link) {
+@@ -2603,6 +2609,16 @@ spawn(const Arg *arg)
+ 	}
+ }
+ 
++void spawnscratch(const Arg *arg)
++{
++	if (fork() == 0) {
++		dup2(STDERR_FILENO, STDOUT_FILENO);
++		setsid();
++		execvp(((char **)arg->v)[1], ((char **)arg->v)+1);
++		die("dwl: execvp %s failed:", ((char **)arg->v)[1]);
++	}
++}
++
+ void
+ startdrag(struct wl_listener *listener, void *data)
+ {
+@@ -2686,6 +2702,29 @@ togglefullscreen(const Arg *arg)
+ 		setfullscreen(sel, !sel->isfullscreen);
+ }
+ 
++void
++togglescratch(const Arg *arg)
++{
++	Client *c;
++	unsigned int found = 0;
++
++	/* search for first window that matches the scratchkey */
++	wl_list_for_each(c, &clients, link)
++		if (c->scratchkey == ((char**)arg->v)[0][0]) {
++			found = 1;
++			break;
++		}
++
++	if (found) {
++		c->tags = VISIBLEON(c, selmon) ? 0 : selmon->tagset[selmon->seltags];
++
++		focusclient(c->tags == 0 ? focustop(selmon) : c, 1);
++		arrange(selmon);
++	} else{
++		spawnscratch(arg);
++	}
++}
++
+ void
+ toggletag(const Arg *arg)
+ {
+-- 
+2.45.2
+
+
+From 4963c34b4958fba9d53a23a1c9929d554a4e8b3d Mon Sep 17 00:00:00 2001
+From: Ben Collerson <benc@benc.cc>
+Date: Sat, 13 Jul 2024 14:50:45 +1000
+Subject: [PATCH 2/2] namedscratchpads: focusortoggle functions
+
+---
+ config.def.h |  2 ++
+ dwl.c        | 87 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+
+diff --git a/config.def.h b/config.def.h
+index 36a691a9..21bb66bb 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -132,6 +132,8 @@ static const Key keys[] = {
+ 	{ MODKEY,                    XKB_KEY_p,          spawn,          {.v = menucmd} },
+ 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Return,     spawn,          {.v = termcmd} },
+ 	{ MODKEY,                    XKB_KEY_grave,      togglescratch,  {.v = scratchpadcmd } },
++	// { MODKEY,                    XKB_KEY_grave,      focusortogglescratch, {.v = scratchpadcmd } },
++	// { MODKEY,                    XKB_KEY_grave,      focusortogglematchingscratch, {.v = scratchpadcmd } },
+ 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = +1} },
+ 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = -1} },
+ 	{ MODKEY,                    XKB_KEY_i,          incnmaster,     {.i = +1} },
+diff --git a/dwl.c b/dwl.c
+index eb0eb775..d7c5552f 100644
+--- a/dwl.c
++++ b/dwl.c
+@@ -286,6 +286,8 @@ static void destroykeyboardgroup(struct wl_listener *listener, void *data);
+ static Monitor *dirtomon(enum wlr_direction dir);
+ static void focusclient(Client *c, int lift);
+ static void focusmon(const Arg *arg);
++static void focusortogglematchingscratch(const Arg *arg);
++static void focusortogglescratch(const Arg *arg);
+ static void focusstack(const Arg *arg);
+ static Client *focustop(Monitor *m);
+ static void fullscreennotify(struct wl_listener *listener, void *data);
+@@ -1405,6 +1407,91 @@ focusmon(const Arg *arg)
+ 	focusclient(focustop(selmon), 1);
+ }
+ 
++void
++focusortogglematchingscratch(const Arg *arg)
++{
++	Client *c;
++	unsigned int found = 0;
++	unsigned int hide = 0;
++
++	wl_list_for_each(c, &clients, link) {
++		if (c->scratchkey == 0) {
++			continue;
++		}
++		if (c->scratchkey == ((char**)arg->v)[0][0]) {
++			if (VISIBLEON(c, selmon)) {
++				if (found == 1) {
++					if (hide == 1) {
++						c->tags = 0;
++						focusclient(focustop(selmon), 1);
++					}
++					continue;
++				}
++				if (focustop(selmon) == c) {
++					// hide
++					c->tags = 0;
++					focusclient(focustop(selmon), 1);
++					hide = 1;
++				} else {
++					// focus
++					focusclient(c, 1);
++				}
++			} else {
++				// show
++				c->tags = selmon->tagset[selmon->seltags];
++				// focus
++				focusclient(c, 1);
++			}
++			found = 1;
++			continue;
++		}
++		if (VISIBLEON(c, selmon)) {
++			// hide
++			c->tags = 0;
++		}
++	}
++
++	if (found) {
++		arrange(selmon);
++	} else {
++		spawnscratch(arg);
++	}
++}
++
++void
++focusortogglescratch(const Arg *arg)
++{
++	Client *c;
++	unsigned int found = 0;
++
++	/* search for first window that matches the scratchkey */
++	wl_list_for_each(c, &clients, link)
++		if (c->scratchkey == ((char**)arg->v)[0][0]) {
++			found = 1;
++			break;
++		}
++
++	if (found) {
++		if (VISIBLEON(c, selmon)) {
++			if (focustop(selmon) == c) {
++				// hide
++				c->tags = 0;
++				focusclient(focustop(selmon), 1);
++			} else {
++				// focus
++				focusclient(c, 1);
++			}
++		} else {
++			// show
++			c->tags = selmon->tagset[selmon->seltags];
++			focusclient(c, 1);
++		}
++		arrange(selmon);
++	} else{
++		spawnscratch(arg);
++	}
++}
++
+ void
+ focusstack(const Arg *arg)
+ {
+-- 
+2.45.2
+

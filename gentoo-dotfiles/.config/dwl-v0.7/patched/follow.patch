@@ -1,0 +1,38 @@
+From c4de366aa5e2a465f5e2963f4ffed7adde77929a Mon Sep 17 00:00:00 2001
+From: moonsabre <moonsabre@tuta.io>
+Date: Thu, 13 Mar 2025 14:36:49 -0700
+Subject: [PATCH] Add parameter for following sent windows.
+
+---
+ config.def.h | 1 +
+ dwl.c        | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/config.def.h b/config.def.h
+index 22d2171..cdbdc72 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -6,6 +6,7 @@
+ /* appearance */
+ static const int sloppyfocus               = 1;  /* focus follows mouse */
+ static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
++static const int follow                    = 1;  /* 1 means follow windows when sent to another tag */
+ static const unsigned int borderpx         = 1;  /* border pixel of windows */
+ static const float rootcolor[]             = COLOR(0x222222ff);
+ static const float bordercolor[]           = COLOR(0x444444ff);
+diff --git a/dwl.c b/dwl.c
+index a2711f6..d2cf8ba 100644
+--- a/dwl.c
++++ b/dwl.c
+@@ -2677,6 +2677,8 @@ tag(const Arg *arg)
+ 	sel->tags = arg->ui & TAGMASK;
+ 	focusclient(focustop(selmon), 1);
+ 	arrange(selmon);
++	if (follow == 1)
++		view(arg);
+ 	printstatus();
+ }
+ 
+-- 
+2.48.1
+

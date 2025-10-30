@@ -1,0 +1,25 @@
+---
+name: logs_sway
+project_root: "/home/ron"
+windows:
+- " logs":
+    layout: 2348,249x60,0,0[249x39,0,0{158x39,0,0,1,90x39,159,0,3},249x20,0,40{87x20,0,40,4,80x20,88,40,5,80x20,169,40,7}]
+    panes:
+    - btop
+    - sleep 2 && grc tail -f /var/log/socklog/everything/current | bat --paging=never -l log
+    - sleep 2 && grc tail -f ~/.log/mango.log | bat --paging=never -l log
+    - peaclock
+    - nvtop
+- " info":
+    layout: even-horizontal
+    panes:
+    - neomutt
+    - newsboat
+- "󰇥 Yazi":
+    layout: even-horizontal
+    panes:
+    - yazi
+- " nvim":
+    layout: even-horizontal
+    panes:
+    - nvim

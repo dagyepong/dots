@@ -1,0 +1,195 @@
+* {
+	font-family: "SFRounded Nerd Font", "monospace";
+	font-size: 12px;
+}
+
+window#waybar {
+	background: rgba(30, 35, 38, 1.0);
+	border-bottom: 2px solid #cba6f7;
+	color: #cdd6f4;
+}
+
+tooltip {
+	background: #11111b; 
+	border: 3px solid #cba6f7; 
+	border-radius: 6px;
+}
+
+tooltip label {
+    color: #cdd6f4;
+    font-size: 14px;
+}
+
+#custom-launcher,
+#dwl-tags,
+#custom-layout,
+#dwl-window,
+#custom-wttrbar,
+#clock,
+#custom-xbps,
+#custom-updates,
+#mpd,
+#custom-gpu_zig,
+#memory,
+#custom-memory_zig,
+#cpu,
+#custom-audio_idle_inhibitor,
+#pulseaudio,
+#custom-wlsunset,
+#idle_inhibitor,
+#tray,
+#custom-dunst,
+#custom-power1,
+#custom-quit,
+#custom-lock,
+#custom-reboot,
+#custom-shutdown,
+#custom-sleep {
+	padding: 0 0px;
+	/* top, right, bottom, left */
+	margin: 0px 4px 0px 4px; 
+}
+
+#custom-launcher {
+	color: #cba6f7;
+	font-size:15px;
+	margin-left: 10px;
+}
+
+#mode {
+	color: #fab387;
+}
+
+#tags button {
+  color: #6c7086;
+  background: #11111b;
+  border-radius: 0px;
+  padding: 0px 0px;
+  margin: 5px 0px;
+}
+
+#tags button.occupied {
+  color: #cdd6f4;
+}
+
+#tags button.focused {
+  color: #fab387;
+}
+
+#tags button.urgent {
+  color: #f38ba8;
+}
+
+#custom-layout {
+	/*background: #6c7086;*/
+	color: #fab387;
+    font-size: 14px;
+    margin-bottom: 3;
+}
+
+#window {
+	/*background: #33353f;*/
+	/*border-radius: 4px;*/
+	padding: 2px 4px;
+	margin-left: 10px;
+}
+
+#clock {
+	color: #f9e2af;
+	font-family: "Digital Readout Thick Upright";
+	font-size: 20px;
+	margin: 4px;
+	background-color: #6c7086;
+	border: 2px solid transparent;
+	border-radius: 5px;	
+}
+
+#custom-updates {
+    padding-right: 15px;
+    color: #f9e2af;
+}
+
+#mpd {
+	color: #cba6f7;
+}
+
+#custom-gpu_zig {
+    color: #b4befe;
+}
+
+#memory {
+	font-family: "Ubuntu Nerd Font";
+	color: #89b4fa;
+}
+
+#custom-memory_zig {
+	font-family: "Ubuntu Nerd Font";
+	color: #89b4fa;
+}
+
+#cpu {
+	color: #fab387;
+	margin-right: 10px;
+}
+
+#custom-audio_idle_inhibitor {
+	color: #f9e2af;
+}
+
+#pulseaudio {
+	color: #a6e3a1;
+}
+
+#custom-wlsunset.on {
+    color: #f9e2af;
+    font-size:15px;
+}
+
+#custom-wlsunset.off {
+    color: #6c7086;
+    font-size:15px;
+}
+
+#idle_inhibitor.activated {
+	color: #eba0ac;    
+}
+
+#idle_inhibitor.deactivated {
+	color: #f9e2af;    
+}
+
+#tray {
+  background-color: #6c7086;
+  margin: 5px;
+  padding: 0px 10px;
+  border-radius: 5px;
+}
+
+#custom-dunst {
+  padding-right: 12;
+  color: #dbbc7f;
+}
+
+#custom-power1 {
+	color: #f38ba8;
+}
+
+#custom-quit {
+	color: #b4befe;
+}
+
+#custom-lock {
+	color: #fab387;
+}
+
+#custom-sleep {
+	color: #f9e2af;
+}
+
+#custom-reboot {
+	color:#74c7ec;
+}
+
+#custom-shutdown {
+	color: #f38ba8;
+}

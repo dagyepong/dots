@@ -1,0 +1,67 @@
+// taken shamelessly from https://codeberg.org/ranjan/qtile-impulse/src/branch/main/fastfetch/config.jsonc thank you ranjan
+{
+ "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+      "type": "kitty",
+      "source": "/home/ron/.config/fastfetch/void.png",
+      "width": 24
+    },
+
+ "display": {
+  "separator": " ",
+  "key": { "width": 10},
+ },
+ "modules": [
+  "break",
+  {
+   "type": "custom",
+   "format": " {#90}󰍴󰍴󰍴 {#31}󰍴󰍴󰍴 {#32}󰍴󰍴󰍴 {#33}󰍴󰍴󰍴 {#34}󰍴󰍴󰍴 {#35}󰍴󰍴󰍴 {#36}󰍴󰍴󰍴 {#37}󰍴󰍴󰍴 "
+  },
+  "break",
+  {
+   "type": "os",
+   "key": " OS ",
+   "format": "{2} {8}",
+   "keyColor": "magenta"
+  },
+  {
+   "type": "kernel",
+   "key": " KER",
+   "keyColor": "cyan"
+  },
+  {
+   "type": "uptime",
+   "key": "󰥔 UP ",
+   "keyColor": "yellow"
+  },
+  {
+   "type": "packages",
+   "key": "󰏗 PKG",
+   "keyColor": "cyan"
+  },
+  {
+   "type": "CPU",
+   "key": "󰻠 CPU",
+   "format": "{1}",
+   "keyColor": "magenta"
+  },
+  {
+   "type": "GPU",
+   "key": "󰻠 GPU",
+   "format": "{2}",
+   "keyColor": "green"
+  },
+  {
+   "type": "memory",
+   "key": "󰻠 MEM",
+   "format": "{1} / {2}",
+   "keyColor": "red"
+  },
+  "break",
+  {
+   "type": "custom",
+   "format": " {#90}󰍴󰍴󰍴 {#31}󰍴󰍴󰍴 {#32}󰍴󰍴󰍴 {#33}󰍴󰍴󰍴 {#34}󰍴󰍴󰍴 {#35}󰍴󰍴󰍴 {#36}󰍴󰍴󰍴 {#37}󰍴󰍴󰍴 "
+  }
+ ]
+}
+

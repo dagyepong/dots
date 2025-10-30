@@ -1,0 +1,25 @@
+window {
+    background-color: rgba(30, 35, 38, 0.98);
+    border-radius: 12px;
+    color: #d3c6aa;
+    border: 2px;
+    border-color: #a7c080;
+}
+
+list {
+    background: none;
+    border-radius: 12px
+}
+
+entry {
+    background-color: rgba(0, 0, 0, 0.2)
+}
+
+button {
+    background: none;
+    border: none
+}
+
+button:hover {
+    background-color: rgba(255, 255, 255, 0.1)
+}

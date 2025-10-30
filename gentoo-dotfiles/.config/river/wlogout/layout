@@ -1,0 +1,23 @@
+{
+    "label" : "lock",
+    "action" : "swaylock",
+    "text" : "Lock"
+}
+
+{
+    "label" : "logout",
+    "action" : "pkill -KILL -u $USER",
+    "text" : "Logout"
+}
+
+{
+    "label" : "shutdown",
+    "action" : "loginctl poweroff",
+    "text" : "Shutdown"
+}
+
+{
+    "label" : "reboot",
+    "action" : "loginctl reboot",
+    "text" : "Reboot"
+}

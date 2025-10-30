@@ -1,0 +1,273 @@
+// for river Void Linux
+
+{
+	"layer": "top",
+	"output":        "DP-3",
+	"modules-left": ["custom/launcher", "dwl/tags", "custom/layout", "dwl/window"],
+	"modules-center": ["custom/wttrbar", "clock", "custom/updates"],
+	"modules-right": ["mpd", "custom/gpu_zig", "custom/memory_zig", "cpu", "custom/audio_idle_inhibitor", "pulseaudio", "tray", "custom/dunst", "custom/power1"],
+
+"custom/launcher": {
+		"format":"  ",
+		"on-click": "exec nwg-menu -va top -s menu-start-dwl.css -cmd-lock lockit -cmd-logout 'killall -u ron' -cmd-restart loginctl reboot -cmd-shutdown loginctl -i poweroff -term foot",
+		"tooltip": false,
+},
+
+    "dwl/tags": {
+        "disable-scroll": false,
+		"num-tags": 10,
+		"tag-labels": ["", "", "", "", "", "", "󰋌", "", "󰺻", ""] 
+    },
+
+	"custom/layout": {
+		"format": "{}",
+		"exec": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh get-layout",
+		"interval": 1,
+		"tooltip": false,
+		"on-scroll-up": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh switch-tile",
+		"on-scroll-down": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh switch-monocle",
+		"on-click": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh switch-centeredmaster",
+		"on-click-right": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh switch-bstack",
+		"on-click-middle": "/home/ron/.config/dwl-v0.7/waybar/scripts/dwl_layout.sh switch-bstackhoriz",
+	},
+
+
+    "dwl/window": {
+		"format": "{title}",
+		"max-length": 600,
+		"icon": true,
+		"rewrite": {
+			"(.*) - Mozilla Firefox": "🌎 $1",
+			"(.*) - vim": " $1",
+            "(.*) - nvim": " $1",
+			"(.*) - zsh": " [$1]"
+		}
+    },
+
+//  wttrbar from https://github.com/bjesus/wttrbar
+    "custom/wttrbar": {
+        "format": "{} °",
+        "tooltip": true,
+        "interval": 3600,
+        "exec": "wttrbar --date-format '%m/%d' --location Coleman --fahrenheit --main-indicator temp_F --ampm --hide-conditions",
+        "return-type": "json"
+    },
+
+    "custom/line": {
+        "format": " | ",
+        "tooltip": false,
+    },
+
+"clock": {
+		"interval": 1,
+		"format": " {:%r} ",
+		"format-alt": " {:%A, %B %d, %Y (%r)}  ",
+    //"tooltip-format": "<tt><small>{calendar}</small></tt>",
+	"tooltip-format": "<tt><small><span size='14pt' font='JetBrainsMono Nerd Font'>{calendar}</span></small></tt>",
+		"on-click-middle": "foot -T calcurse calcurse",
+		"calendar": {
+				"mode"          : "year",
+				"mode-mon-col"  : 3,
+				"weeks-pos"     : "right",
+				"on-scroll"     : 1,
+				"on-click-right": "mode",
+				"format": {
+						"months":     "<span color='#f9e2af'><b>{}</b></span>",
+						"days":       "<span color='#cba6f7'><b>{}</b></span>",
+						"weeks":      "<span color='#a6e3a1'><b>W{}</b></span>",
+						"weekdays":   "<span color='#fab387'><b>{}</b></span>",
+						"today":      "<span color='#f38ba8'><b><u>{}</u></b></span>"
+				}
+		},
+		"actions":  {
+				"on-click-right": "mode",
+				"on-click-forward": "tz_up",
+				"on-click-backward": "tz_down",
+				"on-scroll-up": "shift_up",
+				"on-scroll-down": "shift_down"
+		}
+},
+
+  "custom/updates": {
+    "exec": "/home/ron/.config/dwl-v0.7/waybar/scripts/update-checker2.sh",
+    "interval": 600,
+    "return-type": "json",
+    "format": "{}",
+    "on-click": "ghostty -e sudo emerge --ask --verbose --update --deep --newuse @world"
+},
+
+"mpd": {
+		"interval": 2,
+		"unknown-tag": "",
+		"format": "{stateIcon} {artist} - {title} ({elapsedTime:%M:%S}/{totalTime:%M:%S}) ",
+		"format-disconnected": " Disconnected",
+		"format-paused": "{stateIcon} {artist} - {title}",
+		"format-stopped": "Stopped ",
+		"state-icons": {
+				"paused": "",
+				"playing": "",
+		},
+		"tooltip-format": "MPD (connected)",
+		"tooltip-format-disconnected": "MPD (disconnected)",
+		// Commands to execute on events
+		"on-click": "mpc toggle",
+		"on-click-middle": "mpc prev",
+		"on-click-right": "mpc next",
+		"on-update": "",
+		"on-scroll-up": "mpc seek +00:00:01",
+		"on-scroll-down": "mpc seek -00:00:01",
+		"smooth-scrolling-threshold": 1,
+},
+
+"custom/gpu_zig": {
+    "exec": "/home/ron/Build/zig-waybar-contrib/zig-out/bin/gpu",
+    "return-type": "json",
+    "interval": 1
+},
+
+"memory": {
+		"interval": 5,
+		"format": "  {}%",
+		"on-click": "foot btop",
+		"states": {
+				"warning": 70,
+				"critical": 90
+		}
+},
+
+"custom/memory_zig": {
+    "exec": "/home/ron/Build/zig-waybar-contrib/zig-out/bin/memory",
+    "return-type": "json",
+    "interval": 1
+},
+
+"cpu": {
+		"interval": 5,
+		"format": "  {usage}% ({load}) ",
+		"states": {
+				"warning": 70,
+				"critical": 90,
+		},
+		"on-click": "foot 'htop'",
+},
+
+"custom/audio_idle_inhibitor": {
+	"format": "{icon}",
+	"exec": "sway-audio-idle-inhibit --dry-print-both-waybar",
+	"exec-if": "which sway-audio-idle-inhibit",
+	"return-type": "json",
+	"format-icons": {
+		"output": "",
+		"input": "",
+		"output-input": "  ",
+		"none": ""
+	}
+},
+
+"pulseaudio": {
+		"format": "{icon} {volume}%",
+		"format-bluetooth": "{icon} {volume}%",
+		"format-muted": " ",
+		"format-icons": {
+				"headphone": " ",
+				"hands-free": "󰂑 ",
+				"headset": "󰂑 ",
+				"phone": " ",
+				"portable": " ",
+				"car": " ",
+				"default": [" ", " "]
+		},
+		"scroll-step": 5,
+		"on-click": "pavucontrol",
+		"ignored-sinks": ["Easy Effects Sink"]
+},
+
+"custom/wlsunset": {
+		"exec": "~/.config/dwl-v0.7/waybar/scripts/wlsunset-status.sh",
+		"return-type": "json",
+		"interval": 2,
+		"on-click": "toggle-wlsunset.sh",
+		"tooltip": false
+},
+
+"idle_inhibitor": {
+    "format": "{icon}",
+    "format-icons": {
+        "activated": "",
+        "deactivated": ""
+    }
+},
+
+"tray": {
+		"icon-size": 12,
+		"spacing": 10
+},
+
+"custom/dunst": {
+    "exec": "~/.config/dwl-v0.7/waybar/scripts/dunst.sh",
+    "on-click": "dunstctl set-paused toggle",
+    "restart-interval": 1,
+	"tooltip": false
+},
+
+"custom/power1": {
+		"format":"⏻",
+		"on-click": "exec wlogout -css $HOME/.config/wlogout/style.css -l $HOME/.config/wlogout/layout -b 4 -m 650 -c 50 -p layer-shell",
+		"tooltip": false,
+},
+
+//FOR POWER GROUP
+"custom/quit": {
+		"format": "󰍃",
+		"tooltip": true,
+    "tooltip-format": "Logout",
+		"on-click": "pkill -TERM -u $USER"
+},
+
+"custom/lock": {
+		"format": "󰌾",
+		"tooltip": true,
+    "tooltip-format": "Lock",
+		"on-click": "lockit"
+},
+
+"custom/reboot": {
+		"format": "󰜉",
+		"tooltip": true,
+    "tooltip-format": "Reboot",
+		"on-click": "(sleep 10 && reboot) & (notify-send --urgency=critical --expire-time=20000 --wait 'System Reboot' 'The system will reboot in 10 seconds, click to cancel' && pkill sleep)",
+		"on-click-right": "reboot"
+},
+
+"custom/shutdown": {
+		"format": "󰐥",
+		"tooltip": true,
+    "tooltip-format": "Shutdown",
+		"on-click": "(sleep 10 && shutdown now) & (notify-send --urgency=critical --expire-time=20000 --wait 'System Shutdown' 'The system will shutdown in 10 seconds, click to cancel' && pkill sleep)",
+		"on-click-right": "shutdown now"
+},
+
+"custom/sleep": {
+		"format": "󰒲",
+		"tooltip": true,
+    "tooltip-format": "Sleep",
+		"on-click": "loginctl suspend"
+},
+
+"group/power": {
+		"orientation": "inherit",
+		"drawer": {
+				"transition-duration": 500,
+				"transition-left-to-right": false
+		},
+		"modules": [
+				"custom/power1",
+				"custom/quit",
+				"custom/lock",
+				"custom/sleep",
+				"custom/reboot",
+				"custom/shutdown"
+		]
+}
+
+}

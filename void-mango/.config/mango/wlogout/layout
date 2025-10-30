@@ -1,0 +1,23 @@
+{
+    "label" : "lock",
+    "action" : "swaylock",
+    "text" : "Lock"
+}
+
+{
+    "label" : "logout",
+    "action" : "mmsg -q",
+    "text" : "Logout"
+}
+
+{
+    "label" : "shutdown",
+    "action" : "(sleep 10 && loginctl shutdown now) & (notify-send --urgency=critical --expire-time=20000 --wait 'loginctl System Shutdown now' 'The system will shutdown in 10 seconds, click to cancel' && pkill sleep)",
+    "text" : "Shutdown"
+}
+
+{
+    "label" : "reboot",
+    "action" : "(sleep 10 && loginctl reboot) & (notify-send --urgency=critical --expire-time=20000 --wait 'loginctl reboot' 'The system will reboot in 10 seconds, click to cancel' && pkill sleep)",
+    "text" : "Reboot"
+}

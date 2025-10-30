@@ -1,0 +1,389 @@
+#!/bin/sh
+
+#=============================
+#==== Gentoo river config ====
+#=============================
+
+mod="Mod4"
+mod1="Mod1"
+terminal="kitty"
+filemanager="thunar"
+browser="firefox"
+#goTerm="footclient -e --app-id special-go --working-directory=$HOME/Projects/Go/ zsh -ic 'tmux new-session -s Go'"
+
+#=========================
+#==== start some shit ====
+#=========================
+
+riverctl spawn "pgrep -x kanshi >/dev/null || kanshi"
+riverctl spawn "swaybg -i /home/ron/Wallpapers/cat_gentoo_new_dark.png"
+riverctl spawn "swayidle_start.sh"
+riverctl spawn "gtk-setup.sh"
+riverctl spawn "gentoo-pipewire-launcher restart"
+riverctl spawn "mpd"
+#riverctl spawn "wlsunset -l 31.8 -L -99.4"
+riverctl spawn "dbus-update-activation-environment SEATD_SOCK DISPLAY WAYLAND _DISPLAY XDG_CURRENT_DESKTOP=river"
+riverctl spawn "dbus-update-activation-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=river"
+riverctl spawn "dbus-update-activation-environment XAUTHORITY"
+riverctl spawn "gnome-keyring-daemon --start --components=secrets"
+riverctl spawn "export $(gnome-keyring-daemon)"
+riverctl spawn '/usr/libexec/polkit-gnome-authentication-agent-1'
+riverctl spawn "pgrep -x waybar >/dev/null || (sleep 2 && waybar --config=/home/ron/.config/river/waybar/config.jsonc --style=/home/ron/.config/river/waybar/style.css)"
+#riverctl spawn 'yambar -c /home/ron/.config/yambar/config.yml -l always'
+riverctl spawn "pgrep -x dunst >/dev/null || dunst -conf /home/ron/.config/dunst/dunstrc_river"
+riverctl spawn "pgrep -x mpdris2-rs >/dev/null || mpdris2-rs"
+riverctl spawn "pgrep -x valent >/dev/null || valent"
+riverctl spawn "pgrep -x thunderbird-bin >/dev/null || thunderbird-bin"
+riverctl spawn "pgrep -x nm-applet >/dev/null || nm-applet"
+riverctl spawn "pgrep -x blueman-applet >/dev/null || (sleep 5; blueman-applet)"
+riverctl spawn "pgrep -x steam >/dev/null || steam %U 2>/dev/null"
+riverctl spawn "wl-paste --type text --watch cliphist store # Stores only text data"
+riverctl spawn "wl-paste --type image --watch cliphist store # Stores only image data"
+#riverctl spawn "pgrep -x waycorner >/dev/null || waycorner"
+riverctl spawn "pgrep -x udiskie >/dev/null || udiskie --smart-tray"
+
+#================
+#==== colors ====
+#================
+
+# Set background and border color
+riverctl background-color 0x1e1e2e
+riverctl border-color-focused 0xcba6f7
+riverctl border-color-unfocused 0x6c7086
+
+#==================
+#==== settings ====
+#==================
+
+riverctl set-repeat 50 300
+riverctl default-attach-mode bottom
+riverctl focus-follows-cursor normal
+riverctl hide-cursor timeout 10000 # 10 Seconds in milliseconds
+riverctl hide-cursor when-typing enabled
+riverctl set-cursor-warp on-focus-change
+riverctl xcursor-theme "XCursor-Pro-Light" 24
+
+#==================
+#==== Bindings ====
+#==================
+
+# $mod+Shift+Return to start an instance of foot (https://codeberg.org/dnkl/foot)
+riverctl map normal $mod Return spawn kitty
+
+# $mod+Q to close the focused view
+riverctl map normal $mod+Shift Q close
+
+# $mod+Shift+E to exit river
+riverctl map normal $mod+Shift E exit
+
+#==== restart river
+riverctl map normal $mod+Control R spawn "$HOME/.config/river/init >/dev/null && notify-send 'Refreshed River'"
+
+#==== app binds
+riverctl map normal Mod1 F spawn "riverctl set-focused-tags 2; firefox-bin"
+riverctl map normal Mod1 T spawn "riverctl set-focused-tags 4; thunar"
+riverctl map normal Mod1 R spawn "riverctl set-focused-tags 8; mousepad ~/.config/river/init"
+
+# Focus follows mouse
+riverctl focus-follows-cursor normal
+
+# Atatch new windows at the bottom of the stack
+riverctl attach-mode bottom
+
+#==== Take a screenshot now
+riverctl map normal None Print spawn 'screenshot2 --now'
+
+#==== Take a screenshot in 5 seconds
+riverctl map normal Super Print spawn 'screenshot2 --in5'
+
+#==== Take a screenshot of a window
+riverctl map normal Super+Shift Print spawn 'screenshot2 --win'
+
+#==== take a screnshot of a region
+riverctl map normal Super+Control Print spawn 'screenshot2 --area'
+
+#==== cliphist wofi
+riverctl map normal Super V spawn "cliphist list | wofi --dmenu | cliphist decode | wl-copy"
+
+#==== nwg-clipman
+riverctl map normal Mod1 C spawn "nwg-clipman"
+
+#==== menu stuff
+#riverctl map normal $mod D spawn "wofi --conf /home/ron/.config/river/wofi/config"
+riverctl map normal $mod D spawn "rofi_run_river -d"
+#riverctl map normal $mod X spawn "powermenu_river.sh"
+riverctl map normal $mod X spawn "wlogout --css $HOME/.config/river/wlogout/style.css -l $HOME/.config/river/wlogout/layout -b 4 -m 650 -c 50 -p layer-shell"
+#riverctl map normal $mod P spawn "wmenu-run -b -f 'JetBrainsMono Nerd Font 14' -p run-shit -M 89B4FA -m 1E1E2E -N 1E1E2ED0 -n CBA6F7 -S 89B4FA -s 1E1E2E"
+riverctl map normal $mod P spawn "mew-run"
+riverctl map normal Mod1+Shift E spawn "wofi-emoji"
+riverctl map normal Mod1 P spawn "cliphist list | wofi -S dmenu | cliphist decode | wl-copy"
+
+#==== toggle waybar
+riverctl map normal $mod T spawn "toggle_waybar_river.sh"
+#riverctl map normal $mod T spawn "pkill -SIGUSR1 '^waybar$'"
+riverctl map normal $mod+Alt T spawn "pkill -SIGUSR1 '^waybar$'"
+#riverctl map normal $mod+Shift T spwan "waybar --config=/home/ron/.config/river/waybar/config.jsonc --style=/home/ron/.config/river/waybar/style.css"
+
+#==== toggle yambar
+riverctl map normal $mod Y spawn "toggle_yambar.sh"
+riverctl map normal $mod+Shift Y spawn "pkill -SIGUSR1 '^yambar$'"
+
+#==== movement
+
+# $mod+J and $mod+K to focus the next/previous view in the layout stack
+riverctl map normal $mod J focus-view next
+riverctl map normal $mod K focus-view previous
+
+# $mod+Shift+J and $mod+Shift+K to swap the focused view with the next/previous
+# view in the layout stack
+riverctl map normal $mod+Shift J swap next
+riverctl map normal $mod+Shift K swap previous
+
+# $mod+Period and $mod+Comma to focus the next/previous output
+riverctl map normal $mod Period focus-output next
+riverctl map normal $mod Comma focus-output previous
+
+# $mod+Shift+{Period,Comma} to send the focused view to the next/previous output
+riverctl map normal $mod+Shift Period send-to-output next
+riverctl map normal $mod+Shift Comma send-to-output previous
+
+# $mod+Return to bump the focused view to the top of the layout stack
+riverctl map normal $mod+Shift Return zoom
+
+# $mod+Alt+{H,J,K,L} to move views
+riverctl map normal $mod+Alt H move left 100
+riverctl map normal $mod+Alt J move down 100
+riverctl map normal $mod+Alt K move up 100
+riverctl map normal $mod+Alt L move right 100
+
+# $mod+Alt+Control+{H,J,K,L} to snap views to screen edges
+riverctl map normal $mod+Alt+Control H snap left
+riverctl map normal $mod+Alt+Control J snap down
+riverctl map normal $mod+Alt+Control K snap up
+riverctl map normal $mod+Alt+Control L snap right
+
+# $mod+Alt+Shift+{H,J,K,L} to resize views
+riverctl map normal $mod+Alt+Shift H resize horizontal -100
+riverctl map normal $mod+Alt+Shift J resize vertical 100
+riverctl map normal $mod+Alt+Shift K resize vertical -100
+riverctl map normal $mod+Alt+Shift L resize horizontal 100
+
+# $mod + Left Mouse Button to move views
+riverctl map-pointer normal $mod BTN_LEFT move-view
+
+# $mod + Right Mouse Button to resize views
+riverctl map-pointer normal $mod BTN_RIGHT resize-view
+
+# $mod + Middle Mouse Button to toggle float
+riverctl map-pointer normal $mod BTN_MIDDLE toggle-float
+
+for i in $(seq 1 9); do
+  tags=$((1 << ($i - 1)))
+
+  # $mod+[1-9] to focus tag [0-8]
+  riverctl map normal $mod $i set-focused-tags $tags
+
+  # $mod+Shift+[1-9] to tag focused view with tag [0-8]
+  riverctl map normal $mod+Shift $i set-view-tags $tags
+
+  # $mod+Control+[1-9] to toggle focus of tag [0-8]
+  riverctl map normal $mod+Control $i toggle-focused-tags $tags
+
+  # $mod+Shift+Control+[1-9] to toggle tag [0-8] of focused view
+  riverctl map normal $mod+Shift+Control $i toggle-view-tags $tags
+done
+
+# $mod+0 to focus all tags
+# $mod+Shift+0 to tag focused view with all tags
+all_tags=$(((1 << 32) - 1))
+riverctl map normal $mod 0 set-focused-tags $all_tags
+riverctl map normal $mod+Shift 0 set-view-tags $all_tags
+
+# $mod+Space to toggle float
+riverctl map normal $mod Space toggle-float
+
+# $mod+F to toggle fullscreen
+riverctl map normal $mod F toggle-fullscreen
+
+# Declare a passthrough mode. This mode has only a single mapping to return to
+# normal mode. This makes it useful for testing a nested wayland compositor
+riverctl declare-mode passthrough
+
+# $mod+F11 to enter passthrough mode
+riverctl map normal $mod F11 enter-mode passthrough
+
+# $mod+F11 to return to normal mode
+riverctl map passthrough $mod F11 enter-mode normal
+
+#==== media keys
+# Various media key mapping examples for both normal and locked mode which do
+# not have a modifier
+for mode in normal locked; do
+  # Eject the optical drive (well if you still have one that is)
+  riverctl map $mode None XF86Eject spawn 'eject -T'
+
+  # Control pulse audio volume with pamixer (https://github.com/cdemoulins/pamixer)
+  riverctl map $mode None XF86AudioRaiseVolume spawn 'pulsemixer --change-volume +5 --max-volume 100; ~/.config/dunst/scripts/audio-notification-2.sh'
+  riverctl map $mode None XF86AudioLowerVolume spawn 'pulsemixer --change-volume -5; ~/.config/dunst/scripts/audio-notification-2.sh'
+  riverctl map $mode None XF86AudioMute spawn 'pulsemixer --toggle-mute; ~/.config/dunst/scripts/audio-notification-2.sh'
+
+  # Control MPRIS aware media players with playerctl (https://github.com/altdesktop/playerctl)
+  #riverctl map $mode None XF86Tools spawn 'foot ncmpcpp'
+  riverctl map $mode None XF86Tools spawn 'foot --title=ncmpcpp --app-id=ncmpcpp ncmpcpp'
+  riverctl map $mode None XF86AudioPlay spawn 'mpc toggle'
+  riverctl map $mode None XF86AudioPrev spawn 'mpc prev'
+  riverctl map $mode None XF86AudioNext spawn 'mpc next'
+
+  # Control screen backlight brightness with brightnessctl (https://github.com/Hummer12007/brightnessctl)
+  riverctl map $mode None XF86MonBrightnessUp spawn 'brightnessctl set +5%'
+  riverctl map $mode None XF86MonBrightnessDown spawn 'brightnessctl set 5%-'
+done
+
+#==== riverwm-utils
+riverctl map normal Mod1 Up spawn "cycle-focused-tags +1 9"
+riverctl map normal Mod1 Down spawn "cycle-focused-tags -1 9"
+
+#=============================
+#==== rivercarro bindings ====
+#=============================
+
+# Mod+H and Mod+L to decrease/increase the main ratio of rivercarro
+riverctl map normal $mod H send-layout-cmd rivercarro "main-ratio -0.05"
+riverctl map normal $mod L send-layout-cmd rivercarro "main-ratio +0.05"
+
+# Mod+Shift+H and Mod+Shift+L to increment/decrement the main count of rivercarro
+riverctl map normal $mod+Shift H send-layout-cmd rivercarro "main-count +1"
+riverctl map normal $mod+Shift L send-layout-cmd rivercarro "main-count -1"
+
+# Mod+{Up,Right,Down,Left} to change layout orientation
+riverctl map normal $mod Up send-layout-cmd rivercarro "main-location top"
+riverctl map normal $mod Right send-layout-cmd rivercarro "main-location right"
+riverctl map normal $mod Down send-layout-cmd rivercarro "main-location bottom"
+riverctl map normal $mod Left send-layout-cmd rivercarro "main-location left"
+# And for monocle
+riverctl map normal $mod M send-layout-cmd rivercarro "main-location monocle"
+# Cycle through layout
+riverctl map normal $mod W send-layout-cmd rivercarro "main-location-cycle left,monocle"
+
+# Add others rivercarro's commands the same way with the keybinds you'd like.
+# e.g.
+riverctl map normal $mod+Shift I send-layout-cmd rivercarro "inner-gaps -1"
+riverctl map normal $mod+Control I send-layout-cmd rivercarro "inner-gaps +1"
+riverctl map normal $mod+Shift O send-layout-cmd rivercarro "outer-gaps -1"
+riverctl map normal $mod+Control O send-layout-cmd rivercarro "outer-gaps +1"
+riverctl map normal $mod+Shift W send-layout-cmd rivercarro "width-ratio -0.1"
+riverctl map normal $mod+Control W send-layout-cmd rivercarro "width-ratio +0.1"
+
+#=====================
+#==== scratchpads ====
+#=====================
+
+# Scratchpads
+# Create scratchpad tags for each tag I need
+terminal_tag=$((1 << 11))
+files_tag=$((1 << 12))
+dots_tag=$((1 << 13))
+monitor_tag=$((1 << 14))
+docs_tag=$((1 << 15))
+ticktick_tag=$((1 << 16))
+spotify_tag=$((1 << 17))
+special_tag=$((1 << 18))
+# special2_tag=$((1 << 19))
+# special3_tag=$((1 << 20))
+#
+all_tags=$(((1 << 32) - 1))
+scratch_tags=$((terminal_tag | files_tag | dots_tag | monitor_tag | docs_tag | ticktick_tag | spotify_tag | special_tag))
+all_but_scratch_tag=$((all_tags ^ scratch_tags))
+riverctl spawn-tagmask ${all_but_scratch_tag}
+
+scratchpad="$HOME/.config/river/scratchpads.sh"
+
+riverctl map normal $mod+Shift S spawn "$scratchpad term"
+riverctl map normal $mod+Shift B spawn "$scratchpad btop"
+riverctl map normal $mod+Shift E spawn "$scratchpad files"
+riverctl map normal $mod+Shift N spawn "$scratchpad nvim"
+
+riverctl map normal $mod+Shift D set-focused-tags $docs_tag
+#riverctl map normal $mod+Shift S set-focused-tags $spotify_tag
+riverctl map normal $mod+Shift I set-focused-tags $ticktick_tag
+riverctl map normal $mod+Shift Space set-focused-tags $special_tag
+
+riverctl rule-add -app-id "special-term" tags $terminal_tag
+riverctl rule-add -app-id "special-files" tags $files_tag
+riverctl rule-add -app-id "special-nvim" tags $dots_tag
+riverctl rule-add -app-id "special-btop" tags $monitor_tag
+riverctl rule-add -app-id "ticktick" tags $ticktick_tag
+riverctl rule-add -app-id "Spotify" tags $spotify_tag
+riverctl rule-add -app-id "YouTube Music" tags $spotify_tag
+riverctl rule-add -app-id "org.qbittorrent.qBittorrent" tags $special_tag
+
+# Toggle the scratchpad
+riverctl map normal $mod S toggle-focused-tags ${terminal_tag}
+riverctl map normal $mod B toggle-focused-tags ${monitor_tag}
+riverctl map normal $mod E toggle-focused-tags ${files_tag}
+riverctl map normal $mod N toggle-focused-tags ${dots_tag}
+
+riverctl rule-add -app-id "special-term" float
+#riverctl rule-add -app-id "special-term" dimensions 1360 900
+#riverctl rule-add -app-id "special-term" position 600 270
+riverctl rule-add -app-id "special-term" dimensions 2560 900
+riverctl rule-add -app-id "special-term" position 0 35
+
+#===============
+#==== rules ====
+#===============
+
+# Make all views with an app-id that starts with "float" and title "foo" start floating.
+#riverctl rule-add -app-id 'float*' -title 'foo' float
+
+# Make all views with app-id "bar" and any title use client-side decorations
+#riverctl rule-add -app-id "bar" csd
+
+riverctl rule-add -app-id "mousepad" ssd
+riverctl rule-add -app-id "thunar" ssd
+riverctl rule-add -app-id "firefox" ssd
+riverctl rule-add ssd
+
+#==== float rules
+riverctl rule-add -app-id "foot" -title "calcurse" float
+riverctl rule-add -app-id "dropdown" float
+riverctl rule-add -app-id "org.gnome.Calculator" float
+riverctl rule-add -app-id "nl.hjdskes.gcolor3" float
+riverctl rule-add -app-id "Gimp-2.10" -title "Change Background Color" float
+riverctl rule-add -app-id "Gimp-2.10" -title "Change Foreground Color" float
+riverctl rule-add -app-id "main.py" -title "Azote Palettes" float
+riverctl rule-add -app-id "ncmpcpp" float
+riverctl rule-add -app-id "thunar" -title "Rename *" float
+
+#==== set tag rules
+riverctl rule-add -app-id "firefox-bin" tags $((1 << (2 - 1)))
+riverctl rule-add -app-id "zen" tags $((1 << (2 - 1)))
+riverctl rule-add -app-id "thunar" tags $((1 << (3 - 1)))
+riverctl rule-add -app-id "mousepad" tags $((1 << (4 - 1)))
+riverctl rule-add -app-id "Gimp-2.10" tags $((1 << (5 - 1)))
+riverctl rule-add -app-id "steam" tags $((1 << (6 - 1)))
+riverctl rule-add -app-id "heroic" tags $((1 << (6 - 1)))
+riverctl rule-add -app-id "Spotify" tags $((1 << (7 - 1)))
+riverctl rule-add -app-id "Cider" tags $((1 << (7 - 1)))
+riverctl rule-add -app-id "mpv" tags $((1 << (7 - 1)))
+riverctl rule-add -app-id "ncmpcpp" tags $((1 << (7 - 1)))
+riverctl rule-add -app-id "discord" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "vesktop" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "org.squidowl.halloy" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "org.telegram.desktop" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "im.riot.Riot" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "dev.geopjr.Tuba" tags $((1 << (8 - 1)))
+riverctl rule-add -app-id "tutanota-desktop" tags $((1 << (9 - 1)))
+riverctl rule-add -app-id "thunderbird" tags $((1 << (9 - 1)))
+riverctl rule-add -app-id "betterbird" tags $((1 << (9 - 1)))
+riverctl rule-add -app-id "valent" tags $((1 << (10 - 1)))
+
+#=================
+#==== layouts ====
+#=================
+
+#==== rivercarro
+## Set the default layout generator to be rivercarro and start it.
+## River will send the process group of the init executable SIGTERM on exit.
+riverctl default-layout rivercarro
+pgrep -x rivercarro >/dev/null || rivercarro -outer-gaps 6 -per-tag &
