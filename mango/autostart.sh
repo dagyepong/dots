@@ -35,6 +35,9 @@ wl-paste --type text --watch cliphist store >/dev/null 2>&1 &
 # bluetooth 
 blueman-applet >/dev/null 2>&1 &
 
+# idle to lightdown and shutdown screen
+~/.config/mango/scripts/idle.sh >/dev/null 2>&1 &
+
 # network
 nm-applet >/dev/null 2>&1 &
 xfce4-power-manager >/dev/null 2>&1 &
