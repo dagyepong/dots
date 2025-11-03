@@ -252,162 +252,118 @@ mount_filesystems() {
     log_success "Filesystems mounted"
 }
 
-# FIXED: Reliable stage3 download function
+# SIMPLIFIED: Direct stage3 download with user input
 download_stage3() {
-    log_info "Downloading Gentoo stage3"
+    log_info "Stage3 Download"
+    echo
+    log_warning "Due to frequent changes in Gentoo's mirror structure, we need to manually get the stage3 URL."
+    echo
+    log_info "Please follow these steps:"
+    echo "1. Open a web browser and go to: https://www.gentoo.org/downloads/"
+    echo "2. Find the 'AMD64 OpenRC' version under 'Stage3' section"
+    echo "3. Right-click on the download link and copy the URL"
+    echo "4. Paste the URL below"
+    echo
+    log_info "Alternatively, you can try one of these common URLs (replace DATE with current date):"
+    echo "https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc-DATE.tar.xz"
+    echo "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc-DATE.tar.xz"
+    echo
+    
+    while true; do
+        read -p "Enter the full stage3 URL: " stage3_url
+        
+        if [ -z "$stage3_url" ]; then
+            log_error "URL cannot be empty"
+            continue
+        fi
+        
+        # Basic URL validation
+        if [[ "$stage3_url" != *"stage3-amd64-openrc"* ]] || [[ "$stage3_url" != *".tar.xz" ]]; then
+            log_warning "URL doesn't look like a stage3 amd64 openrc tarball. Are you sure? (y/n)"
+            read -p "Continue anyway? (y/n): " confirm
+            if [[ $confirm != "y" && $confirm != "Y" ]]; then
+                continue
+            fi
+        fi
+        
+        cd "$MOUNT_POINT"
+        
+        log_info "Downloading: $stage3_url"
+        
+        # Download with retry logic
+        if wget --tries=3 --progress=bar:force "$stage3_url"; then
+            # Get the filename from URL
+            filename=$(basename "$stage3_url")
+            
+            # Verify file exists and has reasonable size
+            if [ ! -f "$filename" ]; then
+                log_error "Downloaded file not found: $filename"
+                return 1
+            fi
+            
+            filesize=$(stat -c%s "$filename" 2>/dev/null || stat -f%z "$filename")
+            if [ "$filesize" -lt 200000000 ]; then
+                log_error "File seems too small ($filesize bytes). Download may have failed."
+                rm -f "$filename"
+                return 1
+            fi
+            
+            log_info "Extracting stage3 (this may take a while)..."
+            if tar xpvf "$filename" --xattrs-include='*.*' --numeric-owner; then
+                rm -f "$filename"
+                log_success "Stage3 extracted successfully"
+                return 0
+            else
+                log_error "Failed to extract stage3 tarball"
+                rm -f "$filename"
+                return 1
+            fi
+        else
+            log_error "Failed to download stage3 from: $stage3_url"
+            log_info "Please check the URL and try again"
+            return 1
+        fi
+    done
+}
+
+# Alternative: Try to find stage3 automatically
+try_auto_download() {
+    log_info "Attempting to find stage3 automatically..."
     
     cd "$MOUNT_POINT"
     
-    # Use multiple reliable mirrors
-    MIRRORS=(
+    # Try to get the current stage3 from a known working mirror
+    base_urls=(
         "https://distfiles.gentoo.org/releases/amd64/autobuilds"
-        "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds" 
-        "https://gentoo.osuosl.org/releases/amd64/autobuilds"
-        "https://mirror.leaseweb.com/gentoo/releases/amd64/autobuilds"
+        "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds"
     )
     
-    local stage3_found=false
-    local stage3_url=""
-    local stage3_file=""
-    
-    # Try each mirror to find the latest stage3
-    for mirror in "${MIRRORS[@]}"; do
-        log_info "Trying mirror: $mirror"
+    for base_url in "${base_urls[@]}"; do
+        log_info "Trying: $base_url"
         
-        # Download the latest stage3 information file
-        if wget -q -O latest-stage3.txt "${mirror}/latest-stage3-amd64-openrc.txt"; then
-            # Extract the latest stage3 filename (skip comments and get first field of first data line)
-            stage3_file=$(grep -v '^#' latest-stage3.txt | grep -v '^$' | head -1 | awk '{print $1}')
+        # Try to get the latest stage3 filename
+        if wget -q -O latest-stage3.txt "$base_url/latest-stage3-amd64-openrc.txt"; then
+            # Parse the file to get the actual stage3 filename
+            stage3_path=$(grep -v '^#' latest-stage3.txt | grep -v '^$' | head -1 | awk '{print $1}')
             
-            if [ -n "$stage3_file" ]; then
-                stage3_url="${mirror}/${stage3_file}"
-                log_info "Found stage3: $stage3_file"
-                stage3_found=true
-                break
-            else
-                log_warning "Could not parse stage3 filename from mirror $mirror"
+            if [ -n "$stage3_path" ]; then
+                full_url="$base_url/$stage3_path"
+                log_info "Found stage3: $full_url"
+                
+                if wget --progress=bar:force "$full_url"; then
+                    filename=$(basename "$full_url")
+                    tar xpvf "$filename" --xattrs-include='*.*' --numeric-owner
+                    rm -f "$filename" latest-stage3.txt
+                    log_success "Auto-download successful!"
+                    return 0
+                fi
             fi
-        else
-            log_warning "Mirror $mirror failed"
+            rm -f latest-stage3.txt
         fi
     done
     
-    if [ "$stage3_found" = false ]; then
-        log_error "Could not find stage3 from any mirror"
-        return 1
-    fi
-    
-    log_info "Downloading: $stage3_url"
-    
-    # Download the stage3 tarball
-    if ! wget --progress=bar:force "$stage3_url"; then
-        log_error "Failed to download stage3 tarball"
-        return 1
-    fi
-    
-    # Get the actual filename from URL
-    local tarball_name=$(basename "$stage3_url")
-    
-    # Verify the file exists and has reasonable size
-    if [ ! -f "$tarball_name" ]; then
-        log_error "Downloaded file not found: $tarball_name"
-        return 1
-    fi
-    
-    local file_size=$(stat -c%s "$tarball_name" 2>/dev/null || stat -f%z "$tarball_name")
-    if [ "$file_size" -lt 200000000 ]; then  # Less than 200MB indicates problem
-        log_error "Stage3 tarball seems too small ($file_size bytes). Download may have failed."
-        return 1
-    fi
-    
-    log_info "Extracting stage3 (this may take a while...)"
-    
-    # Extract with proper flags
-    if ! tar xpvf "$tarball_name" --xattrs-include='*.*' --numeric-owner; then
-        log_error "Failed to extract stage3 tarball"
-        return 1
-    fi
-    
-    # Clean up
-    rm -f "$tarball_name" latest-stage3.txt
-    
-    log_success "Stage3 downloaded and extracted successfully"
-    return 0
-}
-
-# Alternative manual stage3 selection
-download_stage3_manual() {
-    log_info "Starting manual stage3 selection"
-    
-    cd "$MOUNT_POINT"
-    
-    # Show user available options
-    log_info "Available stage3 versions (amd64 openrc):"
-    echo "1. Use latest automatic detection (recommended)"
-    echo "2. Enter specific stage3 URL manually"
-    echo "3. Browse available versions on Gentoo mirrors"
-    
-    read -p "Choose option (1-3): " manual_choice
-    
-    case $manual_choice in
-        1)
-            # Try the automatic method again
-            if download_stage3; then
-                return 0
-            else
-                log_error "Automatic download failed"
-                return 1
-            fi
-            ;;
-        2)
-            read -p "Enter full stage3 URL: " custom_url
-            if [ -z "$custom_url" ]; then
-                log_error "No URL provided"
-                return 1
-            fi
-            
-            log_info "Downloading from custom URL: $custom_url"
-            if wget --progress=bar:force "$custom_url"; then
-                local tarball_name=$(basename "$custom_url")
-                tar xpvf "$tarball_name" --xattrs-include='*.*' --numeric-owner
-                rm -f "$tarball_name"
-                log_success "Stage3 downloaded and extracted successfully"
-                return 0
-            else
-                log_error "Failed to download from custom URL"
-                return 1
-            fi
-            ;;
-        3)
-            log_info "Here are some common stage3 URLs (you might need to check for latest version):"
-            echo "https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc/"
-            echo "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds/current-stage3-amd64-openrc/"
-            echo ""
-            log_info "Please visit one of these URLs in your browser to find the latest stage3 filename."
-            read -p "Enter the full URL of the stage3 tarball you want to download: " manual_url
-            
-            if [ -n "$manual_url" ]; then
-                log_info "Downloading: $manual_url"
-                if wget --progress=bar:force "$manual_url"; then
-                    local tarball_name=$(basename "$manual_url")
-                    tar xpvf "$tarball_name" --xattrs-include='*.*' --numeric-owner
-                    rm -f "$tarball_name"
-                    log_success "Stage3 downloaded and extracted successfully"
-                    return 0
-                else
-                    log_error "Failed to download from provided URL"
-                    return 1
-                fi
-            else
-                log_error "No URL provided"
-                return 1
-            fi
-            ;;
-        *)
-            log_error "Invalid choice"
-            return 1
-            ;;
-    esac
+    log_warning "Auto-download failed"
+    return 1
 }
 
 # Configure make.conf
@@ -732,13 +688,10 @@ main() {
     format_partitions
     mount_filesystems
     
-    # Download stage3 with fallback to manual selection
-    if ! download_stage3; then
-        log_warning "Automatic stage3 download failed, starting manual selection..."
-        if ! download_stage3_manual; then
-            log_error "All stage3 download attempts failed. Please check your internet connection and try again."
-            exit 1
-        fi
+    # Try auto download first, then manual if it fails
+    if ! try_auto_download; then
+        log_warning "Auto-download failed, switching to manual download..."
+        download_stage3
     fi
     
     configure_makeconf
