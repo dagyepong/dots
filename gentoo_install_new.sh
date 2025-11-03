@@ -252,31 +252,109 @@ mount_filesystems() {
     log_success "Filesystems mounted"
 }
 
-# Download and extract stage3
+# Download and extract stage3 - FIXED VERSION
 download_stage3() {
     log_info "Downloading Gentoo stage3"
     
     cd "$MOUNT_POINT"
     
-    # Get latest stage3 openrc amd64
-    STAGE3_URL=$(curl -s https://www.gentoo.org/downloads/ | grep -oP 'https://.*stage3-amd64-openrc-[0-9]{8}T[0-9]{6}Z.tar.xz' | head -1)
+    # Use Gentoo's automatic stage3 finder
+    MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     
-    if [ -z "$STAGE3_URL" ]; then
-        log_error "Could not find stage3 download URL"
+    # Get the latest stage3 openrc amd64 filename
+    log_info "Finding latest stage3 openrc amd64..."
+    
+    # Download the latest-stage3-amd64-openrc.txt file
+    if ! wget -q "${MIRROR}/latest-stage3-amd64-openrc.txt" -O latest-stage3.txt; then
+        log_error "Failed to download stage3 information"
+        log_info "Trying alternative mirror..."
+        MIRROR="https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds"
+        if ! wget -q "${MIRROR}/latest-stage3-amd64-openrc.txt" -O latest-stage3.txt; then
+            log_error "Failed to download from alternative mirror too"
+            exit 1
+        fi
+    fi
+    
+    # Extract the latest stage3 filename (skip the first line which contains the directory)
+    STAGE3_FILE=$(tail -n 1 latest-stage3.txt | awk '{print $1}')
+    
+    if [ -z "$STAGE3_FILE" ]; then
+        log_error "Could not determine latest stage3 filename"
         exit 1
     fi
     
-    log_info "Downloading: $STAGE3_URL"
-    wget "$STAGE3_URL"
-    STAGE3_FILE=$(basename "$STAGE3_URL")
+    STAGE3_URL="${MIRROR}/${STAGE3_FILE}"
     
-    log_info "Extracting stage3"
-    tar xpvf "$STAGE3_FILE" --xattrs-include='*.*' --numeric-owner
+    log_info "Downloading: $STAGE3_URL"
+    
+    # Download with resume support and show progress
+    if ! wget --continue --progress=bar:force "$STAGE3_URL"; then
+        log_error "Failed to download stage3 tarball"
+        exit 1
+    fi
+    
+    # Extract the actual filename from the URL
+    STAGE3_TARBALL=$(basename "$STAGE3_URL")
+    
+    log_info "Verifying stage3 tarball..."
+    if [ ! -f "$STAGE3_TARBALL" ]; then
+        log_error "Downloaded file not found: $STAGE3_TARBALL"
+        exit 1
+    fi
+    
+    # Check file size to make sure download completed
+    FILE_SIZE=$(stat -c%s "$STAGE3_TARBALL" 2>/dev/null || stat -f%z "$STAGE3_TARBALL")
+    if [ "$FILE_SIZE" -lt 100000000 ]; then  # Less than 100MB indicates incomplete download
+        log_error "Stage3 tarball seems too small. Download may have failed."
+        exit 1
+    fi
+    
+    log_info "Extracting stage3 (this may take a while...)"
+    if ! tar xpvf "$STAGE3_TARBALL" --xattrs-include='*.*' --numeric-owner; then
+        log_error "Failed to extract stage3 tarball"
+        exit 1
+    fi
     
     # Clean up
-    rm "$STAGE3_FILE"
+    rm -f "$STAGE3_TARBALL" latest-stage3.txt
     
-    log_success "Stage3 downloaded and extracted"
+    log_success "Stage3 downloaded and extracted successfully"
+}
+
+# Alternative stage3 download method
+download_stage3_alternative() {
+    log_info "Trying alternative stage3 download method..."
+    cd "$MOUNT_POINT"
+    
+    # Try direct download from a known working mirror
+    MIRRORS=(
+        "https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc"
+        "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds/current-stage3-amd64-openrc"
+        "https://gentoo.osuosl.org/releases/amd64/autobuilds/current-stage3-amd64-openrc"
+    )
+    
+    for mirror in "${MIRRORS[@]}"; do
+        # First try to get the latest filename
+        if wget -q "${mirror}/latest-stage3-amd64-openrc.txt" -O latest-stage3.txt; then
+            STAGE3_FILE=$(grep -v '^#' latest-stage3.txt | grep stage3-amd64-openrc | head -1 | awk '{print $1}')
+            if [ -n "$STAGE3_FILE" ]; then
+                STAGE3_URL="${mirror}/${STAGE3_FILE}"
+                log_info "Found stage3: $STAGE3_URL"
+                
+                if wget --continue --progress=bar:force "$STAGE3_URL"; then
+                    STAGE3_TARBALL=$(basename "$STAGE3_URL")
+                    log_info "Extracting $STAGE3_TARBALL..."
+                    tar xpvf "$STAGE3_TARBALL" --xattrs-include='*.*' --numeric-owner
+                    rm -f "$STAGE3_TARBALL" latest-stage3.txt
+                    log_success "Stage3 downloaded and extracted successfully"
+                    return 0
+                fi
+            fi
+        fi
+    done
+    
+    log_error "All stage3 download attempts failed"
+    return 1
 }
 
 # Configure make.conf
@@ -599,7 +677,16 @@ main() {
     setup_luks
     format_partitions
     mount_filesystems
-    download_stage3
+    
+    # Try to download stage3 with fallback
+    if ! download_stage3; then
+        log_warning "Primary stage3 download failed, trying alternative method..."
+        if ! download_stage3_alternative; then
+            log_error "All stage3 download attempts failed. Please check your internet connection."
+            exit 1
+        fi
+    fi
+    
     configure_makeconf
     configure_system
     chroot_configure
