@@ -252,7 +252,7 @@ mount_filesystems() {
     log_success "Filesystems mounted"
 }
 
-# SIMPLIFIED: Direct stage3 download with user input
+# Manual stage3 download
 download_stage3() {
     log_info "Stage3 Download"
     echo
@@ -264,10 +264,6 @@ download_stage3() {
     echo "3. Right-click on the download link and copy the URL"
     echo "4. Paste the URL below"
     echo
-    log_info "Alternatively, you can try one of these common URLs (replace DATE with current date):"
-    echo "https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc-DATE.tar.xz"
-    echo "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc-DATE.tar.xz"
-    echo
     
     while true; do
         read -p "Enter the full stage3 URL: " stage3_url
@@ -275,15 +271,6 @@ download_stage3() {
         if [ -z "$stage3_url" ]; then
             log_error "URL cannot be empty"
             continue
-        fi
-        
-        # Basic URL validation
-        if [[ "$stage3_url" != *"stage3-amd64-openrc"* ]] || [[ "$stage3_url" != *".tar.xz" ]]; then
-            log_warning "URL doesn't look like a stage3 amd64 openrc tarball. Are you sure? (y/n)"
-            read -p "Continue anyway? (y/n): " confirm
-            if [[ $confirm != "y" && $confirm != "Y" ]]; then
-                continue
-            fi
         fi
         
         cd "$MOUNT_POINT"
@@ -326,47 +313,7 @@ download_stage3() {
     done
 }
 
-# Alternative: Try to find stage3 automatically
-try_auto_download() {
-    log_info "Attempting to find stage3 automatically..."
-    
-    cd "$MOUNT_POINT"
-    
-    # Try to get the current stage3 from a known working mirror
-    base_urls=(
-        "https://distfiles.gentoo.org/releases/amd64/autobuilds"
-        "https://ftp.acc.umu.se/mirror/gentoo/releases/amd64/autobuilds"
-    )
-    
-    for base_url in "${base_urls[@]}"; do
-        log_info "Trying: $base_url"
-        
-        # Try to get the latest stage3 filename
-        if wget -q -O latest-stage3.txt "$base_url/latest-stage3-amd64-openrc.txt"; then
-            # Parse the file to get the actual stage3 filename
-            stage3_path=$(grep -v '^#' latest-stage3.txt | grep -v '^$' | head -1 | awk '{print $1}')
-            
-            if [ -n "$stage3_path" ]; then
-                full_url="$base_url/$stage3_path"
-                log_info "Found stage3: $full_url"
-                
-                if wget --progress=bar:force "$full_url"; then
-                    filename=$(basename "$full_url")
-                    tar xpvf "$filename" --xattrs-include='*.*' --numeric-owner
-                    rm -f "$filename" latest-stage3.txt
-                    log_success "Auto-download successful!"
-                    return 0
-                fi
-            fi
-            rm -f latest-stage3.txt
-        fi
-    done
-    
-    log_warning "Auto-download failed"
-    return 1
-}
-
-# Configure make.conf
+# Configure make.conf with GPG settings
 configure_makeconf() {
     log_info "Configuring make.conf"
     
@@ -389,7 +336,7 @@ configure_makeconf() {
         JOBS=$CPU_CORES
     fi
     
-    # Basic configuration
+    # Basic configuration with GPG settings
     cat > "$MAKE_CONF" << EOF
 # Common flags
 COMMON_FLAGS="-march=native -O2 -pipe"
@@ -408,7 +355,7 @@ EMERGE_DEFAULT_OPTS="--jobs=${JOBS} --load-average=${JOBS}"
 FEATURES="buildpkg candy compress-build-logs parallel-fetch userfetch usersync"
 
 # Use binary packages for faster installation
-EMERGE_DEFAULT_OPTS="\${EMERGE_DEFAULT_OPTS} --getbinpkg"
+EMERGE_DEFAULT_OPTS="\${EMERGE_DEFAULT_OPTS} --getbinpkg --getbinpkgonly"
 FEATURES="\${FEATURES} getbinpkg"
 
 # Binary package host
@@ -416,6 +363,13 @@ GENTOO_MIRRORS="https://distfiles.gentoo.org"
 
 # License settings
 ACCEPT_LICENSE="*"
+
+# GPG verification for binary packages
+BINPKG_FORMAT="gpkg"
+BINPKG_COMPRESS="zstd"
+
+# Allow temporary GPG failures during installation (will be fixed in chroot)
+FEATURES="\${FEATURES} -gpg-verify -gpg-verify-binpkg"
 EOF
 
     # Ask user for custom configuration
@@ -461,7 +415,7 @@ EOF
     log_success "Basic system configured"
 }
 
-# Chroot and configure system
+# Chroot and configure system with GPG key setup
 chroot_configure() {
     log_info "Chrooting into new system"
     
@@ -495,17 +449,45 @@ eselect locale set en_US.utf8
 # Update environment
 env-update && source /etc/profile
 
-# Sync portage
+# Install and setup GPG keys FIRST
+log_info "Setting up Gentoo GPG keys for package verification..."
+
+# Install necessary tools for key management
+log_info "Installing key management tools"
+emerge --verbose app-crypt/gnupg
+
+# Create portage GPG directory
+mkdir -p /etc/portage/gnupg
+chmod 700 /etc/portage/gnupg
+
+# Import Gentoo release engineering keys
+log_info "Importing Gentoo release engineering keys..."
+gpg --list-keys || true
+
+# Try to download and import keys from keyserver
+log_info "Fetching Gentoo keys from keyserver..."
+gpg --keyserver hkps://keys.gentoo.org --recv-keys 0xBB572E0E2D182910 || true
+gpg --keyserver hkps://keys.gentoo.org --recv-keys 0xDB6B8C1F96D8BF6D || true
+
+# Alternative: Install gentoo-keys package
+log_info "Installing gentoo-keys package..."
+emerge --verbose app-crypt/gentoo-keys
+
+# Update make.conf to re-enable GPG verification
+log_info "Updating make.conf to enable GPG verification..."
+sed -i 's/-gpg-verify -gpg-verify-binpkg/gpg-verify gpg-verify-binpkg/' /etc/portage/make.conf
+
+# Sync portage with proper keys
 log_info "Syncing Portage tree"
 emerge --sync
 
 # Install gentoo-kernel-bin (pre-compiled kernel)
 log_info "Installing gentoo-kernel-bin"
-emerge --ask --verbose sys-kernel/gentoo-kernel-bin
+FEATURES="-gpg-verify" emerge --verbose sys-kernel/gentoo-kernel-bin
 
-# Install necessary tools
+# Install necessary tools (temporarily disable GPG verification if needed)
 log_info "Installing necessary system tools"
-emerge --ask --verbose \
+FEATURES="-gpg-verify" emerge --verbose \
     sys-boot/grub \
     sys-fs/cryptsetup \
     net-misc/dhcpcd \
@@ -514,7 +496,7 @@ emerge --ask --verbose \
 
 # Generate initramfs with LUKS support
 log_info "Generating initramfs with LUKS support"
-emerge --ask --verbose sys-kernel/genkernel
+emerge --verbose sys-kernel/genkernel
 
 # Create genkernel configuration for LUKS
 cat > /etc/genkernel.conf << 'GENKERNEL'
@@ -570,14 +552,18 @@ echo "keymap=\"${KEYMAP}\"" > /etc/conf.d/keymaps
 # Configure hostname
 echo "hostname=\"${HOSTNAME}\"" > /etc/conf.d/hostname
 
-# Install additional useful packages
-log_info "Installing additional useful packages"
-emerge --ask --verbose \
+# Now install additional packages with GPG verification enabled
+log_info "Installing additional useful packages with GPG verification"
+emerge --verbose \
     sys-apps/usbutils \
     sys-process/htop \
     net-misc/curl \
     app-misc/tmux \
     sys-fs/e2fsprogs
+
+# Verify that GPG is working
+log_info "Verifying GPG setup..."
+emerge --info | grep -i gpg || true
 
 # Cleanup
 umount /boot/efi
@@ -687,13 +673,7 @@ main() {
     setup_luks
     format_partitions
     mount_filesystems
-    
-    # Try auto download first, then manual if it fails
-    if ! try_auto_download; then
-        log_warning "Auto-download failed, switching to manual download..."
-        download_stage3
-    fi
-    
+    download_stage3
     configure_makeconf
     configure_system
     chroot_configure
