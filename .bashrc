@@ -87,3 +87,7 @@ PS1="\[$userColor\]\$USER\[\e[m\]@\[\e[38;2;255;176;0m\]\$HOSTNAME\[\e[m\] \
 
 PS4="-[\e[33m${BASH_SOURCE[0]%.sh}\e[m: \e[32m$LINENO\e[m]\
   ${FUNCNAME:+${FUNCNAME[0]}(): }"
+
+  if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
+    dbus-run-session mango
+fi
