@@ -7,7 +7,7 @@ set +e
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots >/dev/null 2>&1
 
 # xwayland dpi scale
-echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
+#echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
 # xrdb merge ~/.Xresources >/dev/null 2>&1
 
 # dms shell
