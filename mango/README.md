@@ -23,3 +23,15 @@ git clone https://github.com/Dreammango/mango-config.git ~/.config/mango
 - alt+left/right/up/down: focus direction
 - super+m: quit mango
 
+
+### **Using Gsettings for themes:**
+
+# Set Gruvbox Material theme
+gsettings set org.gnome.desktop.interface gtk-theme "Gruvbox-Material-Dark"
+gsettings set org.gnome.desktop.interface icon-theme "Adwaita"
+gsettings set org.gnome.desktop.interface cursor-theme "Bibata-Modern-Ice"
+gsettings set org.gnome.desktop.interface cursor-size 24
+gsettings set org.gnome.desktop.interface font-name "Noto Sans 10"
+
+# Enable dark mode
+gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
