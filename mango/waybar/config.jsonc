@@ -9,7 +9,6 @@
     "height": 45,
     "modules-left": [
         "ext/workspaces",
-        // "dwl/tags",
         "wlr/taskbar",
         "dwl/window"
     ],
@@ -20,6 +19,7 @@
         "cpu",
         "temperature",
         "backlight",
+        "battery",
         "clock",
         "custom/notification",
         "custom/power"
@@ -27,25 +27,9 @@
     "ext/workspaces": {
       "format": "{icon}",
       "ignore-hidden": true,
-      // "active-only":true,
       "on-click": "activate",
       "on-click-right": "deactivate",
-      "sort-by-id": true,
-      // "format-icons": {
-      //   "1": "",
-      //   "2": "",
-      //   "3": "",
-      //   "4": "",
-      //   "5": "",
-      //   "urgent": "",
-      //   "active": "",
-      //   "default": ""
-      // },
-    },
-    "dwl/tags": {
-      "num-tags": 9,
-      "hide-vacant": true,
-      // "tag-labels": ["一", "二", "三", "四", "五", "六", "七", "八", "九"]
+      "sort-by-id": true
     },
     "dwl/window": {
         "format": "[{layout}]{title}"
@@ -54,14 +38,14 @@
       "tooltip": false,
       "format": "{icon}",
       "format-icons": {
-        "notification": "<span foreground='red'><sup></sup></span>",
-        "none": "  ",
-        "dnd-notification": "<span foreground='red'><sup></sup></span>",
-        "dnd-none": "",
-        "inhibited-notification": "<span foreground='red'><sup></sup></span>",
-        "inhibited-none": "",
-        "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
-        "dnd-inhibited-none": ""
+        "notification": "<span foreground='red'><sup></sup></span>",
+        "none": "  ",
+        "dnd-notification": "<span foreground='red'><sup></sup></span>",
+        "dnd-none": "",
+        "inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "inhibited-none": "",
+        "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "dnd-inhibited-none": ""
       },
       "return-type": "json",
       "exec-if": "which swaync-client",
@@ -88,7 +72,7 @@
       "thermal-zone": 2,
       "hwmon-path": "/sys/class/hwmon/hwmon1/temp1_input",
       "critical-threshold": 10,
-      "format-critical": " {temperatureC}°C",
+      "format-critical": " {temperatureC}°C",
       "format": ""
     },
     "wlr/taskbar": {
@@ -105,10 +89,25 @@
       "interval": 2,
       "device": "amdgpu_bl0",
       "format": "{icon} {percent}%",
-      "format-icons": ["󰖔", "󰖨"],
+      "format-icons": ["🔅", "🔆"],
       "on-scroll-up": "brightnessctl set +1%",
       "on-scroll-down": "brightnessctl set 1%-",
       "smooth-scrolling-threshold": 1
+    },
+    "battery": {
+        "bat": "BAT1",
+        "interval": 30,
+        "format": "{icon} {capacity}%",
+        "format-icons": ["▕▁", "▕▂", "▕▃", "▕▄", "▕▅", "▕▆", "▕▇", "▕█"],
+        "format-charging": " {capacity}%",
+        "format-plugged": " {capacity}%",
+        "format-full": " Full",
+        "format-alt": "{time} {icon}",
+        "states": {
+            "warning": 20,
+            "critical": 10
+        },
+        "max-length": 25
     },
     "idle_inhibitor": {
         "tooltip": false,
@@ -126,16 +125,16 @@
     },
     "network": {
       "interval": 2,
-      "format-wifi": "{essid} ({signalStrength}%)\uf1eb",
-      "format-ethernet": "󰈀 {ifname}",
-      "format-linked": "\uf059 No IP ({ifname})",
-      "format-disconnected": "\uf071 Disconnected",
+      "format-wifi": "{essid} ({signalStrength}%)",
+      "format-ethernet": "🔌 {ifname}",
+      "format-linked": " No IP ({ifname})",
+      "format-disconnected": " Disconnected",
       "tooltip-format": "{ifname} {ipaddr}/{cidr} via {gwaddr}",
       "format-alt": "↓{bandwidthDownBytes} ↑{bandwidthUpBytes}"
     },
     "clock": {
       "format": "{:%H:%M} ",
-      "format-alt": "{:%A, %b %d} ",
+      "format-alt": "{:%A, %b %d} 月",
       "tooltip-format": "{:%Y}",
       "calendar": {
         "mode": "year",
@@ -154,37 +153,37 @@
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "tooltip": false,
-        "format-muted": " Muted",
+        "format-muted": "🔇 Muted",
         "on-click": "pamixer -t",
         "on-scroll-up": "pamixer -i 2",
         "on-scroll-down": "pamixer -d 2",
         "scroll-step": 5,
         "format-icons": {
-            "headphone": "",
-            "hands-free": "",
-            "headset": "",
-            "phone": "",
-            "portable": "",
-            "car": "",
-            "default": ["", "", ""]
+            "headphone": "🎧",
+            "hands-free": "🎧",
+            "headset": "🎧",
+            "phone": "📞",
+            "portable": "📞",
+            "car": "🚗",
+            "default": ["🔈", "🔉", "🔊"]
         }
     },
     "custom/power": {
-        "format": "",
+        "format": "⏻",
         "tooltip": false,
         "on-click": "wlogout -C ~/.config/mango/wlogout/style.css -l  ~/.config/mango/wlogout/layout  -b 6 --protocol layer-shell",
-  		  "menu": "on-click-right",
-  		  "menu-file": "~/.config/mango/waybar/battery_menu.xml",
-		    "menu-actions": {
-			   "performance": "bash ~/.config/mango/scripts/power-profile  --performance",
-			   "schedutil": "bash ~/.config/mango/scripts/power-profile --schedutil"
+        "menu": "on-click-right",
+        "menu-file": "~/.config/mango/waybar/battery_menu.xml",
+        "menu-actions": {
+            "performance": "bash ~/.config/mango/scripts/power-profile  --performance",
+            "schedutil": "bash ~/.config/mango/scripts/power-profile --schedutil"
         }
     },
     "pulseaudio#microphone": {
         "format": "{format_source}",
-        "format-source": " {volume}%",
+        "format-source": "🎤 {volume}%",
         "tooltip": false,
-        "format-source-muted": " Muted",
+        "format-source-muted": "🎙️ Muted",
         "on-click": "pamixer --default-source -t",
         "on-scroll-up": "pamixer --default-source -i 2",
         "on-scroll-down": "pamixer --default-source -d 2",
@@ -203,8 +202,8 @@
         "on-scroll-up": "playerctl -p spotify volume 0.02+",
         "on-scroll-down": "playerctl -p spotify volume 0.02-",
         "format-icons": {
-            "Paused": " ",
-            "Playing": " "
+            "Paused": "⏸ ",
+            "Playing": "▶ "
         }
     },
     "cava": {
@@ -229,16 +228,5 @@
         "actions": {
                    "on-click-right": "mode"
         }
-    },
-    "battery": {
-        "bat": "hidpp_battery_0",
-        "interval": 1800,
-        "states": {
-                   "warning": 20,
-                   "critical": 10
-        },
-        "format": "{icon}",
-        "format-icons": ["", "", "", "", ""],
-        "max-length": 25
     }
 }
