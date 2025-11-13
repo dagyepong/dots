@@ -1,5 +1,7 @@
 waybar &
-swaybg -i $HOME/Pictures/wallpapers/Anime-Girl1.png &
+
+# wallpaper
+swaybg -i ~/.config/mango/wallpaper/10.png >/dev/null 2>&1 &
 mako &
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots
 # The next line of command is not necessary. It is only to avoid some situations where it cannot start automatically
