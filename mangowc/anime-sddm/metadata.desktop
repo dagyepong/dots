@@ -1,0 +1,14 @@
+[SddmGreeterTheme]
+Name=anime-sddm
+Description=anime-sddm theme for SDDM
+Type=sddm-theme
+Version=2.1
+#Website=
+#Screenshot=
+MainScript=Main.qml
+ConfigFile=theme.conf
+TranslationsDirectory=translations
+#Theme-Id=
+#Theme-API=
+#License=
+QtVersion=6
