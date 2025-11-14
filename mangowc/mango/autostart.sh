@@ -10,7 +10,7 @@ nm-applet >/dev/null &
 kdeconnect-indicator &
 easyeffects --gapplication-service &
 
- notify
+#notify
 swaync -c ~/.config/mango/swaync/config.jsonc -s ~/.config/mango/swaync/style.css >/dev/null 2>&1 &
 
 # night light
