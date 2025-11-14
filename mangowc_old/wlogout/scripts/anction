@@ -1,0 +1,24 @@
+#!/usr/bin/bash
+
+case $1 in
+    shutdown)
+        shutdown now
+        ;;
+    reboot)
+        reboot
+        ;;
+    logout)
+        pkill mango
+        ;;
+    suspend)
+        systemctl suspend
+        ;;
+    hibernate)
+        systemctl hibernate
+        ;;
+    lock)
+        swaylock &
+        ;;
+    *)
+        echo "error"
+esac
