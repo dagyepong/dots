@@ -31,6 +31,10 @@ clipse -listen &
 # ime input
 fcitx5 --replace -d >/dev/null 2>&1 &
 
+# xwayland dpi scale
+#echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
+# xrdb merge ~/.Xresources >/dev/null 2>&1
+
 # inhibit by audio
 sway-audio-idle-inhibit >/dev/null 2>&1 &
 
