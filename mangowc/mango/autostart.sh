@@ -11,6 +11,8 @@ kdeconnect-indicator &
 easyeffects --gapplication-service &
 
 
+# night light
+wlsunset -T 3501 -t 3500 >/dev/null 2>&1 &
 
 # keep clipboard content
 wl-clip-persist --clipboard regular --reconnect-tries 0 >/dev/null 2>&1 &
