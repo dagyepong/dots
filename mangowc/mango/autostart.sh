@@ -28,7 +28,8 @@ clipse -listen &
 # wl-paste --type image --watch cliphist store & 
 # Permission authentication
 /usr/lib/xfce-polkit/xfce-polkit &
-
+# ime input
+fcitx5 --replace -d >/dev/null 2>&1 &
 
 # inhibit by audio
 sway-audio-idle-inhibit >/dev/null 2>&1 &
