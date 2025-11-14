@@ -1,5 +1,6 @@
 waybar &
 
+set +e
 # wallpaper
 swaybg -i ~/.config/mango/wallpaper/10.png >/dev/null 2>&1 &
 mako &
