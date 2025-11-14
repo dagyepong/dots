@@ -18,6 +18,7 @@
     "pulseaudio",
     "cpu",
     "temperature",
+    "power-profiles-daemon",
     "backlight",
     "battery",
     "clock",
@@ -225,6 +226,19 @@
       "Playing": "▶ "
     }
   },
+
+
+  "power-profiles-daemon": {
+		"format": "{icon}",
+		"tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+		"tooltip": true,
+		"format-icons": {
+		"default": "",
+		"performance": "",
+		"balanced": "",
+		"power-saver": ""
+	  }
+	},
   "cava": {
     "framerate": 30,
     "autosens": 0,
