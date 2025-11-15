@@ -1,206 +1,160 @@
-@import "mocha.css";
+/* -----------------------------------------------------
+ * General 
+ * ----------------------------------------------------- */
 * {
-    /* `otf-font-awesome` and SpaceMono Nerd Font are required to be installed for icons */
-    font-family: "SpaceMono Nerd Font";
-    font-size: 15px;
+	font-size: 16px;
+	font-family: Ubuntu Nerd Font, Font Awesome, sans-serif;
+    font-weight: bold;
 }
 
 window#waybar {
-    background: transparent;
-    border-radius: 7rem;
-    color: @mauve;
-    border-width: 2px;
-    border-style: solid;
-    border-color: @mauve;
+	background-color: rgba(26,27,38,0.4);
+    border-bottom: 1px solid rgba(26,27,38,0);
+    border-radius: 0px;
+	color: #f8f8f2;
 }
 
-
-window#waybar.empty #window {
-    background-color: transparent;
-    padding: 0px;
-    border: 0px;
-}
-
-
-#clock,
-#battery,
-#cpu,
-#memory,
-#disk,
-#temperature,
-#backlight,
-#network,
-#pulseaudio,
-#wireplumber,
-#custom-media,
-#tray,
-#bluetooth,
-#mode,
-#idle_inhibitor,
-#scratchpad,
-#power-profiles-daemon,
-#language,
-#mpd {
-	background-color: transparent;
-    padding: 0 10px;
-    border-radius: 7rem;
-    /*border-width: 2px;
-    border-style: solid;
-    border-color: @teal;*/
-}
-
-
-#clock:hover,
-#battery:hover,
-#cpu:hover,
-#memory:hover,
-#disk:hover,
-#temperature:hover,
-#backlight:hover,
-#network:hover,
-#pulseaudio:hover,
-#wireplumber:hover,
-#custom-media:hover,
-#tray:hover,
-#mode:hover,
-#bluetooth:hover,
-#idle_inhibitor:hover,
-#scratchpad:hover,
-#power-profiles-daemon:hover,
-#language:hover,
-#mpd:hover {
-    background-color: @mauve;
-    color: @brown;
-}
-
-
+/* -----------------------------------------------------
+ * Workspaces 
+ * ----------------------------------------------------- */
 #workspaces {
-  border-radius: 7rem;
-  background-color: transparent;
-  /*border-width: 2px;
-  border-style: solid;
-  border-color: @teal;*/
+	background: #c0caf5;
+    margin: 5px 3px 5px 12px;
+    padding: 0px 1px;
+    border-radius: 15px;
+    border: 0px;
+    font-style: normal;
+    color: #15161e;
 }
 
 #workspaces button {
-  color: @mauve;
-  border-radius: 7rem;
+    padding: 0px 5px;
+    margin: 4px 3px;
+    border-radius: 15px;
+    border: 0px;
+    color: #15161e;
+    background-color: #7aa2f7;
+    opacity: 0.5;
+    transition: all 0.3s ease-in-out;
 }
 
 #workspaces button.active {
-  color: @brown;
-  background-color: @mauve;
-  border-radius: 7rem;
+    color: #15161e;
+    background: #7aa2f7;
+    border-radius: 15px;
+    min-width: 40px;
+    transition: all 0.3s ease-in-out;
+    opacity: 1.0;
 }
 
 #workspaces button:hover {
-  color: @brown;
-  background-color: @mauve;
-  border-radius: 7rem;
+    color: #15161e;
+    background: #7aa2f7;
+    border-radius: 15px;
+    opacity: 1.0;
 }
 
-#custom-arch {
-	margin-left: 5px;
-    padding: 0 10px;
-    font-size: 25px;
-    background-color: transparent;
-    border-radius: 7rem;
-	/*border-width: 2px;
-	border-style: solid;
-	border-color: @teal;*/
-}
-#custom-arch:hover {
-    background-color: @mauve;
-    color: @brown;
-}
-#custom-power {
-    margin-right: 5px;
-    padding: 0 10px;
-    background-color: transparent;
-    border-radius: 7rem;
-    /*border-width: 2px;
-	border-style: solid;
-	border-color: @teal;*/
-}
-#custom-power:hover {
-    background-color: @mauve;
-    color: @brown;
-}
-#custom-mako {
-    padding: 0 10px;
-    background-color: transparent;
-    border-radius: 7rem;
-    /*border-width: 2px;
-	border-style: solid;
-	border-color: @teal;*/
-}
-#custom-mako:hover {
-    background-color: @mauve;
-    color: @brown;
+
+/* -----------------------------------------------------
+ * Tooltips
+ * ----------------------------------------------------- */
+tooltip {
+  background: #1a1b26;
+  border: 1px solid #7aa2f7;
+  border-radius: 10px;
 }
 
+tooltip label {
+  color: #c0caf5;
+}
+
+/* -----------------------------------------------------
+ * Window
+ * ----------------------------------------------------- */
 #window {
-  border-radius: 7rem;
-  /*border-width: 2px;
-  border-style: solid;
-  border-color: @teal;
-  padding: 0 10px;*/
-  background-color: transparent;
-  /*color: @teal;*/
-}
-#window:hover {
-    background-color: @mauve;
-    color: @brown;
-}
-#pulseaudio-slider slider {
-	min-width: 0px;
-	min-height: 0px;
-	opacity: 0;
-	background-image: none;
-	border: none;
-	box-shadow: none;
+    color: #15161e;
+    background: #c0caf5;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#pulseaudio-slider trough {
-	min-width: 80px;
-	min-height: 5px;
-	border-radius: 7rem;
+#custom-packages {
+    color: #15161e;
+    background: #f7768e;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#pulseaudio-slider highlight {
-	min-height: 10px;
-	border-radius: 7rem;
+#memory {
+    color: #15161e;
+    background: #e0af68;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#backlight-slider slider {
-	min-width: 0px;
-	min-height: 0px;
-	opacity: 0;
-	background-image: none;
-	border: none;
-	box-shadow: none;
+#clock {
+    color: #15161e;
+    background: #bb9af7;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#backlight-slider trough {
-	min-width: 80px;
-	min-height: 10px;
-	border-radius: 7rem;
+#cpu {
+    color: #15161e;
+    background: #7dcfff;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#backlight-slider highlight {
-	min-width: 10px;
-	border-radius: 7rem;
+#disk {
+    color: #15161e;
+    background: #9ece6a;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
 
-#mpris {
-	border-radius: 7rem;
-	background-color: transparent;
-	padding: 0 10px;
-	/*border-width: 2px;
-	border-style: solid;
-	border-color: @teal;*/
+#battery {
+    color: #15161e;
+    background: #ff79c6;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }
-#mpris:hover {
-    background-color: @mauve;
-    color: @brown;
+
+#network {
+    color: #15161e;
+    background: #f1fa8c;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
+}
+
+#tray {
+    color: #15161e;
+    background: #414868;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
+}
+
+#pulseaudio {
+    color: #15161e;
+    background: #c0caf5;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
+}
+
+#custom-notification {
+    color: #15161e;
+    background: #6272a4;
+    border-radius: 15px;
+    margin: 5px;
+    padding: 2px 10px;
 }

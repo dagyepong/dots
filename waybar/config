@@ -1,0 +1,224 @@
+{
+    "layer": "top",
+    "position": "top",
+    "modules-left": [
+    "cpu",
+    "memory",
+    "battery",
+    "power-profiles-daemon",
+    "mpris"
+  ],
+  "modules-center": [
+        "ext/workspaces"
+
+  ],
+  "modules-right": [
+    "pulseaudio",
+    "backlight",
+    "network#speed",
+    "tray",
+    "custom/mako",
+    "clock",
+    "custom/notification",
+    "custom/power"
+
+
+  ],
+
+
+"network#speed": {
+	"interval": 1,
+	"format": "{ifname}",
+	"format-wifi": "{icon}  {bandwidthUpBytes}  {bandwidthDownBytes}",
+	"format-ethernet": "󰌘  {bandwidthUpBytes}  {bandwidthDownBytes}",
+	"format-disconnected": "󰌙",
+	"tooltip-format": "{ipaddr}",
+	"format-linked": "󰈁 {ifname} (No IP)",
+	"tooltip-format-wifi": "{essid} {icon} {signalStrength}%",
+	"tooltip-format-ethernet": "{ifname} 󰌘",
+	"tooltip-format-disconnected": "󰌙 Disconnected",
+	"min-length": 24,
+	"max-length": 24,
+	"format-icons": [
+		"󰤯", "󰤟", "󰤢", "󰤥", "󰤨"
+	]
+},
+
+  "clock": {
+    "format": "{:%b %d %H:%M}",
+    "tooltip-format": "<span color='#FFFFFF'><tt>{calendar}</tt></span>",
+    "calendar": {
+      "mode-mon-col": 4,
+      "on-scroll": 1,
+      "on-click-right": "mode",
+      "format": {
+        "months": "<span color='#BE95FF'><b>{}</b></span>",
+        "weeks": "<span color='#525252'><b>{}</b></span>",
+        "weekdays": "<span color='#78A9FF'><b>{}</b></span>",
+        "today": "<span color='#BE95FF' background='#161616'><b>{}</b></span>"
+      }
+    },
+     "actions": {
+      "on-click-right": "mode",
+      "on-scroll-up": "shift_up",
+      "on-scroll-down": "shift_down"
+    },
+    "tooltip": true
+  },
+  
+
+"mpris": {
+  "interval": 10,
+  "format": "{player_icon} {title}",
+  "format-paused": "{status_icon} <i>{dynamic}</i>",
+  "on-click-middle": "playerctl play-pause",
+  "on-click": "playerctl previous",
+  "on-click-right": "playerctl next",
+  "scroll-step": 5.0,
+  "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-",
+  "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+",
+  "smooth-scrolling-threshold": 1,
+  "player-icons": {
+    "chromium": "",
+    "default": "",
+    "firefox": "",
+    "kdeconnect": "",
+    "mopidy": "",
+    "mpv": "󰐹",
+    "spotify": "",
+    "vlc": "󰕼",
+    "strawberry": ""
+  },
+  "status-icons": {
+    "paused": "󰐎",
+    "playing": "",
+    "stopped": ""
+  },
+  "max-length": 30
+},
+
+
+"power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+    "tooltip": true,
+    "format-icons": {
+    "default": "",
+    "performance": "",
+    "balanced": "",
+    "power-saver": ""
+}
+},
+"memory": {
+    "interval": 5,
+    "format": " {}%"
+},
+"cpu": {
+    "interval": 5,
+    "format": " {usage:2}%",
+    "tooltip": false
+
+
+},
+"custom/power": {
+    "tooltip": true,
+    "on-click": "wlogout &",
+    "format": "",
+    "tooltip-format": "Power Menu"
+
+},
+"backlight": {
+  "interval": 2,
+  "align": 0,
+  "rotate": 0,
+  "format": "{icon} {percent}%",
+  "format-icons": [
+    " ",
+    " ",
+    " ",
+    "󰃝 ",
+    "󰃞 ",
+    "󰃟 ",
+    "󰃠 "
+  ],
+  //"format": "{icon}",
+  //"format-icons": ["","","","","","","","","","","","","","",""],
+  "tooltip-format": "backlight {percent}%",
+  "icon-size": 10,
+  "on-click": "",
+  "on-click-middle": "",
+  "on-click-right": "",
+  "on-update": "",
+  "on-scroll-up": "brightnessctl s +5%",
+  "on-scroll-down": "brightnessctl s 5%-",
+  "smooth-scrolling-threshold": 1
+},
+"tray": {
+    "spacing": 12,
+    "icon-size": 20
+},
+"pulseaudio": {
+    "format": "{icon} {volume}% {format_source}",
+    "format-bluetooth": "{volume}% {icon} {format_source}",
+    "format-bluetooth-muted": " {icon} {format_source}",
+    "format-muted": " {format_source}",
+    "format-source": " {volume}%",
+    "format-source-muted": "",
+    "format-icons": {
+        "headphone": "",
+        "hands-free": "",
+        "headset": "",
+        "phone": "",
+        "portable": "",
+        "car": "",
+        "default": [
+            "",
+            "",
+            ""
+        ]
+    },
+    "on-click": "pavucontrol"
+},
+"custom/notification": {
+    "tooltip": false,
+    "format": "{icon} {}",
+    "format-icons": {
+        "notification": "<span foreground='red'><sup></sup></span>",
+        "none": "",
+        "dnd-notification": "<span foreground='red'><sup></sup></span>",
+        "dnd-none": "",
+        "inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "inhibited-none": "",
+        "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "dnd-inhibited-none": ""
+    },
+    "return-type": "json",
+    "exec-if": "which swaync-client",
+    "exec": "swaync-client -swb",
+    "on-click": "swaync-client -t -sw",
+    "escape": true
+},
+"battery": {
+    "states": {
+        "warning": 30,
+        "critical": 15
+    },
+    "format": "{icon} {capacity}%",
+    "format-charging": "󰂄 {capacity}%",
+    "format-plugged": "󱘖 {capacity}%",
+    "format-icons": [
+        "󰁺",
+        "󰁻",
+        "󰁼",
+        "󰁽",
+        "󰁾",
+        "󰁿",
+        "󰂀",
+        "󰂁",
+        "󰂂",
+        "󰁹"
+    ],
+    "on-click": "",
+    "tooltip": false
+}
+}
