@@ -1,25 +1,32 @@
 sort=-time
 layer=overlay
-background-color=#2e34407f
-width=450
-height=150
-border-size=3
-border-color=#99c0d0
-border-radius=12
+background-color=#2e3440
+width=300
+height=200
+border-size=2
+border-color=#cba6f7
+border-radius=15
 icons=0
 max-icon-size=64
-default-timeout=5000
-ignore-timeout=0
-font="Noto Sans CJK SC" 14
-margin=12
-padding=12,20
+default-timeout=10000
+ignore-timeout=1
+font=monospace 11
+max-history=30
+max-visible=10
+history=1
+on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/message.oga
+on-button-left=exec makoctl menu -n "$id" dmenu -p 'Select action: '
 
 [urgency=low]
 border-color=#cccccc
 
 [urgency=normal]
-border-color=#99c0d0
+border-color=#cba6f7
 
 [urgency=critical]
 border-color=#bf616a
 default-timeout=0
+
+[category=mpd]
+default-timeout=10000
+group-by=category
