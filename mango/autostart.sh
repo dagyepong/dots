@@ -2,7 +2,9 @@ waybar &
 
 set +e
 # wallpaper
-swaybg -i ~/.config/mango/wallpaper/10.png >/dev/null 2>&1 &
+swaybg -i ~/.config/mango/wallpaper/xavier-cuenca-w4-3.jpg >/dev/null 2>&1 &
+
+
 mako &
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots
 # The next line of command is not necessary. It is only to avoid some situations where it cannot start automatically
@@ -12,7 +14,7 @@ kdeconnect-indicator &
 easyeffects --gapplication-service &
 
 #notify
-swaync -c ~/.config/mango/swaync/config.jsonc -s ~/.config/mango/swaync/style.css >/dev/null 2>&1 &
+#swaync -c ~/.config/mango/swaync/config.jsonc -s ~/.config/mango/swaync/style.css >/dev/null 2>&1 &
 
 # night light
 wlsunset -T 3501 -t 3500 >/dev/null 2>&1 &
