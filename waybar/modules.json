@@ -168,14 +168,15 @@
 		"balanced": "",
 		"power-saver": ""
 	}
-	},
+	
+   
     "custom/power": {
         "tooltip": true,
         "on-click": "wlogout &",
         "format": "",
         "tooltip-format": "Power Menu"
     },
-    "tray": {
+	"tray": {
 	"icon-size": 20,
 	"spacing": 4,
 	},
