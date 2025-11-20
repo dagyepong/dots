@@ -2,7 +2,7 @@ waybar &
 
 set +e
 # wallpaper
-swaybg -i ~/.config/mango/wallpaper/xavier-cuenca-w4-3.jpg >/dev/null 2>&1 &
+swaybg -i ~/.config/mango/wallpaper/SilkSong_screenshot2.png >/dev/null 2>&1 &
 
 
 mako &
