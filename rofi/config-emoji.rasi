@@ -7,7 +7,7 @@
 /* ---- Configuration ---- */
 configuration {
     modi:                       "drun,run,filebrowser";
-    font:                       "Fira Code SemiBold 14";
+    font:                       "Fira Code SemiBold 20";
     show-icons:                 true;
     /* icon-theme:                 "Suru_pywall"; */
     display-drun:               "󰣇 ";
@@ -73,6 +73,9 @@ listbox {
     border-color:               @active-background;
 	background-color:		    @background;
     margin:                     3px;
+    font:                       "Noto Color Emoji 20";
+    
+
 }
 
 /* ---- Dummy ---- */
@@ -91,6 +94,7 @@ inputbar {
     children:                   [ "textbox-prompt-colon","entry" ];
     border:                     2px;
     border-color:               @active-background;
+    font:                       "Fira Code SemiBold 14";
 }
 
 textbox-prompt-colon {
@@ -100,6 +104,7 @@ textbox-prompt-colon {
     str:                           "🔍";
     text-color:                 inherit;
 	background-color:			transparent;
+    font:                       "Fira Code SemiBold 14";
 }
 
 entry {
@@ -110,50 +115,23 @@ entry {
     placeholder:                "Search (ctrl tab to choose mode)";
     placeholder-color:          inherit;
 	background-color:			transparent;
-}
+    font:                       "Fira Code SemiBold 14";
 
-/* ---- Mode Switcher ---- */
-mode-switcher{
-	orientation:				vertical;
-    enabled:                    true;
-    spacing:                    12px;
-    background-color:          	transparent;
-    text-color:                 @foreground;
-}
-
-button {
-    padding:                  0px 5px 0px 10px;
-    border-radius:             20px;
-    background-color:          @background;
-    text-color:                inherit;
-    cursor:                    pointer;
-    border:                     2px;
-    border-color:               @active-background;
-    margin:                     2px;
-
-}
-
-button selected {
-    background-color:          @selected-normal-background;
-    text-color:                @selected-normal-foreground;
-    border:                    1px;
-    border-color:              @background;
-	
 }
 
 /* ---- Listview ---- */
 listview {
 	enabled:					true;
-	columns:					4;
-	lines:						6;
-	spacing:                    5px;
-	padding:					6px;
+	columns:					10;
+	lines:						5;
+	spacing:                    2px;
+	padding:					2px;
 	dynamic:                    true;
 	cycle:                      true;
 	scrollbar:                  false;
 	layout:                     vertical;
 	reverse:                    false;
-	fixed-height:               true;
+	fixed-height:               false;
 	fixed-columns:              false;
 	background-color:           transparent;
 	border-radius:   	        12px;
@@ -163,12 +141,13 @@ listview {
 /* ---- Element ---- */
 element {
     enabled:                    true;
-    padding:                    5px;
-    margin:                     2px;
+    padding:                    5px 12px 5px 0px;
+    margin:                     3px;
     cursor:                     pointer;
     background-color:         	transparent;
     border-radius:              12px;
     border:                     0px;
+
 }
 
 element normal.normal {

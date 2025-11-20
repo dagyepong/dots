@@ -1,0 +1,23 @@
+@import "~/.config/rofi/config.rasi" 
+
+
+window {
+    height:						7%;
+    width: 25%;
+}
+
+
+entry {
+    placeholder:                "";
+}
+
+
+imagebox {
+enabled:                    false;
+}
+
+inputbar {
+    enabled:                    true;
+    margin:                     12px;
+    padding: 2px;
+}
