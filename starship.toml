@@ -1,103 +1,22 @@
-command_timeout = 1000  # in milliseconds (1000 = 1 second)
+[character]
+error_symbol = "[λ](bold #ff5555)"
+success_symbol = "[λ](bold #f8f8f2)"
 
-format = """
-$os\
-$username\
-$hostname\
-$directory\
-$git_branch\
-$git_state\
-$git_status\
-$character"""
-
-right_format = """
-$git_branch\
-"""
-
-add_newline = false
-palette = "everforest"
-
-[os]
-disabled = false
-format = '[$symbol ]($style)'
-style = 'fg:green'
-
-[os.symbols]
-Windows = "󰍲"
-Ubuntu = "󰕈"
-SUSE = ""
-Raspbian = "󰐿"
-Mint = "󰣭"
-Macos = "󰀵"
-Manjaro = ""
-Linux = "󰌽"
-Gentoo = "󰣨"
-Fedora = "󰣛"
-Alpine = ""
-Amazon = ""
-Android = ""
-Arch = "󰣇"
-Artix = "󰣇"
-CentOS = ""
-Debian = "󰣚"
-Redhat = "󱄛"
-RedHatEnterprise = "󱄛"
-Void = ""
-
-[username]
-show_always = true
-style_root = 'fg:red'
-style_user = 'fg:blue'
-format = '[$user]($style)'
-
-[hostname]
-ssh_only = false
-#style = 'fg:blue'
-format = '[@](red)[$hostname](blue) '
+[cmd_duration]
+style = "bold #f1fa8c"
 
 [directory]
-style = "fg:orange"
-read_only_style = "fg:orange"
-truncation_length = 3
-truncation_symbol = "…/"
-format = "[ $path]($style)[$read_only]($read_only_style) "
+style = "bold #50fa7b"
 
 [git_branch]
-style = "fg:green"
-symbol = " "
-format = "[$symbol$branch(:$remote_branch)]($style) "
+style = "bold #ff79c6"
 
-[character]
-success_symbol = '[](bold green)'
-error_symbol = '[](bold red)'
+[git_status]
+style = "bold #ff5555"
 
-[palettes.everforest]
-bg_dim = "#232a2e"
-bg0 = "#2d353b"
-bg1 = "#343f44"
-bg2 = "#3d484d"
-bg3 = "#475258"
-bg4 = "#4f585e"
-bg5 = "#56635f"
-bg_visual = "#543a48"
-bg_red = "#514045"
-bg_green = "#425047"
-bg_blue = "#3a515d"
-bg_yellow = "#4d4c43"
+[hostname]
+style = "bold #ff5555"
 
-fg = "#d3c6aa"
-red = "#e67e80"
-
-orange = "#e69875"
-yellow = "#dbbc7f"
-green = "#a7c080"
-aqua = "#83c092"
-blue = "#7fbbb3"
-purple = "#d699b6"
-grey0 = "#7a8478"
-grey1 = "#859289"
-grey2 = "#9da9a0"
-statusline1 = "#a7c080"
-statusline2 = "#d3c6aa"
-statusline3 = "#e67e80"
-
+[username]
+format = "[$user]($style) on "
+style_user = "bold #bd93f9"
