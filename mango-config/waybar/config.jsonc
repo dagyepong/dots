@@ -21,7 +21,7 @@
         "temperature",
         "pulseaudio",
         "backlight",
-        // "battery",
+        "battery",
         "clock",
         "custom/power"
     ],
