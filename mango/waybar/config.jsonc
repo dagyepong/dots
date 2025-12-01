@@ -17,7 +17,7 @@
         "tray",
         "network",
         "cpu",
-        "memory",
+        "power-profiles-daemon",
         "temperature",
         "pulseaudio",
         "backlight",
@@ -99,9 +99,9 @@
     "backlight": {
         // "device": "acpi_video1",
         "format": "{icon} {percent}%",
-        "format-icons": ["󰖔", "󰖨"],
+        "format-icons": ["󰖔", "󰖨"]
     },
-    "battery": {
+"battery": {
     "states": {
         "warning": 30,
         "critical": 15
@@ -121,8 +121,8 @@
         "󰂂",
         "󰁹"
     ],
-"on-click": "",
-"tooltip": false
+    "on-click": "",
+    "tooltip": false
 },
     "pulseaudio": {
         "format": "{icon} {volume}%",
@@ -148,6 +148,18 @@
         "on-click": "wlogout -C ~/.config/mango/wlogout/style.css -l  ~/.config/mango/wlogout/layout  -b 6 --protocol layer-shell",
         "on-click-right": "sleep 0.1s && swaync-client -t -sw"
     },
+    "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+    "tooltip": true,
+    "format-icons": {
+    "default": "",
+    "performance": "",
+    "balanced": "",
+    "power-saver": ""
+}
+},
+      
     "custom/notification": {
       "tooltip": false,
       "format": "{icon}",
