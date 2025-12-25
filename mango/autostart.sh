@@ -17,7 +17,8 @@ swaybg -i ~/.config/mango/wallpaper/SilkSong_screenshot2.png >/dev/null 2>&1 &
 
 
 # top bar
-waybar -c ~/.config/mango/waybar/config.jsonc -s ~/.config/mango/waybar/style.css >/dev/null 2>&1 &
+waybar -c ~/.config/waybar/gruvbox_blocks/config.jsonc -s ~/.config/waybar/gruvbox_blocks/style.css &
+
 
 
 # xwayland dpi scale
