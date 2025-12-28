@@ -13,13 +13,10 @@ swaync -c ~/.config/mango/swaync/config.jsonc -s ~/.config/mango/swaync/style.cs
 wlsunset -T 3501 -t 3500 >/dev/null 2>&1 &
 
 # wallpaper
-swaybg -i ~/.config/mango/wallpaper/SilkSong_screenshot2.png >/dev/null 2>&1 &
-
+#swaybg -i ~/.config/mango/wallpaper/wallpaper.png >/dev/null 2>&1 &
 
 # top bar
-waybar -c ~/.config/waybar/gruvbox_blocks/config.jsonc -s ~/.config/waybar/gruvbox_blocks/style.css &
-
-
+qs -c noctalia-shell &
 
 # xwayland dpi scale
 #echo "Xft.dpi: 140" | xrdb -merge #dpi缩放
@@ -49,8 +46,10 @@ sway-audio-idle-inhibit >/dev/null 2>&1 &
 # change light value and volume value by swayosd-client in keybind
 swayosd-server >/dev/null 2>&1 &
 
+
+
 # lock
 
 swayidle -w \
     timeout 300 'swaylock -f --effect-blur 5x5 --fade-in 1' \
-    before-sleep 'swaylock -f --effect-blur 5x5 --fade-in 1'  >/dev/null 2>&1 & 
+    before-sleep 'swaylock -f --effect-blur 5x5 --fade-in 1'  >/dev/null 2>&1 &

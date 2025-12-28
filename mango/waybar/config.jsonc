@@ -17,11 +17,11 @@
         "tray",
         "network",
         "cpu",
-        "power-profiles-daemon",
+        "memory",
         "temperature",
         "pulseaudio",
         "backlight",
-        "battery",
+        // "battery",
         "clock",
         "custom/power"
     ],
@@ -99,31 +99,26 @@
     "backlight": {
         // "device": "acpi_video1",
         "format": "{icon} {percent}%",
-        "format-icons": ["󰖔", "󰖨"]
+        "format-icons": ["󰖔", "󰖨"],
     },
-"battery": {
-    "states": {
-        "warning": 30,
-        "critical": 15
+    "battery": {
+        "states": {
+            // "good": 95,
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{capacity}% {icon}",
+        "format-full": "{capacity}% {icon}",
+        "format-charging": "{capacity}% ",
+        "format-plugged": "{capacity}% ",
+        "format-alt": "{time} {icon}",
+        // "format-good": "", // An empty format will hide the module
+        // "format-full": "",
+        "format-icons": ["", "", "", "", ""]
     },
-    "format": "{icon} {capacity}%",
-    "format-charging": "󰂄 {capacity}%",
-    "format-plugged": "󱘖 {capacity}%",
-    "format-icons": [
-        "󰁺",
-        "󰁻",
-        "󰁼",
-        "󰁽",
-        "󰁾",
-        "󰁿",
-        "󰂀",
-        "󰂁",
-        "󰂂",
-        "󰁹"
-    ],
-    "on-click": "",
-    "tooltip": false
-},
+    "battery#bat2": {
+        "bat": "BAT2"
+    },
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "tooltip": false,
@@ -146,20 +141,9 @@
         "format": "󰣇",
         "tooltip": false,
         "on-click": "wlogout -C ~/.config/mango/wlogout/style.css -l  ~/.config/mango/wlogout/layout  -b 6 --protocol layer-shell",
-        "on-click-right": "sleep 0.1s && swaync-client -t -sw"
+        "on-click-right": "sleep 0.1s && swaync-client -t -sw",
+
     },
-    "power-profiles-daemon": {
-    "format": "{icon}",
-    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
-    "tooltip": true,
-    "format-icons": {
-    "default": "",
-    "performance": "",
-    "balanced": "",
-    "power-saver": ""
-}
-},
-      
     "custom/notification": {
       "tooltip": false,
       "format": "{icon}",
@@ -179,5 +163,5 @@
       "on-click": "sleep 0.1s && swaync-client -t -sw",
       "on-click-right": "swaync-client -d -sw",
       "escape": true
-    }
+    },
 }
