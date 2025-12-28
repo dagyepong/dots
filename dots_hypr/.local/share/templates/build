@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+INPUT="$1"
+
+OUTPUT_DIR=$SCRIPT_DIR/dist
+OUTPUT_FILE=$OUTPUT_DIR/"${1%.c}"
+
+shift
+
+mkdir -p $OUTPUT_DIR
+
+gcc $INPUT -o $OUTPUT_FILE "$@"
+
+if [ $? -ne 0 ]; then
+  echo "Compilation failed."
+  exit 1
+fi
+
+"$OUTPUT_FILE"

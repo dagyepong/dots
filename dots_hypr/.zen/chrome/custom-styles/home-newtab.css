@@ -1,0 +1,111 @@
+@-moz-document url("about:newtab"), url("about:home") {
+    /* 
+    Styles for both newtab and home page .
+    */
+
+    body {
+        --newtab-search-icon: none !important;
+        --newtab-button-static-background: #08080b !important;
+        --newtab-background-card: #08080b !important;
+        --newtab-background-color-secondary: #08080b !important;
+        --icon-color: #08080b !important ;
+        --newtab-element-hover-color: rgba(8, 8, 11, 0.1) !important;
+        --newtab-weather-background-color: rgba(8, 8, 11, 0.1) !important;
+        --newtab-button-static-hover-background: #787c99 !important;
+        --newtab-button-text: #fff !important;
+        --size-item-large: 38px !important;
+    }   
+
+    .search-wrapper.fake-focus:not(.search.disabled) .search-handoff-button {
+        border: 2.5px solid #acb0d0 !important;
+        border-radius: 3vh !important;
+        box-shadow: none !important;
+    }
+
+    .fake-caret {
+        opacity: 0 !important;
+    }
+
+    .shortcuts-refresh .top-site-outer .icon-pin-small {
+        inset-block-start: 0.5rem !important;
+        inset-inline-start: 0.5rem !important;
+    }
+
+    .shortcuts-refresh .top-site-outer .context-menu-button {
+        height: 30px !important;
+        width: 30px !important;
+    }
+
+    .search-wrapper {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .search-wrapper .logo-and-wordmark {
+        margin-bottom: 0 !important;
+    }
+
+    .search-wrapper .search-inner-wrapper {
+        min-height: 48px !important;
+        margin: 0 !important;
+        margin-left: 5vh !important;
+    }
+
+    .search-wrapper .search-handoff-button {
+        padding-inline-start: 15px !important;
+        border-radius: 17px !important;
+    }
+
+    .search-wrapper .search-handoff-button,  
+    .search-wrapper .search-handoff-button > * {
+        background-color: rgb(9, 8, 8) !important;
+        color: #ffffff;
+    }
+
+    @media (max-width: 1200px) {
+        .search-wrapper .search-inner-wrapper{
+            padding-left: 5% !important;
+        }
+    }
+}
+
+@-moz-document url("about:home") {
+    .compact-cards .card-outer .card-details {
+        border-bottom-right-radius: 10px;
+        border-bottom-left-radius: 10px;
+    }
+    
+    .logo, .wallpaper-attribution {
+        display: none !important;
+    }
+
+    .top-site-outer .rich-icon {
+        background-size: contain !important;
+    }
+
+    .top-site-inner:hover span.title-label {
+        color: #08080b;
+    }
+
+    .top-site-outer .context-menu-button,
+    .top-site-outer .context-menu-button:hover {
+        background-color: rgba(255, 255, 255, 0) !important;
+    }
+
+    .top-site-outer .context-menu-button {
+        top: 0 !important;
+        fill: #08080b !important;
+    }
+}
+
+@-moz-document url("about:newtab") {
+    .layout-variant-b.no-recommended-stories .search-wrapper {
+        padding-bottom: 51.5vh !important;
+    }
+
+    .logo, .ds-top-sites, .ds-highlights,
+    .wallpaper-attribution {
+        display: none !important;
+    }
+}

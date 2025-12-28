@@ -1,0 +1,204 @@
+#!/bin/bash
+
+prompt() {
+    read -r -p $'\033[35m'"$1"$'\033[32m [Y/n] \033[0m' CHOICE
+    if [ -z "$CHOICE" ]; then 
+        echo 1 
+    else
+        case "$CHOICE" in 
+            y|Y ) echo 1;;
+            n|N ) echo 0;;
+        esac
+    fi
+}
+
+red() { 
+    printf '\033[31m%s\033[0m\n' "$*"; 
+}
+
+yellow() { 
+    printf '\033[33m%s\033[0m\n' "$*"; 
+}
+
+green() { 
+    printf '\033[32m%s\033[0m\n' "$*"; 
+}
+
+OLD_DIR="$HOME/.local/old"
+if [ -e "$OLD_DIR" ]; then
+    i=1
+    while :; do
+        CANDIDATE="${OLD_DIR}_${i}"
+        if [ ! -e "$CANDIDATE" ]; then
+            OLD_DIR="$CANDIDATE"
+            break
+        fi
+        i=$((i+1))
+    done
+fi
+
+SRC=$(dirname "$0")
+DEST=$HOME
+
+green "Wellcome to dotfiles installation!"
+green "Conflicting configuration files will be moved to $OLD_DIR"
+green "After installation you can find your previous config files there."
+yellow "Warning!!! this installation assumes you have all necessary packages."
+green "If you dont have, install them firstly."
+
+if [ $(prompt "Continue?") = 0 ]; then
+    exit 1
+fi
+
+# Initialize/update submodules (auto walls scripts, nvim theme)
+green "Initializing submodules..."
+git submodule init
+git submodule update --recursive --remote
+
+mkdir -p $OLD_DIR/.config
+mkdir -p $OLD_DIR/.local
+mkdir -p $DEST/.config # Just in case
+mkdir -p $DEST/.local
+mkdir -p $DEST/.local/share/applications
+mkdir -p $DEST/.local/share/templates
+
+# Step one, install everything from $SRC/.config
+green "Installing everything from $SRC/.config ..."
+
+for CONFIG_PATH in $SRC/.config/*; do
+    NAME=$(basename $CONFIG_PATH)
+    
+    if [ -e "$DEST/.config/$NAME" ]; then
+        mv "$DEST/.config/$NAME" $OLD_DIR/.config
+    fi
+
+    cp -r $CONFIG_PATH "$DEST/.config/"
+done
+
+# Step two, install everything from $SRC/.local
+green "Installing scripts from $SRC/.local/bin ..."
+
+if [ -e "$DEST/.local/bin" ]; then
+    mv "$DEST/.local/bin" $OLD_DIR/.local/bin
+fi
+cp -r "$SRC/.local/bin" "$DEST/.local/"
+
+# Instead of replacing, just add content of these 
+
+green "Moving applications & files templates from $SRC/.local ..."
+
+# Save previous anyways
+cp -r "$SRC/.local/share/applications/" "$OLD_DIR/.local/share/"
+cp -r "$SRC/.local/share/templates/" "$OLD_DIR/.local/share/"
+
+cp "$SRC"/.local/share/applications/* "$DEST"/.local/share/applications
+cp "$SRC"/.local/share/templates/* "$DEST"/.local/share/templates
+
+for LOCAL_SHARE_PATH in $SRC/.local/share/*; do
+    NAME=$(basename $LOCAL_SHARE_PATH)
+    green "Installing $NAME ..."
+
+    if [ "$NAME" = "applications" ] || [ "$NAME" = "templates" ]; then
+        continue
+    fi 
+    
+    if [ -e "$DEST/.local/share/$NAME" ]; then
+        mv "$DEST/.local/share/$NAME" $OLD_DIR/.local/share
+    fi
+
+    cp -r $LOCAL_SHARE_PATH $DEST/.local/share/
+done
+
+# Zshenv
+cp $SRC/.zshenv $DEST
+
+# Move wallpapers.
+green "Installing wallpapers ..."
+
+mkdir -p $DEST/media/pictures/
+cp -r $SRC/wallpapers $DEST/media/pictures/
+
+# If there is powerprofilesctl installed, replace waybar arch module with power-profiles module
+if [ -n "$(which powerprofilesctl 2>/dev/null)" ]; then
+    WAYBAR_FILES=(
+        "$DEST/.config/waybar/layouts/with_music.jsonc"
+        "$DEST/.config/waybar/layouts/with_window.jsonc"
+    )
+    
+    for FILE in "${WAYBAR_FILES[@]}"; do
+        sed -E -e 's#"modules-left"[[:space:]]*:[[:space:]]*$$[^]]*"custom/start"([^]]*)$$#"modules-left": ["power-profiles-daemon"\1]#' \
+            -e 's#"custom/start"#"power-profiles-daemon"#g' \
+            -i "$FILE"
+    done
+fi
+
+# Change timezone in waybar clock module
+TIMEZONE=$(readlink -f /etc/localtime | sed 's|.*/zoneinfo/||')
+sed -i "s/\"timezone\": *\"[^\"]*\"/\"timezone\": \"${TIMEZONE//\//\\/}\"/" \
+    "$DEST/.config/waybar/modules.jsonc"
+
+# Install papirus icon theme
+green "Installing icon theme..."
+ICON_THEME_TAR="$DEST/.local/share/icons/papirus-icon-theme-bluegrey-folders.tar.xz"
+
+if tar -xJf $ICON_THEME_TAR -C "$DEST/.local/share/icons"; then
+    gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark'
+    rm $ICON_THEME_TAR
+else
+    red "Could not install? Please install manually at $ICON_THEME_TAR"
+fi
+
+# Install Kripton GTK theme
+green "Installing GTK theme..."
+GTK_THEME_TAR="$DEST/.local/share/themes/Kripton.tar.xz"
+
+if tar -xJf $GTK_THEME_TAR -C "$DEST/.local/share/themes"; then
+    gsettings set org.gnome.desktop.interface gtk-theme "Kripton"
+    gsettings set org.gnome.desktop.wm.preferences theme "Kripton"  
+    rm $GTK_THEME_TAR
+else
+    red "Could not install? Please install manually at $GTK_THEME_TAR"
+fi
+
+# Apply spicetify theme
+if [ -n "$(which spicetify 2>/dev/null)" ]; then
+    spicetify backup apply
+    spicetify config current_theme "Custom"
+    spicetify apply
+else
+    yellow "Spicetify is not installed. Spotify theme won't be set"
+fi
+
+# If vscodium is installed, lets apply theme
+if [ -n "$(which vscodium 2>/dev/null)" ]; then
+    EXT_ID=Venage5603.tokyo-night-dark-enhanced
+    vscodium --install-extension $EXT_ID
+fi
+
+green "Installing oh-my-zsh..."
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+# Zen theme
+if [ $(prompt "Would you like to install custom zen-browser theme?") = 1 ]; then
+    ZEN_DIR=$(find "$DEST/.zen/" -name '*(release)' -type d)
+
+    if [ ! -e "$DEST/.zen" ] || [ -z "$ZEN_DIR" ]; then
+        yellow "WARNING! Could not find $DEST/.zen, perhaps zen-browser is not installed?"
+        yellow "You should install the theme manually later."
+
+        echo ""
+        echo "Additional info:"
+        cat $SRC/.zen/README.md
+        echo ""
+    else 
+        if [ -d "$ZEN_DIR/chrome" ]; then
+            mkdir -p $OLD_DIR/.zen
+            mv "$ZEN_DIR/chrome" "$OLD_DIR/.zen"
+        fi
+
+        mkdir -p "$ZEN_DIR/chrome"
+        cp -r "$SRC/.zen/chrome/"* "$ZEN_DIR/chrome"
+    fi
+fi
+
+green "Installation finished! Hope you enjoy."

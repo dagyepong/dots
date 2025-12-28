@@ -1,0 +1,30 @@
+.mission-center-window 
+viewswitcher button .wide label {
+	padding-left: 6px;
+}
+
+.mission-center-window 
+preferencespage .header {
+    padding: 8px;
+}
+
+.mission-center-window 
+preferencespage .title {
+	margin-bottom: 4px;
+}
+
+.mission-center-window 
+preferencespage .subtitle {
+	font-size: small;
+	margin-right: 20px;
+}
+
+.mission-center-window 
+overlay-split-view .end .layout-grid picture {
+	margin-right: 5px;
+}
+
+.mission-center-window 
+toolbarview .navigation-sidebar row {
+	padding-left:5px;
+}
