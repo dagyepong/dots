@@ -1,5 +1,0 @@
-@-moz-document url-prefix("http://"), url-prefix("https://") {
-    a:any-link:focus {
-        outline: none !important;
-    }
-}

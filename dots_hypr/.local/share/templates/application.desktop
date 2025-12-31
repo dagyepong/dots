@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Name=My Custom App
-Comment=This is a custom application shortcut
-Exec=/path/to/your/application-or-script
-Icon=icon
-Terminal=false
-Type=Application
-Categories=Utility;Application;
