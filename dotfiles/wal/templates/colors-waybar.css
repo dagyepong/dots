@@ -1,9 +1,0 @@
-:root {
-    --waybar-background: rgba({background.strip}, 0.65);
-    --waybar-color0: rgba({color0.strip}, 0.7);
-    --waybar-color12: rgba({color7.strip}, 0.3);
-    --waybar-color3: rgba({color3.strip}, 0.5);
-    --waybar-color4: rgba({color4.strip}, 0.2);
-    --waybar-color7: {color7};
-    --waybar-color6: rgba({color7.strip}, 0.25);
-}

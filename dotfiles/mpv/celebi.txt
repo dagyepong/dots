@@ -1,3 +1,0 @@
-audio-channels=auto-safe
-sub-pos=100.000000
-volume=77.600021
