@@ -1,0 +1,195 @@
+/* =========================
+   Gruvbox Dark (Soft Light)
+   ========================= */
+
+* {
+    border: none;
+    border-radius: 8px;
+    font-family: "JetBrainsMono Nerd Font", "Font Awesome 6 Free";
+    font-size: 13px;
+    min-height: 0;
+}
+
+/* =========================
+   Waybar container
+   ========================= */
+window#waybar {
+    background: rgba(40, 40, 40, 0.92);
+    color: #ebdbb2;
+}
+
+/* =========================
+   Modules base
+   ========================= */
+#custom-launch,
+#taskbar,
+#clock,
+#cpu,
+#memory,
+#network,
+#wireplumber,
+#battery,
+#backlight,
+#tray {
+    background: #32302f;
+    margin: 3px 4px;
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+
+/* =========================
+   Hover effect (light vibe)
+   ========================= */
+#custom-launch:hover,
+#clock:hover,
+#cpu:hover,
+#memory:hover,
+#network:hover,
+#wireplumber:hover,
+#battery:hover,
+#backlight:hover {
+    background: #3c3836;
+}
+
+/* =========================
+   Custom launcher
+   ========================= */
+#custom-launch {
+    color: #fabd2f;
+    font-size: 15px;
+}
+
+/* =========================
+   Taskbar
+   ========================= */
+#taskbar {
+    padding: 3px;
+}
+
+#taskbar button {
+    padding: 4px 8px;
+    margin: 0 3px;
+    color: #d5c4a1;
+    background: transparent;
+    border-radius: 8px;
+}
+
+#taskbar button.active {
+    background: #458588;
+    color: #fbf1c7;
+}
+
+#taskbar button:hover {
+    background: #504945;
+}
+
+/* =========================
+   Clock (center)
+   ========================= */
+#clock {
+    color: #b8bb26;
+    font-weight: bold;
+}
+
+/* =========================
+   CPU & Memory
+   ========================= */
+#cpu {
+    color: #83a598;
+}
+
+#memory {
+    color: #d3869b;
+}
+
+/* =========================
+   Network
+   ========================= */
+#network {
+    color: #8ec07c;
+}
+
+#network.disconnected {
+    color: #fb4934;
+}
+
+/* =========================
+   Audio (Wireplumber)
+   ========================= */
+#wireplumber {
+    color: #fabd2f;
+}
+
+#wireplumber.muted {
+    color: #928374;
+}
+
+/* =========================
+   Backlight group
+   ========================= */
+#backlight {
+    color: #fe8019;
+}
+
+/* Slider */
+#backlight-slider slider {
+    min-height: 6px;
+    min-width: 6px;
+    background: #fabd2f;
+    border-radius: 10px;
+}
+
+#backlight-slider trough {
+    min-height: 6px;
+    background: #504945;
+    border-radius: 10px;
+}
+
+#backlight-slider highlight {
+    background: #fe8019;
+    border-radius: 10px;
+}
+
+/* =========================
+   Battery
+   ========================= */
+#battery {
+    color: #b8bb26;
+}
+
+#battery.warning {
+    color: #fabd2f;
+}
+
+#battery.critical {
+    color: #fb4934;
+}
+
+/* =========================
+   Tray
+   ========================= */
+#tray {
+    background: #32302f;
+}
+
+#tray > .passive {
+    opacity: 0.6;
+}
+
+#tray > .needs-attention {
+    background: #fb4934;
+}
+
+/* =========================
+   Tooltip
+   ========================= */
+tooltip {
+    background: #1d2021;
+    color: #ebdbb2;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+tooltip label {
+    color: #ebdbb2;
+}
