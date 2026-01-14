@@ -1,6 +1,2 @@
--- Rafael Bodill's Neovim entry-point
--- https://github.com/rafi/vim-config
---
--- since 2014.
-
-require('rafi.config.lazy')
+-- bootstrap lazy.nvim, LazyVim and your plugins
+require("config.lazy")
