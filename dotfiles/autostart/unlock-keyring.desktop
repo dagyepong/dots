@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Exec=gnome-keyring-daemon --start --components=pkcs11
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_US]=Unlock Keyring
+Name=Unlock Keyring
+Comment[en_US]=Unlock GNOME Keyring on login
+Comment=Unlock GNOME Keyring on login
+

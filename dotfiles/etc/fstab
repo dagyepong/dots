@@ -1,0 +1,8 @@
+
+/dev/nvme1n1p1		/boot/efi		vfat		noauto											1 2
+/dev/nvme1n1p3		none			swap		sw											0 0	
+
+
+# TMPFS - Compiling optimization
+
+tmpfs			/var/tmp/portage	tmpfs		rw,nosuid,noatime,nodev,size=24G,mode=775,uid=portage,gid=portage,x-mount.mkdir=775	0 0

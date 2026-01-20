@@ -1,0 +1,4 @@
+#!/bin/bash
+
+export QT_QPA_PLUGIN=xcb
+exec alacritty
