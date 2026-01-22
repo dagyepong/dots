@@ -1,0 +1,47 @@
+[colors]
+# This is a custom cyberpunk-inspired "Eye Candy" theme.
+# It offers a dark, high-contrast palette with vibrant accents.
+
+# Default colors
+[colors.primary]
+background = '#121029'
+foreground = '#E6E6FF'
+
+# Cursor colors
+[colors.cursor]
+text = '#121029'
+cursor = '#FF79C6'
+
+# Normal ANSI colors
+[colors.normal]
+black   = '#21203E'
+red     = '#FF445B'
+green   = '#50FA7B'
+yellow  = '#F1FA8C'
+blue    = '#9D65FF'
+magenta = '#FF79C6'
+cyan    = '#88C0D0'
+white   = '#DCDFE4'
+
+# Bright ANSI colors
+[colors.bright]
+black   = '#404169'
+red     = '#FF647A'
+green   = '#69FF91'
+yellow  = '#FFF2A2'
+blue    = '#B282FF'
+magenta = '#FF9DCD'
+cyan    = '#9CD7E6'
+white   = '#FAFAFA'
+
+# Dim colors
+[colors.dim]
+black   = '#1A1934'
+red     = '#CA3C4F'
+green   = '#43C265'
+yellow  = '#D4C165'
+blue    = '#8457D2'
+magenta = '#CC6CB1'
+cyan    = '#77A3B1'
+white   = '#A2A2A7'
+

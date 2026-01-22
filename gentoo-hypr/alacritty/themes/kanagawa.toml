@@ -1,0 +1,33 @@
+[colors]
+# The `draw_bold_text_with_bright_colors` option determines whether bold text uses
+# the "bright" color variants.
+draw_bold_text_with_bright_colors = true
+
+
+[colors.primary]
+background = '#1F1F28' # SumiInk0
+foreground = '#DCD7BA' # OldWhite
+
+[colors.cursor]
+text = '#1F1F28'   # SumiInk0
+cursor = '#C8C093' # FaintGrey
+
+[colors.normal]
+black =   '#0C0C0C' # SumiInk0
+red =     '#EE6464' # AutumnRed
+green =   '#87C095' # SpringGreen
+yellow =  '#E6C384' # AutumnYellow
+blue =    '#7AA89F' # WaveBlue
+magenta = '#995F9C' # SakuraPink
+cyan =    '#7FC0BA' # WinterBlue
+white =   '#C8C093' # FaintGrey
+
+[colors.bright]
+black =   '#54546D' # SumiInk1
+red =     '#EE6464' # AutumnRed
+green =   '#87C095' # SpringGreen
+yellow =  '#E6C384' # AutumnYellow
+blue =    '#7AA89F' # WaveBlue
+magenta = '#995F9C' # SakuraPink
+cyan =    '#7FC0BA' # WinterBlue
+white =   '#DCD7BA' # OldWhite
