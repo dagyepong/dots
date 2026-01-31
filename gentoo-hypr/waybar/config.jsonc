@@ -1,50 +1,39 @@
 {
-    "position": "top",
-    "layer": "top",
-    "height": 38,
-    "margin-top": 0,
+    "layer": "top", 
+    "position": "top", 
+    "height": 0,  
+    "spacing": 5, 
     "margin-bottom": 0,
-    "margin-left": 0,
-    "margin-right": 0,
-    "modules-left": ["custom/launcher", "clock", "hyprland/window", "custom/weather",  "custom/nightlight"],
-    "modules-center": ["hyprland/workspaces",],
-    "modules-right": ["pulseaudio", "tray", "memory", "cpu", "backlight", "network", "battery", "custom/power_btn"],
 
-// Modules configuration
+    "modules-left": [
+        "custom/distro-icon",
+        "clock",
+        "wlr/taskbar",
+        "custom/weather",
+        "custom/nightlight",
+    ],
 
-	"hyprland/window": {
-	       "format": "{}",
-	},
-	
-	
+    "modules-center": [
+        "hyprland/workspaces",
+    ],
 
-	"hyprland/workspaces": {
-        "active-only": false,
-        "all-outputs": true,
-        "disable-scroll": false,
-        "on-scroll-up": "hyprctl dispatch workspace -1",
-        "on-scroll-down": "hyprctl dispatch workspace +1",
-		"format": "{icon}",
-		"on-click": "activate",
-		"format-icons": {
-			"urgent": "",
-			"active": "",
-			"active": "󰧞",
-    "sort-by-number": true
-    },
-    },
+    "modules-right": [
+        "pulseaudio", 
+        "backlight", 
+        "cpu",
+        "memory",
+        "battery",
+        "custom/power_btn",
+    ],
 
-     // Nightlight option.
-    "custom/nightlight": {
-        "format": "󰖔 ",
-        "exec": "~/.config/hypr/scripts/nightlight.sh",
-        "on-click": "~/.config/hypr/scripts/nightlight.sh --value",
-        "on-click-right": "~/.config/hypr/scripts/nightlight.sh --def",
-        "tooltip": true,
-        "tooltip-format": "Left Click: set temp 5000k\nRight Click: set temp default",
-        "interval": 1
-    },
-    
+       "custom/distro-icon": {
+        "format": "{}",
+        "interval": "once",
+        "tooltip": false,
+        "exec": "$HOME/.config/waybar/get_distro_icon.sh",
+        "on-click": "wofi --show drun -I -a -n -W 500 -H 376",
+  },
+
      "custom/weather": {
         "format": "  {}",
         "format-alt": "{alt}: {}",
@@ -56,45 +45,64 @@
         "exec-if": "ping wttr.in -c1",
         "tooltip": true
     },
-     
-       // network
-    "network": {
-        // "interface": "wlp2*", // (Optional) To force the use of this interface
-        "format-wifi": "{icon}",
-        "format-ethernet": "󰌘",
-        "tooltip-format": "Network: <big><b>{essid}</b></big>\nSignal strength: <b>{signaldBm}dBm ({signalStrength}%)</b>\nFrequency: <b>{frequency}MHz</b>\nInterface: <b>{ifname}</b>\nIP: <b>{ipaddr}/{cidr}</b>\nGateway: <b>{gwaddr}</b>\nNetmask: <b>{netmask}</b>",
-        "format-linked": "󰈀 {ifname} (No IP)",
-        "format-disconnected": "󰖪 ",
-        "tooltip-format-disconnected": "Disconnected",
-        "interval": 2,
-        "max-length": 30,
-    	"format-icons": [
-    		"󰤯", "󰤟", "󰤢", "󰤥", "󰤨"
-    	],
-        "on-click-right": "kitty -e nmtui"
-    },
 
-    // network speed
-    "network#speed": {
-        // "interface": "wlp2*", // (Optional) To force the use of this interface
-        "format": "<span foreground='#1e1e2e'> {bandwidthDownBytes}</span> <span foreground='#11111b'> {bandwidthUpBytes}</span>",
-        "format-disconnected": "󰖪 ",
-        "tooltip": false,
-        "interval": 1,
-        "max-length": 30,
-    	"format-icons": [
-    		"󰤯", "󰤟", "󰤢", "󰤥", "󰤨"
-    	],
-        "on-click-right": "kitty -e nmtui"
-    },
 
-         // power menu ( universal )
+       // Nightlight option.
+    "custom/nightlight": {
+        "format": "󰖔 ",
+        "exec": "~/.config/hypr/scripts/nightlight.sh",
+        "on-click": "~/.config/hypr/scripts/nightlight.sh --value",
+        "on-click-right": "~/.config/hypr/scripts/nightlight.sh --def",
+        "tooltip": true,
+        "tooltip-format": "Left Click: set temp 5000k\nRight Click: set temp default",
+        "interval": 1
+    },
+    
+       // power menu ( universal )
     "custom/power_btn": {
         "format": "",
         "on-click": "wlogout -b 6 --layout ~/.config/wlogout/layout --css ~/.config/wlogout/style.css",
         "tooltip": false
+  },
+
+    "memory": {
+    "format": "󰍛 {}%",
+    "format-alt": "󰍛 {used}/{total} GiB",
+    "interval": 5
+  },
+
+  "cpu": {
+    "format": "󰻠 {usage}%",
+    "format-alt": "󰻠 {avg_frequency} GHz",
+    "interval": 5
+  },
+
+     "battery": {
+	//"interval": 5,
+	"align": 0,
+	"rotate": 0,
+	"full-at": 100,
+	"design-capacity": false,
+	"states": {
+		"good": 95,
+		"warning": 30,
+		"critical": 15
+	},
+	"format": "{icon} {capacity}%",
+	"format-charging": " {capacity}%",
+	"format-plugged": "󱘖 {capacity}%",
+	"format-alt-click": "click",
+	"format-full": "{icon} Full",
+	"format-alt": "{icon} {time}",
+	"format-icons": [
+		"󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"
+	    ],
+	"format-time": "{H}h {M}min",
+	"tooltip": true,
+	"tooltip-format": "{timeTo} {power}w"
     },
-      "clock": {
+
+    "clock": {
         "format": " {:%I:%M %p}",
         "format-alt": "󰃭 {:%d·%m·%Y}",
         "on-clock-right": "exec gnome-calendar",
@@ -120,112 +128,7 @@
         }
     },
 
-
-      // power section expand
-    "custom/power": {
-        "format": "",
-        "tooltip-format": "Poweroff",
-        "on-click": "~/.config/hypr/scripts/power.sh --poweroff"
-    },
-
-    "custom/reboot": {
-        "format": "",
-        "tooltip-format": "Reboot" ,
-        "on-click": "~/.config/hypr/scripts/power.sh --reboot"
-    },
-
-    "custom/lock": {
-        "format": "",
-        "tooltip-format": "Screen lock" ,
-        "on-click": "~/.config/hypr/scripts/power.sh --lock"
-    },
-    
-    "custom/logout": {
-        "format": "󰿅",
-        "tooltip-format": "logout" ,
-        "on-click": "~/.config/hypr/scripts/power.sh --logout"
-    },
-   
-
-   // opening power menu
-    "group/power": {
-        "orientation": "inherit",
-       "drawer": {
-            "transition-duration": 300,
-            "children-class": "not-memory",
-            "transition-left-to-right": false
-       },
-       "modules": [
-            "custom/power",
-            "custom/lock",
-            "custom/logout",
-            "custom/reboot"
-       ]
-    },
-
-
-
-
-	 "battery": {
-	//"interval": 5,
-	"align": 0,
-	"rotate": 0,
-	"full-at": 100,
-	"design-capacity": false,
-	"states": {
-		"good": 95,
-		"warning": 30,
-		"critical": 15
-	},
-	"format": "{icon} {capacity}%",
-	"format-charging": " {capacity}%",
-	"format-plugged": "󱘖 {capacity}%",
-	"format-alt-click": "click",
-	"format-full": "{icon} Full",
-	"format-alt": "{icon} {time}",
-	"format-icons": [
-		"󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"
-	    ],
-	"format-time": "{H}h {M}min",
-	"tooltip": true,
-	"tooltip-format": "{timeTo} {power}w"
-    },
-
-  "memory": {
-    "format": "󰍛 {}%",
-    "format-alt": "󰍛 {used}/{total} GiB",
-    "interval": 5
-  },
-
-  "cpu": {
-    "format": "󰻠 {usage}%",
-    "format-alt": "󰻠 {avg_frequency} GHz",
-    "interval": 5
-  },
-
-
-  "disk": {
-    "format": "󰋊 {}%",
-    "format-alt": "󰋊 {used}/{total} GiB",
-    "interval": 5,
-    "path": "/mnt/Datos"
-  },
-	
-	 "tray": {
-        "icon-size": 13,
-        "spacing": 10
-    },
-
-	// backlight
-    "backlight": {
-        "device": "intel_backlight",
-        "format": "{icon} {percent}%",
-        "format-icons": ["󰃞", "󰃟", "󰃠"],
-        "on-scroll-up": "brightnessctl set 1%+",
-        "on-scroll-down": "brightnessctl set 1%-",
-        "min-length": 6
-   },
-	  "pulseaudio": {
+     "pulseaudio": {
         "format": "{icon}  {volume}%",
         "format-bluetooth": "{icon} {volume}%  {format_source}",
         "format-bluetooth-muted": " {icon} {format_source}",
@@ -243,22 +146,41 @@
         },
         "on-click": "pavucontrol"
     },
+    },
     
-    "pulseaudio#microphone": {
-	"format": "{format_source}",
-	"format-source": " {volume}%",
-	"format-source-muted": "",
-	"on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
-	"on-click-right": "pavucontrol -t 4",
-	"on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%-",
-	"on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%+",
-	"tooltip-format": "{source_desc} | {source_volume}%",
-	"scroll-step": 5,
-},
-  
-  "custom/launcher": {
-    "format": "󰈸",
-    "on-click": "wofi --show drun -I -a -n -W 500 -H 376",
-  },
+    // backlight
+    "backlight": {
+        "device": "intel_backlight",
+        "format": "{icon} {percent}%",
+        "format-icons": ["󰃞", "󰃟", "󰃠"],
+        "on-scroll-up": "brightnessctl set 1%+",
+        "on-scroll-down": "brightnessctl set 1%-",
+        "min-length": 6
+   },
+
+    "tray": {
+        "icon-size": 25,
+        "spacing": 13
+    },
+
+    "wlr/taskbar": {
+        "format": "{icon}",
+        "icon-size": 28,
+        "icon-theme": "Numix-Circle",
+        "tooltip": false,
+        "on-click": "activate",
+        "on-click-middle": "close",
+        "ignore-list": [
+            "Alacritty"
+        ],
+        "app_ids-mapping": {
+            "firefoxdeveloperedition": "firefox-developer-edition"
+        },
+        "rewrite": {
+            "Firefox Web Browser": "Firefox",
+            "Foot Server": "Terminal"
+        }
+}
 
 }
+
