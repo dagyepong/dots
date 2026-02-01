@@ -7,35 +7,35 @@
 
 {
     "label": "logout",
-    "action": "$HOME/.config/hypr/scripts/power.sh --logout",
+    "action": "hyprctl dispatch exit",
     "text": "Logout",
     "keybind": "e"
 }
 
 {
     "label": "suspend",
-    "action": "lockscreen.sh & disown && systemctl suspend",
+    "action": "loginctl suspend",
     "text": "Suspend",
     "keybind": "u"
 }
 
 {
     "label": "hibernate",
-    "action": "systemctl hibernate",
+    "action": "loginctl hibernate",
     "text": "Hibernate",
     "keybind": "h"
 }
 
 {
     "label": "shutdown",
-    "action": "$HOME/.config/hypr/scripts/power.sh --poweroff",
+    "action": "loginctl poweroff",
     "text": "Power Off",
     "keybind": "s"
 }
 
 {
     "label": "reboot",
-    "action": "$HOME/.config/hypr/scripts/power.sh --reboot",
+    "action": "loginctl reboot",
     "text": "Reboot",
     "keybind": "r"
 }
