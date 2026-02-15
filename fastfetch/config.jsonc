@@ -45,6 +45,14 @@
    "key": "│ {#33} age     {#keys}│" 
   },
   {
+   "key": "│ {#36}󰇄 desktop {#keys}│",
+   "type": "de"
+  },
+  {
+   "key": "│ {#36}󰇄 wm      {#keys}│",
+   "type": "wm"
+  },
+  {
    "type": "CPU",
    "key": "󰻠 CPU",
    "format": "{1}",
