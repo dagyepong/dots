@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec barrierc -f 192.168.0.8

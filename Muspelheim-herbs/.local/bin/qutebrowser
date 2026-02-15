@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec /bin/qutebrowser --qt-flag enable-accelerated-video-decode --qt-flag enable-gpu-rasterization --qt-flag enable-oop-rasterization "$@"
