@@ -277,7 +277,7 @@ session_serialization false
 // Default: default
 //
 theme "gruvbox-dark"
-
+//theme "rose-pine"
 // The name of the default layout to load on startup
 // Default: "default"
 //
