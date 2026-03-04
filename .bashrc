@@ -4,9 +4,9 @@
 
 
 alias b='bash'
-alias v='vim'
+alias vim='nvim'
 
-alias ls='ls --file-type --color=auto'
+alias ls='lsd -lah --group-dirs first'
 alias la='ls -A'
 alias ll='ls -l'
 alias cat="bat -p"
@@ -320,15 +320,15 @@ alias vecna-cursed='echo "You have been cursed by Vecna!"'
 alias eleven='echo "ᕦ( ͡° ͜ʖ ͡°)ᕤ"'
 
 # Welcome message
-echo -e "${DEMO_RED}"
-echo "   ___  ___  __  __  ___  ____   ___  ____  "
-echo "  / _ \/ _ \/ / / / / _ \/ __ \ / _ \/ __ \ "
-echo " / // / , _/ /_/ / / // / /_/ / // / /_/ / "
-echo "/____/_/|_|\____/ /____/\____/____/\____/  "
-echo -e "${RESET}"
-echo "Demogorgon prompt activated! Type 'demogorgon_prompt_menu' to change styles."
+#echo -e "${DEMO_RED}"
+#echo "   ___  ___  __  __  ___  ____   ___  ____  "
+#echo "  / _ \/ _ \/ / / / / _ \/ __ \ / _ \/ __ \ "
+#echo " / // / , _/ /_/ / / // / /_/ / // / /_/ / "
+#echo "/____/_/|_|\____/ /____/\____/____/\____/  "
+#echo -e "${RESET}"
+#echo "Demogorgon prompt activated! Type 'demogorgon_prompt_menu' to change styles."
 
 
   if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
-    dbus-run-session hyprland
+    dbus-run-session start-hyprland
 fi

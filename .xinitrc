@@ -55,4 +55,4 @@ fi
 
 
 
-exec mango
+dbus-run-session start-hyprland
