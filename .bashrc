@@ -347,14 +347,6 @@ function demogorgon_prompt_menu() {
 # Set the default prompt
 PROMPT_COMMAND=set_demogorgon_prompt
 
-# Enable color support
-if [ -x /usr/bin/dircolors ]; then
-    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
-    alias ls='ls --color=auto'
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
-fi
 
 # Add some demogorgon-themed aliases
 alias demo-status='echo "The Demogorgon is watching..."'
