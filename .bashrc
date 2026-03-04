@@ -2,10 +2,15 @@
 # demogorgon_prompt.sh - A Stranger Things demogorgon-themed bash prompt
 
 
+# -------------------- Useful Aliases (doas version) --------------------
 
+# Basic ls enhancements
+
+
+
+alias l='ls -CF'
 alias b='bash'
 alias vim='nvim'
-
 alias ls='lsd -lah --group-dirs first'
 alias la='ls -A'
 alias ll='ls -l'
@@ -14,16 +19,53 @@ alias pfetch="curl -s https://raw.githubusercontent.com/dylanaraps/pfetch/master
 alias update="sudo emaint -a sync && sudo emerge -avuDN @world"
 alias rm='rm -fr'
 
-# adding flags
-alias df='df -h'               # human-readable sizes
-alias free='free -m'           # show sizes in MB
-alias grep='grep --color=auto' # colorize output (good for log files)
+# Grep with color
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+# Human-readable sizes
+alias df='df -h'
+alias du='du -h'
+alias free='free -h'
 
-# ps
-alias psa="ps auxf"
-alias psgrep="ps aux | grep -v grep | grep -i -e VSZ -e"
+# Process management
+alias psa='ps auxf'
+alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
 alias psmem='ps auxf | sort -nr -k 4'
 alias pscpu='ps auxf | sort -nr -k 3'
+# Gentoo package management (using doas)
+alias sync='doas emaint -a sync'
+alias update='doas emerge -avuDN @world'
+alias upgrade='doas emerge -avuDN @world'
+alias newuse='doas emerge -avuDN @world'
+alias clean='doas emerge --depclean'
+alias distclean='doas emerge -aC'
+alias eclean-dist='doas eclean-dist'
+alias revdep='doas revdep-rebuild'
+alias etc-update='doas etc-update'
+alias conf-update='doas dispatch-conf'
+
+# Search installed packages
+alias qlist='qlist -IC'
+alias qfile='qfile'
+alias equery='equery'
+# System maintenance
+alias syslog='doas tail -f /var/log/messages'
+alias journal='doas journalctl -xe'           # if using systemd
+alias kern-log='doas dmesg -T -w'
+
+# Security / Hardening
+alias checksec='scanelf -pvf'
+alias hardened-check='hardened-check'
+
+# Networking
+alias ip='ip -color'
+alias myip='curl -s ifconfig.me'
+
+# Quick navigation
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
 
 # Color definitions
 RESET='\[\e[0m\]'
