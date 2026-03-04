@@ -16,7 +16,6 @@ alias la='ls -A'
 alias ll='ls -l'
 alias cat="bat -p"
 alias pfetch="curl -s https://raw.githubusercontent.com/dylanaraps/pfetch/master/pfetch | sh"
-alias update="sudo emaint -a sync && sudo emerge -avuDN @world"
 alias rm='rm -fr'
 
 # Grep with color
