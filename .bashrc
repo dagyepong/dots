@@ -5,7 +5,9 @@
 # -------------------- Useful Aliases (doas version) --------------------
 
 # Basic ls enhancements
-
+# required font
+#doas emerge --ask media-fonts/noto-emoji   # Emoji support
+#doas emerge --ask media-fonts/nerd-fonts   # or a specific one like media-fonts/firacode-nerd
 
 
 alias l='ls -CF'
