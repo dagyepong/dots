@@ -13,7 +13,7 @@
 alias l='ls -CF'
 alias b='bash'
 alias vim='nvim'
-alias ls='lsd -lah --group-dirs first'
+alias ls='eza -lah --icons --git --group-directories-first --color=always'
 alias la='ls -A'
 alias ll='ls -l'
 alias cat="bat -p"
@@ -365,5 +365,5 @@ alias eleven='echo "ᕦ( ͡° ͜ʖ ͡°)ᕤ"'
 
 
   if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
-    dbus-run-session start-hyprland
+    dbus-run-session mango
 fi
