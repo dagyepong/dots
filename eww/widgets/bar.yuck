@@ -1,0 +1,23 @@
+(include "widgets/workspaces.yuck")
+(include "widgets/weather.yuck")
+(include "widgets/network.yuck")
+(include "widgets/cpu.yuck")
+(include "widgets/ram.yuck")
+(include "widgets/battery.yuck")
+(include "widgets/brightness.yuck")
+
+(defwidget bar []
+  (centerbox :orientation "h" :class "bar"
+    (box :class "left" :halign "start"
+      (workspaces))  ; This will show tags 1-9
+    (box :class "center" :halign "center"
+      (weather))
+    (box :class "right" :halign "end"
+      (cpu)
+      (ram)
+      (network)
+      (brightness) 
+      (battery)
+      (button :class "power-btn"
+              :onclick "eww open powermenu"
+              "⏻"))))

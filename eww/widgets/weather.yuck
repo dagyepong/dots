@@ -1,0 +1,7 @@
+(defpoll weather :interval "30m"
+  "bash /home/nana/.config/eww/scripts/weather.sh")
+
+(defwidget weather []
+  (box :class "weather"
+       :orientation "h"
+    (label :text weather)))

@@ -1,0 +1,11 @@
+(defpoll battery_icon :interval "30s"
+  "bash /home/nana/.config/eww/scripts/battery.sh icon")
+(defpoll battery_percent :interval "30s"
+  "bash /home/nana/.config/eww/scripts/battery.sh percent")
+
+(defwidget battery []
+  (box :class "battery"
+       :orientation "h"
+       :spacing 5
+    (label :text battery_icon)
+    (label :text battery_percent)))

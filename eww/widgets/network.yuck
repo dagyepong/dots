@@ -1,0 +1,7 @@
+(defpoll network :interval "10s"
+  "bash /home/nana/.config/eww/scripts/network.sh")
+
+(defwidget network []
+  (box :class "network"
+       :orientation "h"
+    (label :text network)))
