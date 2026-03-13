@@ -67,3 +67,23 @@ $crust: #11111b;
   border-radius: 6px;
   color: $peach;
 }
+
+
+.systray {
+  background-color: #313244;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 0 4px;
+}
+
+.systray button {
+  padding: 2px;
+  margin: 0 2px;
+  background: transparent;
+  border: none;
+}
+
+.systray button:hover {
+  background: #45475a;
+  border-radius: 4px;
+}

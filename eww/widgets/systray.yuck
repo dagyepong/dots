@@ -1,0 +1,7 @@
+;; Custom wrapper for the built-in systray widget
+(defwidget my-systray []
+  (box :class "systray"
+       :orientation "h"
+       :spacing 4
+    (systray :icon-size 20
+             :prepend-new false)))
