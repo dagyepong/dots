@@ -1,0 +1,16 @@
+emerge app-backup/snapper   
+
+umount /.snapshots   
+
+rmdir /.snapshots   
+
+snapper -c root create-config /   
+
+mkdir /.snapshots
+mount /.snapshots   
+
+emerge --ask sys-process/cronie
+rc-update add cronie default
+rc-service cronie start   
+
+doas snapper list   
