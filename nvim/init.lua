@@ -1,12 +1,21 @@
--- Load lazy.nvim plugin manager
-require("config.lazy")
+require 'config.options'
+require 'config.keyblinds'
 
--- Load configuration
-require("config.options")
-require("config.keymaps")
-require("config.autocmds")
+local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
+if not (vim.uv or vim.loop).fs_stat(lazypath) then
+    local lazyrepo = 'https://github.com/folke/lazy.nvim.git'
+    local out = vim.fn.system { 'git', 'clone', '--filter=blob:none', '--branch=stable', lazyrepo, lazypath }
+    if vim.v.shell_error ~= 0 then
+        error('Error cloning lazy.nvim:\n' .. out)
+    end
+end
+vim.opt.rtp:prepend(lazypath)
 
--- Set nicer line number highlighting
-vim.api.nvim_set_hl(0, "LineNrAbove", { fg = "#4C4f5A", bold = false })
-vim.api.nvim_set_hl(0, "LineNr", { fg = "#E2E2E3", bold = true })
-vim.api.nvim_set_hl(0, "LineNrBelow", { fg = "#4C4f5A", bold = false })
+require('lazy').setup({
+
+    { import = 'plugins.ui' },
+    { import = 'plugins.others' },
+    { import = 'plugins.editor' },
+    { import = 'plugins.code' },
+
+})

@@ -1,98 +1,63 @@
-# Ghostty terminal theme: "Noctalia"
-# Based on your four accent colors + complementary shades
-
-background = #0C0D11
-foreground = #CACEE2
-
-cursor-color = #A8AEFF
-cursor-text = #0C0D11
-selection-background = #2A2D3A
-selection-foreground = #CACEE2
-
-# Standard colors (0-7)
-palette = 0=#0C0D11
-palette = 1=#FF6B81
-palette = 2=#7FB77E
-palette = 3=#FFBB66
-palette = 4=#8EABFF
-palette = 5=#E3C2FF
-palette = 6=#7DC4E4
-palette = 7=#CACEE2
-
-# Bright colors (8-15)
-palette = 8=#2A2D3A
-palette = 9=#FF8A9F
-palette = 10=#A5D6A5
-palette = 11=#FFD699
-palette = 12=#A8AEFF
-palette = 13=#F0D6FF
-palette = 14=#A1DAF0
-palette = 15=#E6E9FA
+#--------------------------------------------------------------------------------
+#                                                              
+#     ,----.   ,--.                    ,--.    ,--.            
+#    '  .-./   |  ,---.  ,---.  ,---.,-'  '-.,-'  '-.,--. ,--. 
+#    |  | .---.|  .-.  || .-. |(  .-''-.  .-''-.  .-' \  '  /  
+#    '  '--'  ||  | |  |' '-' '.-'  `) |  |    |  |    \   '   
+#     `------' `--' `--' `---' `----'  `--'    `--'  .-'  /    
+#                                                    `---'     
+#           _______
+#　　　　　 /  ＞　　フ     
+#　　　　　| 　_　 _ l      RESUME: basic configs to this terminal, using 
+#　 　　　／` ミ＿xノ               default keyblinds
+#　　 　 /　　　 　 |
+#　　　 /　 ヽ　　 ﾉ
+#　 　 │　　|　|　|         AUTHOR:  Andr3xDev
+#　／￣|　　 |　|　|        URL: https://github.com/Andr3xDev/HyprPharch
+#　| (￣ヽ＿_ヽ_)__)
+#　＼二つ
+#--------------------------------------------------------------------------------
 
 
+#--------------------------------------------------------------------------------
+# General Config
+#--------------------------------------------------------------------------------
 
+#--- Cursor & Trail ---#
+cursor-style = bar
+cursor-style-blink = true
+custom-shader = shaders/cursor-trail.glsl
 
-font-family = JetBrainsMono Nerd Font
+#--- Fonts ---#
+font-family = "JetBrains Mono Nerd Font"
 font-size = 10
-#theme = Everforest Dark Hard
-background-opacity = 0.90
-cursor-opacity = 0.5
-window-padding-x = 8
-window-padding-y = 8
-window-padding-balance = true
-window-decoration = false
-wait-after-command = true
-clipboard-paste-protection = true
-mouse-hide-while-typing = false
-shell-integration = zsh
-shell-integration-features = cursor, sudo, title
-#keybind = ctrl+F11=toggle_quick_terminal
-keybind = ctrl+w=toggle_window_decorations
-keybind = shift+z=toggle_window_decorations
-keybind = super+f12=toggle_fullscreen
-unfocused-split-opacity = 1
-split-divider-color = #a7c080
-#====> quick terminal
-#quick-terminal-position = top
-#quick-terminal-size = 40%,95%
-#gtk-quick-terminal-layer = overlay
-#gtk-quick-terminal-namespace = ghosted
-#quick-terminal-autohide = false
-#quick-terminal-keyboard-interactivity = on-demand
-##keybind = global:super+grave=toggle_quick_terminal
-#keybind = super+a=toggle_quick_terminal
+font-feature = calt
 
-#==== shaders
-#custom-shader = ./shaders/animated-gradient-shader.glsl
-#custom-shader = ./shaders/bettercrt.glsl
-#custom-shader = ./shaders/bloom025.glsl
-#custom-shader = ./shaders/bloom050.glsl
-#custom-shader = ./shaders/bloom075.glsl
-#custom-shader = ./shaders/bloom.glsl
-#custom-shader = ./shaders/cineShader-lava.glsl
-#custom-shader = ./shaders/cubes.glsl
-custom-shader = ./shaders/cursor_blaze.glsl
-#custom-shader = ./shaders/cursor_synesthaxia(tweened).glsl
-#custom-shader = ./shaders/dither.glsl
-#custom-shader = ./shaders/drunkard.glsl
-#custom-shader = ./shaders/fireworks.glsl
-#custom-shader = ./shaders/fireworks-rockets.glsl
-#custom-shader = ./shaders/galaxy.glsl
-#custom-shader = ./shaders/gears-and-belts.glsl
-#custom-shader = ./shaders/glitchy.glsl
-#custom-shader = ./shaders/glow-rgbsplit-twitchy.glsl
-#custom-shader = ./shaders/gradient-background.glsl
-#custom-shader = ./shaders/inside-the-matrix.glsl
-#custom-shader = ./shaders/just-snow.glsl
-#custom-shader = ./shaders/matrix-hallway.glsl
-#custom-shader = ./shaders/mnoise.glsl
-#custom-shader = ./shaders/negative.glsl
-#custom-shader = ./shaders/retro-terminal.glsl
-#custom-shader = ./shaders/smoke-and-ghost.glsl
-#custom-shader = ./shaders/sparks-from-fire.glsl
-#custom-shader = ./shaders/spotlight.glsl
-#custom-shader = ./shaders/starfield.glsl
-#custom-shader = ./shaders/starfield-colors.glsl
-#custom-shader = ./shaders/tft.glsl
-#custom-shader = ./shaders/underwater.glsl
-custom-shader-animation = always
+#--- Visuals ---#
+window-padding-x = 5
+window-padding-y = 5
+window-decoration = false 
+
+#--- Other ---#
+gtk-single-instance = true
+confirm-close-surface = false 
+copy-on-select = clipboard
+scrollback-limit = 50000
+shell-integration-features = no-cursor
+selection-clear-on-copy = true
+
+
+#--------------------------------------------------------------------------------
+#  Keyblinds
+#--------------------------------------------------------------------------------
+
+#--- Others ---#
+keybind = ctrl+shift+c=copy_to_clipboard
+keybind = ctrl+shift+v=paste_from_clipboard
+keybind = ctrl+shift+r=reload_config
+
+
+#--------------------------------------------------------------------------------
+# Theme
+#--------------------------------------------------------------------------------
+theme = abysal-obsidian
