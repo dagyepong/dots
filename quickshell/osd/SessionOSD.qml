@@ -52,11 +52,11 @@ PanelWindow {
 
                     Repeater {
                         model: [
-                            { label: "⏻ Shutdown", color: Colors.red200,    cmd: ["systemctl", "poweroff"] },
-                            { label: " Reboot",   color: Colors.orange200, cmd: ["systemctl", "reboot"] },
+                            { label: "⏻ Shutdown", color: Colors.red200,    cmd: ["loginctl", "poweroff"] },
+                            { label: " Reboot",   color: Colors.orange200, cmd: ["loginctl", "reboot"] },
                             { label: "󰍃 Logout",   color: Colors.green200,  cmd: ["mmsg", "-q"] },
-                            { label: "󰒲 Suspend",  color: Colors.blue200,   cmd: ["systemctl", "suspend"] },
-                            { label: " Lock",     color: Colors.yellow200, cmd: ["hyprlock"] }
+                            { label: "󰒲 Suspend",  color: Colors.blue200,   cmd: ["loginctl", "suspend"] },
+                            { label: " Lock",     color: Colors.yellow200, cmd: ["swaylock"] }
                         ]
 
                         delegate: Rectangle {
