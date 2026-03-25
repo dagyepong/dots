@@ -1,85 +1,61 @@
-//--------------------------------------------------------------------------------
-//                                                                  
-//                                                   
-//                        ,--.                                           
-//                        |  |   ,--.,--. ,---.,--. ,--.,--,--,  ,--,--. 
-//                        |  |   |  ||  || .--' \  '  / |      \' ,-.  | 
-//                        |  '--.'  ''  '\ `--.  \   '  |  ||  |\ '-'  | 
-//                        `-----' `----'  `---'.-'  /   `--''--' `--`--' 
-//                                             `---'                     
-//            _______
-//　　　　　  /  ＞　　フ     
-//　　　　　 | 　_　 _ l      RESUME: QuickShell system config, includes bars,
-//　 　　　 ／` ミ＿xノ               launchers, widgets & more.
-//　　 　  /　　　 　 |
-//　　　  /　 ヽ　　 ﾉ
-//　  　 │　　|　|　|         AUTHOR:  Andr3xDev
-//　 ／￣|　　 |　|　|        URL: https://github.com/Andr3xDev/HyprPharch
-//　| (￣ヽ＿_ヽ_)__)
-//　＼二つ
-//--------------------------------------------------------------------------------
-
-
+//@ pragma Env QS_NO_RELOAD_POPUP=1
+//@ pragma Env QSG_RENDER_LOOP=threaded
+//@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
 
 import Quickshell
-import Quickshell.Wayland
-import "modules/bar"
-import "modules/launchers/themeLauncher"
-import "modules/launchers/appsLauncher"
-import "modules/launchers/powerLauncher"
-import "modules/launchers/clipLauncher"
-import "widgets/calendar"
+import Quickshell.Services.Notifications
+import QtQuick 6.10
+import "services" as QsServices
+import "modules/osd"
 
-/*!
-    Root of the configuration, this is where components,
-    launchers, and widgets are declared
-*/
 ShellRoot {
-
-    Variants {
-        model: Quickshell.screens.filter(scr => !isExcluded(scr.name))
+    id: root
+    
+    // Initialize services immediately
+    readonly property var notifs: QsServices.Notifs
+    readonly property var pywal: QsServices.Pywal
+    readonly property var audio: QsServices.Audio
+    readonly property var brightness: QsServices.Brightness
+    
+    // Direct NotificationServer to ensure it starts
+    NotificationServer {
+        id: notificationServer
         
-        Bar {
-            property var modelData
-            screen: modelData
+        keepOnReload: false
+        actionsSupported: true
+        bodyHyperlinksSupported: true
+        bodyMarkupSupported: true
+        imageSupported: true
+        persistenceSupported: true
+        
+        onNotification: notif => {
+            console.log("📬 [ShellRoot] Notification received:", notif.appName, notif.summary);
+            notif.tracked = true;
+            notifs.addNotification(notif);
+        }
+        
+        Component.onCompleted: {
+            console.log("🔔 NotificationServer registered on D-Bus");
         }
     }
-
-    // Theme Launcher - Toggle with hyprctl dispatch
-    ThemeLauncher {
-        id: themeLauncher
-        externalScriptPath: Quickshell.env("HOME") + "/.config/quickshell/lucyna/scripts/apply-theme.sh"
-    }
-
-    // App Launcher - Toggle with hyprctl dispatch
-    AppLauncher {
-        id: appLauncher
-    }
-
-    // Power Launcher - Toggle with hyprctl dispatch, opens on screen under cursor
-    PowerLauncher {
-        id: powerLauncher
-    }
-
-    // Clip Launcher - Toggle via: qs -c lucyna ipc --call toggleClip
-    ClipLauncher {
-        id: clipLauncher
-    }
-
-    // Calendar - Toggle via: click on clock | quickshell ipc --config lucyna call toggleCalendar handle
-    CalendarWindow {
-        id: calendarWindow
+    
+    Loader {
+        id: barLoader
+        source: "modules/bar/BarWrapper.qml"
     }
     
-    /*!
-        Create multiple Bars to each monitor & exclude the creation in tarjet monitor
-    */
-    function isExcluded(screenName) {
-        const excluded = [
-            //"HDMI-A-1",
-            //"DP-2",
-        ];
-        return excluded.includes(screenName);
+    // Notification popups in top-right corner
+    Loader {
+        id: notificationPopupsLoader
+        source: "modules/bar/components/NotificationPopups.qml"
+    }
+    
+    // OSD overlays (volume and brightness)
+    Wrapper {
+        pywal: root.pywal
     }
 
+    Component.onCompleted: {
+        console.log("QuickShell loaded successfully!")
+    }
 }

@@ -1,95 +1,49 @@
-import QtQuick
-import QtQuick.Layouts
 import Quickshell
-import Quickshell.Hyprland
-import "../../../theme" as Theme
+import QtQuick 6.10
+import QtQuick.Layouts 6.10
+import "../../../config" as QsConfig
+import "../../../services" as QsServices
 
-/*!
-    A dynamic widget for displaying and switching between Hyprland workspaces.
-    This component renders a horizontal row of workspace indicators
-    based on the Hyprland workspaces.
-*/
+// Clean workspace container - no outer pill
 Item {
-    implicitWidth: workspaceRow.implicitWidth
-    implicitHeight: parent
-    width: implicitWidth
-    height: implicitHeight
+    id: root
     
-    // Map as JavaScript object that defines custom display names for workspaces
-    property var workspaceNames: {
-        "1": "イ",
-        "2": "ロ",
-        "3": "ハ",
-        "4": "ニ",
-        "5": "ホ",
-        "6": "ヘ",
-        "7": "ト",
-        "8": "チ",
-        "9": "リ",
-        "10": "ヌ",
-        "11": "ル"
-    }
+    property var screen
     
-    /*!
-        Get color based on workspace state (focused, active, or inactive)
-        Handles multi-monitor setups where workspaces can be active but not focused
-    */
-    function getWorkspaceColor(workspace) {
-        if (workspace.focused) return Theme.ThemeManager.currentPalette.color1
-        if (workspace.active) return Theme.ThemeManager.currentPalette.color2
-        return Theme.ThemeManager.currentPalette.color8
-    }
+    readonly property var config: QsConfig.Config
+    readonly property var pywal: QsServices.Pywal
+    readonly property var hypr: QsServices.Hypr
+    readonly property int activeWsId: hypr.activeWsId
+    readonly property var occupied: hypr.getOccupiedWorkspaces()
     
-    /*!
-        Get border color (transparent if not active/focused)
-    */
-    function getBorderColor(workspace) {
-        if (workspace.focused) return Theme.ThemeManager.currentPalette.color1
-        if (workspace.active) return Theme.ThemeManager.currentPalette.color2
-        return "transparent"
-    }
+    implicitWidth: layout.implicitWidth
+    implicitHeight: config.bar.height - config.bar.padding * 2
     
-    // Show workspaces
     RowLayout {
-        id: workspaceRow
+        id: layout
+        
         anchors.centerIn: parent
+        spacing: root.config.bar.workspaces.spacing
         
         Repeater {
-            model: Hyprland.workspaces
-            delegate: Rectangle {
-                // Hide special workspaces
-                visible: modelData.id > 0
-
-                // Collapse non visible items
-                width: visible ? 25 : 0
-                height: visible ? 25 : 0
-                
-                color: "transparent"
-                Layout.alignment: Qt.AlignVCenter
-                
-                // Workspaces colors & names implementation
-                Text {
-                    anchors.centerIn: parent
-                    text: workspaceNames[modelData.id.toString()] || modelData.id
-                    color: getWorkspaceColor(modelData)
-                    font.pixelSize: Theme.ThemeManager.currentPalette.baseFontSize
-                }
-                
-                // Bottom border indicator for active/focused workspaces
-                Rectangle {
-                    id: bottomBorder
-                    width: parent.width * 0.8
-                    height: 2
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    color: getBorderColor(modelData)
-                }
+            id: workspaceRepeater
+            model: root.config.bar.workspaces.count
             
-                // Clickable
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Hyprland.dispatch("workspace " + modelData.id)
+            delegate: Loader {
+                required property int index
+                
+                source: "Workspace.qml"
+                asynchronous: false
+                
+                onLoaded: {
+                    item.workspaceId = index + 1
+                    item.isActive = Qt.binding(() => root.activeWsId === (index + 1))
+                    item.isOccupied = Qt.binding(() => root.occupied[index + 1] ?? false)
+                    item.clicked.connect(function() {
+                        if (root.hypr.activeWsId !== item.workspaceId) {
+                            root.hypr.dispatch(`workspace ${item.workspaceId}`)
+                        }
+                    })
                 }
             }
         }
