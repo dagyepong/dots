@@ -37,6 +37,8 @@ font-feature = calt
 window-padding-x = 5
 window-padding-y = 5
 window-decoration = false 
+background-opacity = 0.85
+background-blur-radius = 20
 
 #--- Other ---#
 gtk-single-instance = true
