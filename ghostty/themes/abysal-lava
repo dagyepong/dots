@@ -1,0 +1,26 @@
+#--- Lava Glow Theme ---#
+foreground = "#ff4500"
+background = "#000000"
+cursor-color = "#ff6347"
+
+palette = 0=#000000
+palette = 1=#ff0000
+palette = 2=#ff8c00
+palette = 3=#ffd700
+palette = 4=#ff4500
+palette = 5=#ff6347
+palette = 6=#ff7f50
+palette = 7=#ffffff
+
+palette = 8=#400000
+palette = 9=#ff3030
+palette = 10=#ff9933
+palette = 11=#ffeb3b
+palette = 12=#ff5722
+palette = 13=#ff6b6b
+palette = 14=#ff9800
+palette = 15=#ffffff
+
+background-opacity = 0.85
+background-blur-radius = 30
+custom-shader = shaders/lava-glow.glsl

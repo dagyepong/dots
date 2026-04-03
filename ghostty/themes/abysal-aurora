@@ -1,0 +1,26 @@
+#--- Aurora Borealis Theme ---#
+foreground = "#00ffff"
+background = "#000000"
+cursor-color = "#00b894"
+
+palette = 0=#000000
+palette = 1=#00ff00
+palette = 2=#00ff7f
+palette = 3=#00ffff
+palette = 4=#007fff
+palette = 5=#00b894
+palette = 6=#00e676
+palette = 7=#ffffff
+
+palette = 8=#003333
+palette = 9=#00ff40
+palette = 10=#00ff99
+palette = 11=#00ffff
+palette = 12=#0099ff
+palette = 13=#00d4b1
+palette = 14=#00ffcc
+palette = 15=#ffffff
+
+background-opacity = 0.80
+background-blur-radius = 35
+custom-shader = shaders/aurora-glow.glsl

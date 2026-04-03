@@ -1,0 +1,29 @@
+#--- Glowing Synthwave Theme ---#
+foreground = "#ff00ff"
+background = "#000000"
+cursor-color = "#00ffff"
+
+# ANSI Colors (0-7) — Neon glow
+palette = 0=#000000
+palette = 1=#ff0000
+palette = 2=#00ff00
+palette = 3=#ffff00
+palette = 4=#0000ff
+palette = 5=#ff00ff
+palette = 6=#00ffff
+palette = 7=#ffffff
+
+# Bright Colors (8-15) — Brighter glow
+palette = 8=#404040
+palette = 9=#ff4040
+palette = 10=#40ff40
+palette = 11=#ffff40
+palette = 12=#4040ff
+palette = 13=#ff40ff
+palette = 14=#40ffff
+palette = 15=#ffffff
+
+# Keep your existing glow settings
+background-opacity = 0.85
+background-blur-radius = 25
+custom-shader = shaders/cursor-trail.glsl

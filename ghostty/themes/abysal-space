@@ -1,0 +1,26 @@
+#--- Deep Space Theme ---#
+foreground = "#6c5ce7"
+background = "#000000"
+cursor-color = "#00b894"
+
+palette = 0=#000000
+palette = 1=#8e44ad
+palette = 2=#9b59b6
+palette = 3=#bb8fce
+palette = 4=#6c5ce7
+palette = 5=#a29bfe
+palette = 6=#dfe6e9
+palette = 7=#ffffff
+
+palette = 8=#2d3436
+palette = 9=#e17055
+palette = 10=#fdcb6e
+palette = 11=#fab1a0
+palette = 12=#6c5ce7
+palette = 13=#a29bfe
+palette = 14=#dfe6e9
+palette = 15=#ffffff
+
+background-opacity = 0.90
+background-blur-radius = 40
+custom-shader = shaders/deep-space.glsl
