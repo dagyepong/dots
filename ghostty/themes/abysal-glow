@@ -1,0 +1,39 @@
+#--------------------------------------------------------------------------------
+# Aesthetic Ghostty Theme — "Neon Vault" (Dark + Vibrant + Glow)
+#--------------------------------------------------------------------------------
+
+# General
+background = #0f0f0f
+foreground = #ffffff
+cursor-color = #00ffcc
+cursor-text = #0f0f0f
+selection-background = #252525
+selection-foreground = #ffffff
+
+# Palette (0–15)
+palette = 0=#353535
+palette = 8=#555555
+
+palette = 1=#ff5555
+palette = 9=#ff5555
+
+palette = 2=#00ffaa
+palette = 10=#00ffaa
+
+palette = 3=#ffcc44
+palette = 11=#ffcc44
+
+palette = 4=#ffcc44
+palette = 12=#ff8833
+
+palette = 5=#cc66ff
+palette = 13=#cc66ff
+
+palette = 6=#44aaff
+palette = 14=#44aaff
+
+palette = 7=#dddddd
+palette = 15=#ffffff
+
+# Visuals
+background-opacity = 0.85

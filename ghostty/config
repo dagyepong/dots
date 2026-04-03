@@ -37,7 +37,7 @@ font-feature = calt
 window-padding-x = 5
 window-padding-y = 5
 window-decoration = false 
-background-opacity = 0.85
+background-opacity = 0.75
 background-blur-radius = 20
 
 #--- Other ---#
@@ -62,4 +62,4 @@ keybind = ctrl+shift+r=reload_config
 #--------------------------------------------------------------------------------
 # Theme
 #--------------------------------------------------------------------------------
-theme = abysal-obsidian
+theme = abysal-glow
