@@ -1,8 +1,0 @@
-(defpoll cpu :interval "2s"
-  "bash /home/nana/.config/eww/scripts/cpu.sh")
-
-(defwidget cpu []
-  (box :class "cpu"
-       :orientation "h"
-    (label :text " ")
-    (label :text cpu)))

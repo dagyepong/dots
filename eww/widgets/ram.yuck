@@ -1,8 +1,0 @@
-(defpoll ram :interval "2s"
-  "bash /home/nana/.config/eww/scripts/ram.sh")
-
-(defwidget ram []
-  (box :class "ram"
-       :orientation "h"
-    (label :text "󰍛 ")
-    (label :text ram)))
