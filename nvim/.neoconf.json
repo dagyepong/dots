@@ -7,7 +7,7 @@
   },
   "neoconf": {
     "plugins": {
-      "lua_ls": {
+      "sumneko_lua": {
         "enabled": true
       }
     }
