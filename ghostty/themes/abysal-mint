@@ -1,0 +1,40 @@
+# ==================================================
+#   Ghostty Theme — "Glowing Mint & Pink"
+# ==================================================
+# Inspired by Hyprland's mint gradient + cherry blossom
+# ==================================================
+
+# --- Base Colors ---
+background = 0a1a12
+foreground = e0e0e0
+cursor-color = 1bfd9c
+cursor-text = 0a1a12
+selection-background = 2a2a3a
+selection-foreground = ffffff
+
+# --- Palette (0–15) ---
+palette = 0=1e1e2e
+palette = 8=4a4a5a
+palette = 1=ff8888
+palette = 9=ffaaaa
+palette = 2=1bfd9c
+palette = 10=5affb8
+palette = 3=ffcc66
+palette = 11=ffdd88
+palette = 4=66ccff
+palette = 12=88ddff
+palette = 5=ff66cc
+palette = 13=ff88dd
+palette = 6=44ffcc
+palette = 14=88ffee
+palette = 7=dddddd
+palette = 15=ffffff
+
+# --- Visuals with Glow Effect ---
+background-opacity = 0.88
+window-padding-x = 16
+window-padding-y = 16
+font-family = JetBrains Mono
+font-size = 12
+cursor-style = block
+cursor-blink = true
