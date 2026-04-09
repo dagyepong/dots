@@ -3,7 +3,7 @@
 # This script is designed to replicate the Hyprland configuration for the River window manager.
 
 ### MY PROGRAMS ###
-TERMINAL="foot"
+TERMINAL="ghostty"
 FILE_MANAGER="dolphin -stylesheet ~/archhypr_dotfiles/kde_stuff/dolphin.qss"
 MENU="rofi -show drun"
 
@@ -11,10 +11,23 @@ riverctl rule-add ssd
 riverctl rule-add -app-id com.mitchellh.ghostty ssd
 
 ### AUTOSTART ###
+qs -p ~/.config/quickshell/shell.qml &
+/usr/libexec/polkit-gnome-authentication-agent-1 &
+#exec-once = waybar -c ~/.config/waybar/config.jsonc
+swaybg -i /home/nana/Pictures/wallpaper/dopesmoker_gruvbox.png &
 kanshi &
 swww-daemon &
 waybar -c ~/.config/waybar/gruvbox_blocks/config.jsonc -s ~/.config/waybar/gruvbox_blocks/style.css &
 dunst &
+exec-once = hyprctl setcursor Bibata-Modern-Classic 24
+ /usr/lib/polkit-kde-authentication-agent-1 &
+wl-paste --type text --watch cliphist store &
+wl-paste --type image --watch cliphist store &
+hash dbus-update-activation-environment 2>/dev/null &
+xdg-desktop-portal-hyprland &
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+hyprctl setcursor Bibata-Modern-Classic 24
+hyprsunset &
 
 ### ENVIRONMENT VARIABLES ###
 source "$HOME/.config/river/env.sh"
