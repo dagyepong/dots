@@ -6,11 +6,15 @@
 QS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BT_PID_FILE="$HOME/.cache/bt_scan_pid"
 BT_SCAN_LOG="$HOME/.cache/bt_scan.log"
-SRC_DIR="${WALLPAPER_DIR:-$HOME/Images/Wallpapers}"
+SRC_DIR="${WALLPAPER_DIR:-${srcdir:-$HOME/Pictures/Wallpapers}}"
 THUMB_DIR="$HOME/.cache/wallpaper_picker/thumbs"
 
+# User-specific cache directory matching the QML logic
+QS_NETWORK_CACHE="${XDG_RUNTIME_DIR:-$HOME/.cache}/qs_network"
+mkdir -p "$QS_NETWORK_CACHE"
+
 IPC_FILE="/tmp/qs_widget_state"
-NETWORK_MODE_FILE="/tmp/qs_network_mode"
+NETWORK_MODE_FILE="$QS_NETWORK_CACHE/mode"
 
 ACTION="$1"
 TARGET="$2"
@@ -30,7 +34,7 @@ if [[ "$ACTION" =~ ^[0-9]+$ ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# PREP FUNCTIONS (Untouched)
+# PREP FUNCTIONS
 # -----------------------------------------------------------------------------
 handle_wallpaper_prep() {
     mkdir -p "$THUMB_DIR"

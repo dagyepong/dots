@@ -66,10 +66,11 @@ done
 killall -USR1 kitty
 
 # Reload CAVA
+# ALWAYS rebuild the final config file from the base and newly generated colors
+cat ~/.config/cava/config_base ~/.config/cava/colors > ~/.config/cava/config 2>/dev/null
+
+# Tell CAVA to reload the config ONLY if it is currently running
 if pgrep -x "cava" > /dev/null; then
-    # Rebuild the final config file from the base and newly generated colors
-    cat ~/.config/cava/config_base ~/.config/cava/colors > ~/.config/cava/config 2>/dev/null
-    # Tell CAVA to reload the config
     killall -USR1 cava
 fi
 

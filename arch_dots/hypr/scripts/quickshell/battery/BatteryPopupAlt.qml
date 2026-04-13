@@ -407,7 +407,7 @@ Item {
                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: { 
                         exitAnim.start(); 
-                        Quickshell.execDetached(["sh", "-c", "hyprctl dispatch exit"]); 
+                        Quickshell.execDetached(["sh", "-c", "loginctl terminate-user $USER"]); 
                         Quickshell.execDetached(["sh", "-c", "echo 'close' > /tmp/qs_widget_state"]); 
                     }
                 }

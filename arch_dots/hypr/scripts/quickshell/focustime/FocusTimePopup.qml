@@ -106,7 +106,7 @@ Item {
     readonly property bool isTodaySelected: window.selectedDateStr === getIsoDate(new Date())
 
     readonly property string scriptsDir: Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/focustime"
-    readonly property string xdgRuntime: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
+    readonly property string xdgRuntime: Quickshell.env("XDG_RUNTIME_DIR") || (Quickshell.env("HOME") + "/.cache/focustime")
     readonly property string stateFilePath: window.xdgRuntime + "/focustime_state.json"
 
     // --- ENHANCED CHOREOGRAPHED STARTUP STATES ---

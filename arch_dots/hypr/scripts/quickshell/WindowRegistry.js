@@ -1,16 +1,18 @@
 .pragma library
 
-function getScale(mw) {
+function getScale(mw, userScale) {
     if (mw <= 0) return 1.0;
     let r = mw / 1920.0;
+    let baseScale = 1.0;
     
     if (r <= 1.0) {
-        return Math.max(0.35, Math.pow(r, 0.85));
+        baseScale = Math.max(0.35, Math.pow(r, 0.85));
     } else {
         // SCALING UP:
-        // Kept at 0.85 so it still looks good on 4K.
-        return Math.pow(r, 0.85);
+        baseScale = Math.pow(r, 0.5);
     }
+    
+    return baseScale * (userScale !== undefined ? userScale : 1.0);
 }
 
 // Helper to easily round scaled values
@@ -19,8 +21,8 @@ function s(val, scale) {
 }
 
 // Centralized registry for all widget dimensions and positional mathematics.
-function getLayout(name, mx, my, mw, mh) {
-    let scale = getScale(mw);
+function getLayout(name, mx, my, mw, mh, userScale) {
+    let scale = getScale(mw, userScale);
 
     let base = {
         // Right-aligned: pinned 20px from the right edge dynamically

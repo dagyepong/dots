@@ -98,13 +98,20 @@ Item {
 
         const escapeBash = (str) => String(str).replace(/(["\\$`])/g, '\\$1');
         
+        // 2. HARDWARE ADAPTATION: Force Vulkan rendering
+        // FIX: Hardcoded to bypass the Quickshell.env check since the backend is required.
+        const renderOverride = "env WGPU_BACKEND=vulkan ";
+        const randomTransition = window.transitions[Math.floor(Math.random() * window.transitions.length)];
+        
+        // 3. AUTO-REVIVE COMMAND: Ensure daemon is alive before sending IPC commands
+        const ensureDaemonCmd = `if ! pgrep -x "awww-daemon" > /dev/null; then awww-daemon >/dev/null 2>&1 & sleep 0.2; fi`;
+        
         if (window.currentFilter === "Search" && window.hasSearched) {
             let alreadyExists = window.isDownloaded(safeFileName);
             let destFile = window.srcDir + "/" + safeFileName;
             let finalThumb = decodeURIComponent(window.thumbDir.replace("file://", "")) + "/" + safeFileName;
             let tempThumb = decodeURIComponent(window.searchDir.replace("file://", "")) + "/" + safeFileName;
             let mapFile = Quickshell.env("HOME") + "/.cache/wallpaper_picker/search_map.txt";
-            const randomTransition = window.transitions[Math.floor(Math.random() * window.transitions.length)];
 
             if (alreadyExists) {
                 const applyScript = `
@@ -119,14 +126,15 @@ Item {
                         cp "$DEST_FILE" /tmp/lock_bg.png || true
                         pkill mpvpaper || true
                         
+                        ${ensureDaemonCmd}
+                        
                         # Run matugen completely detached so it doesn't block awww execution
                         ( matugen image "$FINAL_THUMB" --source-color-index 0 || true; bash "$RELOAD_SCRIPT" || true ) &
                         MATUGEN_PID=$!
                         
-                        # DETERMINISTIC LOOP: Force awww to succeed.
-                        # It will poll every 50ms up to 20 times until the compositor accepts the frame.
+                        # DETERMINISTIC LOOP
                         for i in {1..20}; do
-                            if awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                            if ${renderOverride}awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
                                 break
                             fi
                             sleep 0.05
@@ -168,12 +176,14 @@ Item {
                             cp "$DEST_FILE" /tmp/lock_bg.png || true
                             pkill mpvpaper || true
                             
+                            ${ensureDaemonCmd}
+                            
                             ( matugen image "$FINAL_THUMB" --source-color-index 0 || true; bash "$RELOAD_SCRIPT" || true ) &
                             MATUGEN_PID=$!
                             
                             # DETERMINISTIC LOOP
                             for i in {1..20}; do
-                                if awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                                if ${renderOverride}awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
                                     break
                                 fi
                                 sleep 0.05
@@ -202,11 +212,10 @@ Item {
             wallpaperCmd = `mpvpaper -o 'loop --no-audio --hwdec=auto --profile=high-quality --video-sync=display-resample --interpolation --tscale=oversample' '*' "$WALL_FILE"`
             lockBgCmd = `cp "$THUMB_FILE" /tmp/lock_bg.png`
         } else {
-            const randomTransition = window.transitions[Math.floor(Math.random() * window.transitions.length)]
-            // Inject the deterministic loop directly into the standard command variable
             wallpaperCmd = `
+                ${ensureDaemonCmd}
                 for i in {1..20}; do
-                    if awww img "$WALL_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
+                    if ${renderOverride}awww img "$WALL_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >/dev/null 2>&1; then
                         break
                     fi
                     sleep 0.05
@@ -235,9 +244,7 @@ Item {
             ) </dev/null >/dev/null 2>&1 & disown
         `
         Quickshell.execDetached(["bash", "-c", fullScript])
-    }
-
-    // -------------------------------------------------------------------------
+    }    // -------------------------------------------------------------------------
     // PERSISTENT SETTINGS
     // -------------------------------------------------------------------------
     Settings {
@@ -253,32 +260,36 @@ Item {
     }
 
     // -------------------------------------------------------------------------
-    // VISIBILITY LOGIC
-    // -------------------------------------------------------------------------
-    onVisibleChanged: {
-        if (!visible) {
-            window.initialFocusSet = false;
-            window.searchIndexRestored = false;
-            window.isApplying = false; // Free the lock strictly when hidden
-            
-            if (window.hasSearched) {
-                window.isSearchPaused = true;
-            }
-        } else {
-            window.isFilterAnimating = true;
-            filterAnimationTimer.restart();
+    // VISIBILITY LOGIC
+    // -------------------------------------------------------------------------
+    onVisibleChanged: {
+        if (!visible) {
+            window.initialFocusSet = false;
+            window.searchIndexRestored = false;
+            window.isApplying = false; // Free the lock strictly when hidden
+            
+            if (window.hasSearched) {
+                window.isSearchPaused = true;
+            }
+        } else {
+            // CHANGED: Force a refresh of the settings from the SSOT every time the picker is opened
+            wpSettingsReader.running = false;
+            wpSettingsReader.running = true;
 
-            // Re-apply focus rules when re-opening
-            if (window.currentFilter !== "Search") {
-                window.applyFilters(true);
-            } else if (window.hasSearched) {
-                window.searchIndexRestored = false;
-                window.isSearchPaused = true;
-                window.trySearchFocus();
-                window.syncSearchModel();
-            }
-        }
-    }
+            window.isFilterAnimating = true;
+            filterAnimationTimer.restart();
+
+            // Re-apply focus rules when re-opening
+            if (window.currentFilter !== "Search") {
+                window.applyFilters(true);
+            } else if (window.hasSearched) {
+                window.searchIndexRestored = false;
+                window.isSearchPaused = true;
+                window.trySearchFocus();
+                window.syncSearchModel();
+            }
+        }
+    }
 
     // -------------------------------------------------------------------------
     // NOTIFICATION & LABEL STATE LOGIC
@@ -490,8 +501,39 @@ Item {
     readonly property string homeDir: "file://" + Quickshell.env("HOME")
     readonly property string thumbDir: homeDir + "/.cache/wallpaper_picker/thumbs"
     readonly property string searchDir: homeDir + "/.cache/wallpaper_picker/search_thumbs"
-    readonly property string srcDir: Quickshell.env("WALLPAPER_DIR")
 
+    // CHANGED: Make srcDir dynamic instead of readonly, with a safe fallback
+    property string srcDir: Quickshell.env("HOME") + "/Pictures/Wallpapers"
+
+    // ADDED: Read directly from the SSOT settings.json to get the live directory
+    Process {
+        id: wpSettingsReader
+        command: ["bash", "-c", "cat ~/.config/hypr/settings.json 2>/dev/null || echo '{}'"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    if (this.text && this.text.trim().length > 0 && this.text.trim() !== "{}") {
+                        let parsed = JSON.parse(this.text);
+                        if (parsed.wallpaperDir) {
+                            let dir = parsed.wallpaperDir.trim();
+                            // Sanitize: Expand '~' to absolute home path (QML file:// does not understand ~)
+                            if (dir.startsWith("~/")) {
+                                dir = Quickshell.env("HOME") + dir.substring(1);
+                            }
+                            // Sanitize: Remove trailing slashes
+                            if (dir.endsWith("/")) {
+                                dir = dir.substring(0, dir.length - 1);
+                            }
+                            window.srcDir = dir;
+                        }
+                    }
+                } catch (e) {
+                    console.log("Error parsing settings in WallpaperPicker:", e);
+                }
+            }
+        }
+    }
     readonly property var transitions: ["grow", "outer", "any", "wipe", "wave", "pixel", "center"]
 
     readonly property real itemWidth: window.s(400)

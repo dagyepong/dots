@@ -37,11 +37,12 @@ PanelWindow {
         onClicked: switchWidget("hidden", "")
     }
 
-    property string currentActive: "hidden" 
-    onCurrentActiveChanged: {
+    // Initialize state on boot
+    Component.onCompleted: {
         Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > /tmp/qs_active_widget"]);
     }
 
+    property string currentActive: "hidden" 
     property bool isVisible: false
     property string activeArg: ""
     property bool disableMorph: false 
@@ -52,12 +53,58 @@ PanelWindow {
     property real animH: 1
     property real animX: 0
     property real animY: 0
+    
+    property real targetW: 1
+    property real targetH: 1
 
-    function getLayout(name) {
-        return Registry.getLayout(name, 0, 0, Screen.width, Screen.height);
+    property real globalUiScale: 1.0
+
+    onGlobalUiScaleChanged: {
+        handleNativeScreenChange();
     }
 
-    // Automatically recalculates position and scale if the OS resolution changes
+    // --- Dynamic Settings Reader ---
+    Process {
+        id: settingsReader
+        command: ["bash", "-c", "cat ~/.config/hypr/settings.json 2>/dev/null || echo '{}'"]
+        running: true // Run once at startup
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    if (this.text && this.text.trim().length > 0 && this.text.trim() !== "{}") {
+                        let parsed = JSON.parse(this.text);
+                        if (parsed.uiScale !== undefined && masterWindow.globalUiScale !== parsed.uiScale) {
+                            masterWindow.globalUiScale = parsed.uiScale;
+                        }
+                    }
+                } catch (e) {
+                    console.log("Error parsing settings.json in main.qml:", e);
+                }
+            }
+        }
+    }
+
+    // EVENT-DRIVEN WATCHER
+    Process {
+        id: settingsWatcher
+        command: ["bash", "-c", "while [ ! -f ~/.config/hypr/settings.json ]; do sleep 1; done; inotifywait -qq -e modify,close_write ~/.config/hypr/settings.json"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                settingsReader.running = false;
+                settingsReader.running = true;
+                
+                settingsWatcher.running = false;
+                settingsWatcher.running = true;
+            }
+        }
+    }
+    // -------------------------------
+
+    function getLayout(name) {
+        return Registry.getLayout(name, 0, 0, Screen.width, Screen.height, masterWindow.globalUiScale);
+    }
+
     Connections {
         target: Screen
         function onWidthChanged() { handleNativeScreenChange(); }
@@ -69,15 +116,14 @@ PanelWindow {
         
         let t = getLayout(masterWindow.currentActive);
         if (t) {
-            // Update the animation targets. The Behaviors below will 
-            // glide the widget to the new layout perfectly.
             masterWindow.animX = t.rx;
             masterWindow.animY = t.ry;
             masterWindow.animW = t.w;
             masterWindow.animH = t.h;
+            masterWindow.targetW = t.w;
+            masterWindow.targetH = t.h;
         }
     }
-    // ---------------------------------------
 
     onIsVisibleChanged: {
         if (isVisible) masterWindow.requestActivate();
@@ -105,8 +151,8 @@ PanelWindow {
 
         Item {
             anchors.centerIn: parent
-            width: masterWindow.currentActive !== "hidden" && getLayout(masterWindow.currentActive) ? getLayout(masterWindow.currentActive).w : 1
-            height: masterWindow.currentActive !== "hidden" && getLayout(masterWindow.currentActive) ? getLayout(masterWindow.currentActive).h : 1
+            width: masterWindow.targetW
+            height: masterWindow.targetH
 
             StackView {
                 id: widgetStack
@@ -139,6 +185,8 @@ PanelWindow {
     }
 
     function switchWidget(newWidget, arg) {
+        Quickshell.execDetached(["bash", "-c", "echo '" + newWidget + "' > /tmp/qs_active_widget"]);
+
         prepTimer.stop();
         teleportFadeOutTimer.stop();
         teleportFadeInTimer.stop();
@@ -212,6 +260,8 @@ PanelWindow {
             masterWindow.animY = t.ry;
             masterWindow.animW = t.w;
             masterWindow.animH = t.h;
+            masterWindow.targetW = t.w;
+            masterWindow.targetH = t.h;
 
             let props = newWidget === "wallpaper" ? { "widgetArg": newArg } : {};
             widgetStack.replace(t.comp, props, StackView.Immediate);
@@ -248,6 +298,8 @@ PanelWindow {
         masterWindow.animY = t.ry;
         masterWindow.animW = t.w;
         masterWindow.animH = t.h;
+        masterWindow.targetW = t.w;
+        masterWindow.targetH = t.h;
         
         let props = newWidget === "wallpaper" ? { "widgetArg": arg } : {};
 
@@ -267,7 +319,7 @@ PanelWindow {
 
     Process {
         id: ipcPoller
-        command: ["bash", "-c", "if [ -f /tmp/qs_widget_state ]; then cat /tmp/qs_widget_state; rm /tmp/qs_widget_state; fi"]
+        command: ["bash", "-c", "if [ -f /tmp/qs_widget_state ]; then mv /tmp/qs_widget_state /tmp/qs_widget_state_read 2>/dev/null && cat /tmp/qs_widget_state_read && rm /tmp/qs_widget_state_read; fi"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let rawCmd = this.text.trim();
@@ -281,13 +333,12 @@ PanelWindow {
                     switchWidget("hidden", "");
                 } else if (getLayout(cmd)) {
                     delayedClear.stop();
-                    // Removed the redundant toggle check. 
-                    // qs_manager.sh is now the absolute source of truth.
                     switchWidget(cmd, arg);
                 }
             }
         }
     }
+
     Timer {
         id: delayedClear
         interval: masterWindow.isWallpaperTransition ? 150 : masterWindow.morphDuration 
