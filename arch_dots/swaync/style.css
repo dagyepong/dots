@@ -1,0 +1,335 @@
+/* SWAYNC STYLE - ROUNDED, ELEGANT & DYNAMIC
+   Powered by Matugen
+*/
+
+* {
+  all: unset;
+  font-size: 14px;
+  font-family: "Ubuntu Nerd Font", sans-serif;
+  transition: all 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* --- SLIDERS (Volume / Backlight) --- */
+trough highlight {
+  background: #e1e2e8;
+  border-radius: 24px;
+}
+
+scale {
+  margin: 0 8px;
+}
+
+scale trough {
+  margin: 0rem 1rem;
+  min-height: 14px; 
+  min-width: 70px;
+  border-radius: 24px; 
+  background-color: #272a2f;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25); 
+}
+
+trough slider {
+  margin: -10px;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 50%; 
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background-color: #9fcafc;
+}
+
+trough slider:hover {
+  transform: scale(1.15); 
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5), 0 0 12px #9fcafc;
+}
+
+/* --- NOTIFICATIONS --- */
+.notification-background {
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px #42474e;
+  border-radius: 28px; 
+  margin: 12px;
+  background: #191c20;
+  color: #e1e2e8;
+  padding: 6px;
+}
+
+.notification-background .notification {
+  padding: 12px;
+  border-radius: 22px;
+}
+
+.notification-background .notification.critical {
+  box-shadow: inset 0 0 10px 0 #ffb4ab;
+  border: 1px solid #ffb4ab;
+}
+
+.notification .notification-content {
+  margin: 8px;
+}
+
+.notification .notification-content overlay {
+  margin: 4px;
+}
+
+.notification-content .summary {
+  color: #e1e2e8;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.notification-content .time {
+  color: #c2c7cf;
+  font-size: 0.9em;
+  margin-right: 5px;
+}
+
+.notification-content .body {
+  color: #c2c7cf;
+  margin-top: 6px;
+}
+
+.notification > *:last-child > * {
+  min-height: 3.4em;
+}
+
+/* Close Button */
+.notification-background .close-button {
+  margin: 8px;
+  padding: 6px;
+  border-radius: 50%; 
+  color: #101418;
+  background-color: #ffb4ab;
+  min-width: 24px;
+  min-height: 24px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+}
+
+.notification-background .close-button:hover {
+  background-color: #93000a;
+  transform: rotate(90deg) scale(1.1); 
+}
+
+.notification-background .close-button:active {
+  background-color: #ffb4ab;
+  transform: rotate(90deg) scale(0.9);
+}
+
+/* Actions */
+.notification .notification-action {
+  border-radius: 16px;
+  color: #e1e2e8;
+  box-shadow: inset 0 0 0 1px #42474e;
+  margin: 6px;
+  padding: 6px 12px;
+  font-size: 1rem;
+  background-color: #272a2f;
+}
+
+.notification .notification-action:hover {
+  background-color: #42474e;
+  color: #9fcafc;
+}
+
+.notification .notification-action:active {
+  background-color: #42474e;
+}
+
+/* Progress Bars */
+.notification.critical progress {
+  background-color: #ffb4ab;
+}
+
+.notification.low progress,
+.notification.normal progress {
+  background-color: #9fcafc;
+}
+
+.notification progress,
+.notification trough,
+.notification progressbar {
+  border-radius: 24px;
+  min-height: 8px;
+}
+
+/* --- CONTROL CENTER --- */
+.control-center {
+  box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.7), inset 0 0 0 1px #272a2f;
+  border-radius: 36px; 
+  background-color: #101418;
+  color: #e1e2e8;
+  padding: 24px;
+  margin: 12px;
+}
+
+.control-center .notification-background {
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 1px #42474e;
+  margin: 8px 0;
+}
+
+.control-center .notification-background .notification {
+  border-radius: 18px;
+}
+
+.control-center .notification-background .notification.low {
+  opacity: 0.8;
+}
+
+/* Widgets Title */
+.control-center .widget-title > label {
+  color: #e1e2e8;
+  font-size: 1.5em;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.control-center .widget-title button {
+  border-radius: 16px;
+  color: #e1e2e8;
+  background-color: #272a2f;
+  box-shadow: inset 0 0 0 1px #42474e;
+  padding: 8px 16px;
+  font-weight: 700;
+}
+
+.control-center .widget-title button:hover {
+  background-color: #42474e;
+  color: #bac8db;
+}
+
+.control-center .widget-title button:active {
+  background-color: #42474e;
+}
+
+.control-center .notification-group {
+  margin-top: 12px;
+}
+
+.control-center .notification-group:focus .notification-background {
+  background-color: #272a2f;
+}
+
+/* Scrollbar */
+scrollbar slider {
+  min-width: 8px;
+  margin: 0px 6px;
+  background: #42474e;
+  border-radius: 24px;
+  opacity: 0.8;
+}
+
+scrollbar trough {
+  margin: 0;
+}
+
+/* --- DND TOGGLE --- */
+.widget-dnd {
+  margin-top: 12px;
+  border-radius: 20px;
+  background: #272a2f; 
+  padding: 8px 18px;
+}
+
+.widget-dnd > switch {
+  font-size: initial;
+  border-radius: 24px;
+  background: #42474e;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
+}
+
+.widget-dnd > switch:checked {
+  background: #9fcafc;
+}
+
+.widget-dnd > switch slider {
+  background: #e1e2e8;
+  border-radius: 50%;
+  margin: 3px;
+}
+
+/* --- MPRIS (Media) --- */
+.widget-mpris-player {
+  background: #272a2f;
+  border-radius: 28px;
+  color: #e1e2e8;
+  padding: 12px;
+  margin: 12px 0;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+}
+
+.widget-mpris-album-art {
+  border-radius: 20px;
+  margin-right: 18px;
+}
+
+.widget-mpris-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #e1e2e8;
+}
+
+.widget-mpris-subtitle {
+  font-size: 1rem;
+  color: #c2c7cf;
+}
+
+.widget-mpris button {
+  border-radius: 50%; 
+  color: #e1e2e8;
+  margin: 0 6px;
+  padding: 10px;
+}
+
+.widget-mpris button:hover {
+  background-color: #42474e;
+  color: #9fcafc;
+}
+
+/* --- BUTTON GRID --- */
+.widget-buttons-grid {
+  padding-top: 1.2rem;
+}
+
+.widget-buttons-grid > flowbox > flowboxchild > button {
+  background: #272a2f;
+  border-radius: 20px;
+  margin: 6px;
+  padding: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.widget-buttons-grid > flowbox > flowboxchild > button:hover {
+  background: #42474e;
+  transform: translateY(-2px);
+}
+
+.widget-buttons-grid > flowbox > flowboxchild > button label {
+  font-size: 1.8rem; 
+}
+
+/* --- VOLUME & BACKLIGHT --- */
+.widget-volume, .widget-backlight {
+  background: #191c20; 
+  border-radius: 24px;
+  margin: 6px 0;
+  padding: 8px;
+}
+
+.widget-volume label {
+  color: #d6bee5;
+  font-size: 1.5rem;
+  padding-left: 12px;
+}
+
+.widget-volume trough highlight {
+  background: #d6bee5;
+}
+
+.widget-backlight trough highlight {
+  background: #bac8db;
+}
+
+.widget-backlight label {
+  font-size: 1.5rem;
+  color: #bac8db;
+  padding-left: 12px;
+}
