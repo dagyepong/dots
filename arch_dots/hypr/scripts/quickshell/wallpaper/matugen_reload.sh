@@ -79,8 +79,7 @@ if command -v swaync-client &> /dev/null; then
     swaync-client -rs
 fi
 
-# Restart swayosd-server in the background
+# Restart swayosd-server in the background and disown it so the script doesn't hang
 killall swayosd-server 2>/dev/null
 swayosd-server --top-margin 0.9 --style "$HOME/.config/swayosd/style.css" > /dev/null 2>&1 &
-
-wait
+disown

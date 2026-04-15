@@ -25,7 +25,7 @@ SUBTARGET="$3"
 # -----------------------------------------------------------------------------
 if [[ "$ACTION" =~ ^[0-9]+$ ]]; then
     WORKSPACE_NUM="$ACTION"
-    echo "close" > "$IPC_FILE" # Tell QML to hide the widget natively
+    echo "close" > "$IPC_FILE"
     
     CMD="workspace $WORKSPACE_NUM"
     [[ "$2" == "move" ]] && CMD="movetoworkspace $WORKSPACE_NUM"
@@ -83,8 +83,8 @@ handle_wallpaper_prep() {
         CURRENT_SRC=$(basename "$CURRENT_SRC")
     fi
 
-    if [ -z "$CURRENT_SRC" ] && command -v awww >/dev/null; then
-        CURRENT_SRC=$(awww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
+    if [ -z "$CURRENT_SRC" ] && command -v swww >/dev/null; then
+        CURRENT_SRC=$(swww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
         CURRENT_SRC=$(basename "$CURRENT_SRC")
     fi
 
@@ -124,7 +124,7 @@ if ! pgrep -f "quickshell.*TopBar\.qml" >/dev/null; then
 fi
 
 # -----------------------------------------------------------------------------
-# IPC ROUTING (No hyprctl focus/move commands needed!)
+# IPC ROUTING
 # -----------------------------------------------------------------------------
 if [[ "$ACTION" == "close" ]]; then
     echo "close" > "$IPC_FILE"
@@ -139,10 +139,12 @@ if [[ "$ACTION" == "close" ]]; then
 fi
 
 if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
-    ACTIVE_WIDGET=$(cat /tmp/qs_active_widget 2>/dev/null)
     CURRENT_MODE=$(cat "$NETWORK_MODE_FILE" 2>/dev/null)
 
+    # Network widget: bash must still own the mode-file logic here,
+    # so we read qs_active_widget only for this specific case.
     if [[ "$TARGET" == "network" ]]; then
+        ACTIVE_WIDGET=$(cat /tmp/qs_active_widget 2>/dev/null)
         if [[ "$ACTION" == "toggle" && "$ACTIVE_WIDGET" == "network" ]]; then
             if [[ -n "$SUBTARGET" ]]; then
                 if [[ "$CURRENT_MODE" == "$SUBTARGET" ]]; then
@@ -162,11 +164,9 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
         exit 0
     fi
 
-    if [[ "$ACTION" == "toggle" && "$ACTIVE_WIDGET" == "$TARGET" ]]; then
-        echo "close" > "$IPC_FILE"
-        exit 0
-    fi
-
+    # All other widgets: just write the target.
+    # QML reads its own in-memory currentActive to decide open vs close —
+    # no stale qs_active_widget reads, no race condition.
     if [[ "$TARGET" == "wallpaper" ]]; then
         handle_wallpaper_prep
         echo "$TARGET:$WALLPAPER_THUMB" > "$IPC_FILE"

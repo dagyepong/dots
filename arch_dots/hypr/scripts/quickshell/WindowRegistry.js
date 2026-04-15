@@ -12,6 +12,7 @@ function getScale(mw, userScale) {
         baseScale = Math.pow(r, 0.5);
     }
     
+    // Multiply the screen-calculated scale by the user's uiScale
     return baseScale * (userScale !== undefined ? userScale : 1.0);
 }
 
@@ -26,8 +27,7 @@ function getLayout(name, mx, my, mw, mh, userScale) {
 
     let base = {
         // Right-aligned: pinned 20px from the right edge dynamically
-        // Note on rx: The 500 represents the 480 base width + 20 margin. 
-        "battery":   { w: s(480, scale), h: s(760, scale), rx: mw - s(500, scale), ry: s(70, scale), comp: "battery/BatteryPopup.qml" },
+        "battery":   { w: s(801, scale), h: s(760, scale), rx: mw - s(821, scale), ry: s(70, scale), comp: "battery/BatteryPopup.qml" },
         "volume":    { w: s(480, scale), h: s(760, scale), rx: mw - s(500, scale), ry: s(70, scale), comp: "volume/VolumePopup.qml" },
         
         // Centered horizontally dynamically based on current screen width
@@ -47,6 +47,9 @@ function getLayout(name, mx, my, mw, mh, userScale) {
         // Guide Popup (Centered)
         "guide":     { w: s(1200, scale), h: s(750, scale), rx: Math.floor((mw/2)-(s(1200, scale)/2)), ry: Math.floor((mh/2)-(s(750, scale)/2)), comp: "guide/GuidePopup.qml" },
 
+        // Notification Center (Centered)
+        "notifications": { w: s(800, scale), h: s(700, scale), rx: Math.floor((mw/2)-(s(800, scale)/2)), ry: Math.floor((mh/2)-(s(700, scale)/2)), comp: "notifications/NotificationCenter.qml" },
+
         // Full width, centered vertically
         "wallpaper": { w: mw, h: s(650, scale), rx: 0, ry: Math.floor((mh/2)-(s(650, scale)/2)), comp: "wallpaper/WallpaperPicker.qml" },
         
@@ -61,4 +64,22 @@ function getLayout(name, mx, my, mw, mh, userScale) {
     t.y = my + t.ry;
     
     return t;
+}
+
+// -----------------------------------------------------------------------------
+// Separate Layout function for the Notification OSD popups
+// -----------------------------------------------------------------------------
+function getPopupLayout(mw, userScale) {
+    let scale = getScale(mw, userScale);
+    return {
+        // You can change dimensions and position here
+        w: s(350, scale),
+        marginTop: s(70, scale),
+        marginRight: s(20, scale),
+        
+        // We can also centralize internal UI scaling sizes here if desired
+        spacing: s(12, scale),
+        radius: s(14, scale),
+        padding: s(12, scale)
+    };
 }

@@ -14,14 +14,23 @@ echo "Started watching $SETTINGS_FILE for changes..."
 while inotifywait -q -e close_write "$SETTINGS_FILE"; do
     echo "Settings updated! Applying changes..."
 
-    # Extract values using jq (raw output to strip quotes)
+    # Extract values using jq 
+    # Removed '// empty' from the boolean to prevent 'false' from evaluating to empty
     LANG=$(jq -r '.language // empty' "$SETTINGS_FILE")
-    GUIDE_STARTUP=$(jq -r '.openGuideAtStartup // empty' "$SETTINGS_FILE")
+    KB_OPT=$(jq -r '.kbOptions // empty' "$SETTINGS_FILE")
+    GUIDE_STARTUP=$(jq -r '.openGuideAtStartup' "$SETTINGS_FILE")
     WP_DIR=$(jq -r '.wallpaperDir // empty' "$SETTINGS_FILE")
 
-    # 1. Update Keyboard Layout
+    # 1. Update Keyboard Layout & Options
     if [ -n "$LANG" ] && [ "$LANG" != "null" ]; then
         sed -i "s/^ *kb_layout =.*/    kb_layout = $LANG/" "$HYPR_CONF"
+    fi
+    
+    if [ -n "$KB_OPT" ] && [ "$KB_OPT" != "null" ]; then
+        sed -i "s/^ *kb_options =.*/    kb_options = $KB_OPT/" "$HYPR_CONF"
+    else
+        # If it's explicitly empty/null (No Toggle), clear the value entirely
+        sed -i "s/^ *kb_options =.*/    kb_options = /" "$HYPR_CONF"
     fi
 
     # 2. Update Guide Autostart (Comment / Uncomment)
@@ -38,7 +47,7 @@ while inotifywait -q -e close_write "$SETTINGS_FILE"; do
         # We use '|' as the sed delimiter here to prevent path slashes from breaking the command
         sed -i "s|^env = WALLPAPER_DIR,.*|env = WALLPAPER_DIR,$WP_DIR|" "$HYPR_CONF"
         
-        # Keep ZSH in sync if it exists (matching your install.sh logic)
+        # Keep ZSH in sync if it exists
         if [ -f "$ZSH_RC" ]; then
             sed -i "s|^export WALLPAPER_DIR=.*|export WALLPAPER_DIR=\"$WP_DIR\"|" "$ZSH_RC"
         fi

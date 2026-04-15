@@ -70,6 +70,7 @@ Item {
     readonly property color activeGradientSecondary: Qt.darker(window.activeColor, 1.25)
 
     // Simplified connection logic
+    property string ethDeviceName: "" // Stores interface name (e.g. enp5s0)
     property bool ethPowerPending: false
     property string expectedEthPower: ""
     property string ethPower: "off"
@@ -144,6 +145,10 @@ Item {
         if (textData === "") return;
         try {
             let data = JSON.parse(textData);
+            
+            let fetchedDevice = data.device || "";
+            if (fetchedDevice !== "") window.ethDeviceName = fetchedDevice;
+
             let fetchedPower = data.power || "off";
             
             if (window.ethPowerPending) {
@@ -977,11 +982,17 @@ Item {
                         ethPendingReset.restart();
                         window.ethPower = window.expectedEthPower; 
                         
-                        if (window.expectedEthPower === "on") {
-                            Quickshell.execDetached(["nmcli", "device", "connect", window.ethConnected ? window.ethConnected.id : "eth0"]);
-                        } else {
-                            Quickshell.execDetached(["nmcli", "device", "disconnect", window.ethConnected ? window.ethConnected.id : "eth0"]);
+                        // We use the cached device name, or fallback to the currentCore's id
+                        let targetDev = window.ethDeviceName !== "" ? window.ethDeviceName : (window.currentCore ? window.currentCore.id : "");
+                        
+                        if (targetDev !== "") {
+                            if (window.expectedEthPower === "on") {
+                                Quickshell.execDetached(["nmcli", "device", "connect", targetDev]);
+                            } else {
+                                Quickshell.execDetached(["nmcli", "device", "disconnect", targetDev]);
+                            }
                         }
+                        
                         ethPoller.running = true;
                     }
                 }

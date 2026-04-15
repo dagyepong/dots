@@ -1171,7 +1171,7 @@ Item {
                             let saveCmd = "awk -v new_mons='" + monitorBlock + "' '/^monitor[[:space:]]*=/ { if (!done) { print new_mons; done=1; } next; } {print}' ~/.config/hypr/hyprland.conf > ~/.config/hypr/hyprland.conf.tmp && mv ~/.config/hypr/hyprland.conf.tmp ~/.config/hypr/hyprland.conf";
                             
                             let fullCommand = "hyprctl --batch '" + batchCmds.join(" ; ") + "'";
-                            let postReloadCmd = "awww kill ; sleep 0.2 ; awww-daemon &";
+                            let postReloadCmd = "swww kill ; sleep 0.2 ; swww-daemon &";
                             
                             Quickshell.execDetached(["sh", "-c", fullCommand + " ; " + saveCmd + " ; " + postReloadCmd]);
                             Quickshell.execDetached(["notify-send", "Display Update", "Applied & Saved layout for: " + summaryString]);

@@ -4,7 +4,10 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.Notifications
 import "WindowRegistry.js" as Registry
+
+import "notifications" as Notifs
 
 PanelWindow {
     id: masterWindow
@@ -28,7 +31,7 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 65 // Safely covers your TopBar height + margins
+        height: 65 
     }
 
     MouseArea {
@@ -37,7 +40,6 @@ PanelWindow {
         onClicked: switchWidget("hidden", "")
     }
 
-    // Initialize state on boot
     Component.onCompleted: {
         Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > /tmp/qs_active_widget"]);
     }
@@ -46,8 +48,8 @@ PanelWindow {
     property bool isVisible: false
     property string activeArg: ""
     property bool disableMorph: false 
-    property bool isWallpaperTransition: false 
     property int morphDuration: 500
+    property int exitDuration: 300 // Controls how fast the outgoing widget disappears
 
     property real animW: 1
     property real animH: 1
@@ -59,15 +61,74 @@ PanelWindow {
 
     property real globalUiScale: 1.0
 
+    // =========================================================
+    // --- DAEMON: NOTIFICATION HANDLING
+    // =========================================================
+    // 1. Permanent History (For the Notification Center)
+    ListModel {
+        id: globalNotificationHistory
+    }
+
+    // 2. Transient Popups (For the OSD)
+    ListModel {
+        id: activePopupsModel
+    }
+
+    property int _popupCounter: 0
+
+    function removePopup(uid) {
+        for (let i = 0; i < activePopupsModel.count; i++) {
+            if (activePopupsModel.get(i).uid === uid) {
+                activePopupsModel.remove(i);
+                break;
+            }
+        }
+    }
+
+    NotificationServer {
+        id: globalNotificationServer
+        bodySupported: true
+        actionsSupported: true
+        imageSupported: true
+
+        onNotification: (n) => {
+            console.log("Saving to history:", n.appName, "-", n.summary);
+            
+            let notifData = {
+                "appName": n.appName !== "" ? n.appName : "System",
+                "summary": n.summary !== "" ? n.summary : "No Title",
+                "body": n.body !== "" ? n.body : "",
+                "iconPath": n.appIcon !== "" ? n.appIcon : "", // <-- ADDED: Save the -i parameter path
+                "notif": n
+            };
+
+            // A. Insert into the permanent center
+            globalNotificationHistory.insert(0, notifData);
+
+            // B. Append to the on-screen popups
+            masterWindow._popupCounter++;
+            let popupData = Object.assign({ "uid": masterWindow._popupCounter }, notifData);
+            activePopupsModel.append(popupData);
+        }
+    }    
+    property var notifModel: globalNotificationHistory
+    
+    // --- INSTANTIATE THE POPUP OVERLAY ---
+    Notifs.NotificationPopups {
+        id: osdPopups
+        popupModel: activePopupsModel
+        uiScale: masterWindow.globalUiScale
+    }
+    // =========================================================
+
     onGlobalUiScaleChanged: {
         handleNativeScreenChange();
     }
 
-    // --- Dynamic Settings Reader ---
     Process {
         id: settingsReader
         command: ["bash", "-c", "cat ~/.config/hypr/settings.json 2>/dev/null || echo '{}'"]
-        running: true // Run once at startup
+        running: true 
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -84,7 +145,6 @@ PanelWindow {
         }
     }
 
-    // EVENT-DRIVEN WATCHER
     Process {
         id: settingsWatcher
         command: ["bash", "-c", "while [ ! -f ~/.config/hypr/settings.json ]; do sleep 1; done; inotifywait -qq -e modify,close_write ~/.config/hypr/settings.json"]
@@ -99,7 +159,6 @@ PanelWindow {
             }
         }
     }
-    // -------------------------------
 
     function getLayout(name) {
         return Registry.getLayout(name, 0, 0, Screen.width, Screen.height, masterWindow.globalUiScale);
@@ -129,21 +188,22 @@ PanelWindow {
         if (isVisible) masterWindow.requestActivate();
     }
 
-    // --- THE WIDGET CONTAINER ---
     Item {
         x: masterWindow.animX
         y: masterWindow.animY
         width: masterWindow.animW
         height: masterWindow.animH
         clip: true 
+        layer.enabled: true 
 
-        Behavior on x { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
-        Behavior on y { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
-        Behavior on width { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
-        Behavior on height { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
+        // Smoother easing type: OutExpo makes animations feel snappy yet perfectly fluid
+        Behavior on x { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutExpo } }
+        Behavior on y { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutExpo } }
+        Behavior on width { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutExpo } }
+        Behavior on height { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutExpo } }
 
         opacity: masterWindow.isVisible ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: masterWindow.isWallpaperTransition ? 150 : (masterWindow.morphDuration === 500 ? 300 : 200); easing.type: Easing.InOutSine } }
+        Behavior on opacity { NumberAnimation { duration: masterWindow.morphDuration === 500 ? 300 : 200; easing.type: Easing.InOutSine } }
 
         MouseArea {
             anchors.fill: parent
@@ -176,8 +236,9 @@ PanelWindow {
                 }
                 replaceExit: Transition {
                     ParallelAnimation {
-                        NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 300; easing.type: Easing.InExpo }
-                        NumberAnimation { property: "scale"; from: 1.0; to: 1.02; duration: 300; easing.type: Easing.InExpo }
+                        // Uses the dynamically set exitDuration
+                        NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: masterWindow.exitDuration; easing.type: Easing.InExpo }
+                        NumberAnimation { property: "scale"; from: 1.0; to: 1.02; duration: masterWindow.exitDuration; easing.type: Easing.InExpo }
                     }
                 }
             }
@@ -188,16 +249,12 @@ PanelWindow {
         Quickshell.execDetached(["bash", "-c", "echo '" + newWidget + "' > /tmp/qs_active_widget"]);
 
         prepTimer.stop();
-        teleportFadeOutTimer.stop();
-        teleportFadeInTimer.stop();
         delayedClear.stop();
-
-        let involvesWallpaper = (newWidget === "wallpaper" || currentActive === "wallpaper");
-        masterWindow.isWallpaperTransition = involvesWallpaper;
 
         if (newWidget === "hidden") {
             if (currentActive !== "hidden") {
                 masterWindow.morphDuration = 250; 
+                masterWindow.exitDuration = 250;
                 masterWindow.disableMorph = false;
                 
                 masterWindow.animW = 1;
@@ -209,6 +266,7 @@ PanelWindow {
         } else {
             if (currentActive === "hidden") {
                 masterWindow.morphDuration = 250;
+                masterWindow.exitDuration = 300;
                 masterWindow.disableMorph = false;
                 
                 let t = getLayout(newWidget);
@@ -222,17 +280,14 @@ PanelWindow {
                 prepTimer.start();
                 
             } else {
+                // Morphing directly between widgets (including wallpaper)
                 masterWindow.morphDuration = 500;
-                if (involvesWallpaper) {
-                    masterWindow.disableMorph = true;
-                    masterWindow.isVisible = false; 
-                    teleportFadeOutTimer.newWidget = newWidget;
-                    teleportFadeOutTimer.newArg = arg;
-                    teleportFadeOutTimer.start();
-                } else {
-                    masterWindow.disableMorph = false;
-                    executeSwitch(newWidget, arg, false);
-                }
+                masterWindow.disableMorph = false;
+                
+                // If transitioning to wallpaper, make the previous widget disappear significantly faster
+                masterWindow.exitDuration = (newWidget === "wallpaper") ? 100 : 300;
+                
+                executeSwitch(newWidget, arg, false);
             }
         }
     }
@@ -243,50 +298,6 @@ PanelWindow {
         property string newWidget: ""
         property string newArg: ""
         onTriggered: executeSwitch(newWidget, newArg, false)
-    }
-
-    Timer {
-        id: teleportFadeOutTimer
-        interval: 150 
-        property string newWidget: ""
-        property string newArg: ""
-        onTriggered: {
-            let t = getLayout(newWidget);
-
-            masterWindow.currentActive = newWidget;
-            masterWindow.activeArg = newArg;
-
-            masterWindow.animX = t.rx;
-            masterWindow.animY = t.ry;
-            masterWindow.animW = t.w;
-            masterWindow.animH = t.h;
-            masterWindow.targetW = t.w;
-            masterWindow.targetH = t.h;
-
-            let props = newWidget === "wallpaper" ? { "widgetArg": newArg } : {};
-            widgetStack.replace(t.comp, props, StackView.Immediate);
-
-            teleportFadeInTimer.newWidget = newWidget;
-            teleportFadeInTimer.newArg = newArg;
-            teleportFadeInTimer.start();
-        }
-    }
-
-    Timer {
-        id: teleportFadeInTimer
-        interval: 50 
-        property string newWidget: ""
-        property string newArg: ""
-        onTriggered: {
-            masterWindow.isVisible = true; 
-            if (newWidget !== "wallpaper") resetMorphTimer.start();
-        }
-    }
-
-    Timer {
-        id: resetMorphTimer
-        interval: masterWindow.morphDuration 
-        onTriggered: masterWindow.disableMorph = false
     }
 
     function executeSwitch(newWidget, arg, immediate) {
@@ -302,6 +313,7 @@ PanelWindow {
         masterWindow.targetH = t.h;
         
         let props = newWidget === "wallpaper" ? { "widgetArg": arg } : {};
+        props["notifModel"] = masterWindow.notifModel;
 
         if (immediate) {
             widgetStack.replace(t.comp, props, StackView.Immediate);
@@ -312,36 +324,46 @@ PanelWindow {
         masterWindow.isVisible = true;
     }
 
-    Timer {
-        interval: 50; running: true; repeat: true
-        onTriggered: { if (!ipcPoller.running) ipcPoller.running = true; }
-    }
-
+    // =========================================================
+    // --- IPC: EVENT-DRIVEN WATCHER
+    // =========================================================
     Process {
-        id: ipcPoller
-        command: ["bash", "-c", "if [ -f /tmp/qs_widget_state ]; then mv /tmp/qs_widget_state /tmp/qs_widget_state_read 2>/dev/null && cat /tmp/qs_widget_state_read && rm /tmp/qs_widget_state_read; fi"]
+        id: ipcWatcher
+        command: ["bash", "-c",
+            "inotifywait -qq -e close_write,moved_to --include 'qs_widget_state$' /tmp/ 2>/dev/null; " +
+            "if [ -f /tmp/qs_widget_state ]; then cat /tmp/qs_widget_state && rm -f /tmp/qs_widget_state; fi"
+        ]
+        running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 let rawCmd = this.text.trim();
-                if (rawCmd === "") return;
 
-                let parts = rawCmd.split(":");
-                let cmd = parts[0];
-                let arg = parts.length > 1 ? parts[1] : "";
+                if (rawCmd !== "") {
+                    let parts = rawCmd.split(":");
+                    let cmd   = parts[0];
+                    let arg   = parts.length > 1 ? parts[1] : "";
 
-                if (cmd === "close") {
-                    switchWidget("hidden", "");
-                } else if (getLayout(cmd)) {
-                    delayedClear.stop();
-                    switchWidget(cmd, arg);
+                    if (cmd === "close") {
+                        switchWidget("hidden", "");
+                    } else if (getLayout(cmd)) {
+                        delayedClear.stop();
+                        if (cmd === masterWindow.currentActive) {
+                            switchWidget("hidden", "");
+                        } else {
+                            switchWidget(cmd, arg);
+                        }
+                    }
                 }
+
+                ipcWatcher.running = false;
+                ipcWatcher.running = true;
             }
         }
     }
 
     Timer {
         id: delayedClear
-        interval: masterWindow.isWallpaperTransition ? 150 : masterWindow.morphDuration 
+        interval: masterWindow.morphDuration 
         onTriggered: {
             masterWindow.currentActive = "hidden";
             widgetStack.clear();

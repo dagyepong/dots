@@ -205,7 +205,6 @@ class DaemonTracker:
     def full_sync(self, target_date):
         c = self.conn.cursor()
         
-        # Heavy, bulk O(1) reads happen rarely
         yesterday = target_date - timedelta(days=1)
         c.execute('SELECT SUM(seconds) FROM focus_log WHERE log_date = ?', (yesterday.isoformat(),))
         yesterday_seconds = c.fetchone()[0] or 0
@@ -247,7 +246,6 @@ class DaemonTracker:
                 "seconds": secs, "percent": round((secs / week_apps_total) * 100, 1) if week_apps_total > 0 else 0
             })
 
-        # Bulk Week Days
         c.execute('SELECT log_date, SUM(seconds) FROM focus_log WHERE log_date >= ? AND log_date <= ? GROUP BY log_date', 
                  (monday.isoformat(), sunday.isoformat()))
         week_map = {r[0]: r[1] for r in c.fetchall()}
@@ -257,7 +255,6 @@ class DaemonTracker:
             d_str = (monday + timedelta(days=i)).isoformat()
             week_data.append({"date": d_str, "day": days_str[i], "total": week_map.get(d_str, 0), "is_target": d_str == target_date.isoformat()})
 
-        # Bulk Month Days
         first_day = target_date.replace(day=1)
         _, num_days = calendar.monthrange(target_date.year, target_date.month)
         last_day = target_date.replace(day=num_days)
@@ -327,14 +324,12 @@ class DaemonTracker:
         self.last_sync = time.time()
         self.last_date = target_date
         
-    def fast_tick(self, app_class, app_title):
+    def fast_tick(self, app_class, app_title, write_to_disk=True):
         now = datetime.now()
         target_date = now.date()
         
-        # Buffer DB Writes to save SSD wear
         self.buffer.append((target_date.isoformat(), app_class, app_title, now))
         
-        # If uninitialized or over 60s, do full sync. Otherwise, do blazing fast memory math.
         if self.cached_json is None or target_date != self.last_date or (time.time() - self.last_sync > 60):
             self.flush()
             self.full_sync(target_date)
@@ -371,16 +366,16 @@ class DaemonTracker:
             day_idx = now.weekday()
             if 0 <= hr < 24: d["week_heatmap"][day_idx][hr] += 1
                 
-        # Non-blocking write to tmpfs
-        temp_file = STATE_FILE + ".tmp"
-        try:
-            with open(temp_file, "w") as f:
-                json.dump(self.cached_json, f)
-            os.rename(temp_file, STATE_FILE)
-        except Exception:
-            pass
+        # Conditionally write to tmpfs
+        if write_to_disk:
+            temp_file = STATE_FILE + ".tmp"
+            try:
+                with open(temp_file, "w") as f:
+                    json.dump(self.cached_json, f)
+                os.rename(temp_file, STATE_FILE)
+            except Exception:
+                pass
             
-        # Batch insert to DB every 15 ticks
         if len(self.buffer) >= 15:
             self.flush()
             
@@ -394,7 +389,6 @@ class DaemonTracker:
         intervals = defaultdict(int)
         minutes = defaultdict(int)
         
-        # Consolidate exact inserts to be extremely fast
         for d_str, cls, title, dt in self.buffer:
             logs[(d_str, cls)] += 1
             titles[cls] = title
@@ -443,10 +437,13 @@ def main():
     ipc_thread = threading.Thread(target=listen_hyprland_ipc, daemon=True)
     ipc_thread.start()
 
+    tick_counter = 0
     while True:
         time.sleep(1)
+        tick_counter += 1
         if current_app_class and current_app_class not in [""]:
-            tracker.fast_tick(current_app_class, current_app_title)
+            # Only dump JSON to memory/disk every 5 seconds
+            tracker.fast_tick(current_app_class, current_app_title, write_to_disk=(tick_counter % 5 == 0))
 
 if __name__ == "__main__":
     main()
