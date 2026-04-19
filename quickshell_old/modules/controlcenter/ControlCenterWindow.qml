@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import "../../services" as QsServices
 import "../../config" as QsConfig
+import "../../components"
 import "../../components/effects"
 import "components"
 
@@ -45,16 +46,22 @@ PanelWindow {
         command: ["wlogout"]
         onStarted: root.shouldShow = false
     }
+
+    Process {
+        id: screenshotsProcess
+        command: ["xdg-open", root.screenshot.screenshotsDir]
+        onStarted: root.shouldShow = false
+    }
     
     // Solid UI Color Tokens - Professional dark theme
-    readonly property color cSurface: pywal.background
-    readonly property color cSurfaceContainer: Qt.lighter(pywal.background, 1.15)
-    readonly property color cSurfaceContainerHigh: Qt.lighter(pywal.background, 1.25)
-    readonly property color cBorder: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.08)
+    readonly property color cSurface: pywal.surfaceContainerHighest
+    readonly property color cSurfaceContainer: pywal.surfaceContainerHigh
+    readonly property color cSurfaceContainerHigh: pywal.surfaceContainerHigh
+    readonly property color cBorder: pywal.outlineVariant
     readonly property color cPrimary: pywal.primary
     readonly property color cSecondary: pywal.secondary
     readonly property color cOnSurface: pywal.foreground
-    readonly property color cOnSurfaceVariant: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.7)
+    readonly property color cOnSurfaceVariant: pywal.onSurfaceMuted
     readonly property color cOnSurfaceDim: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.5)
     
     screen: Quickshell.screens[0]
@@ -84,8 +91,11 @@ PanelWindow {
         anchors.fill: parent
         
         transformOrigin: Item.TopRight
-        scale: 0.94
-        opacity: 0
+        property real revealOffsetX: root.shouldShow ? 0 : 20
+        property real revealOffsetY: root.shouldShow ? 0 : -10
+        scale: root.shouldShow ? 1.0 : 0.965
+        opacity: root.shouldShow ? 1.0 : 0.0
+        transform: Translate { x: panelContent.revealOffsetX; y: panelContent.revealOffsetY }
         
         focus: true
         
@@ -140,57 +150,33 @@ PanelWindow {
             onClicked: root.shouldShow = false
         }
         
-        // Show Animation - Material 3 emphasized decelerate
-        SequentialAnimation {
-            running: root.shouldShow
-            ParallelAnimation {
-                NumberAnimation { 
-                    target: panelContent
-                    property: "scale"
-                    from: 0.94
-                    to: 1.0
-                    duration: Material3Anim.medium2
-                    easing.bezierCurve: Material3Anim.emphasizedDecelerate
-                }
-                NumberAnimation { 
-                    target: panelContent
-                    property: "opacity"
-                    from: 0
-                    to: 1
-                    duration: Material3Anim.medium1
-                    easing.bezierCurve: Material3Anim.standard
-                }
-            }
+        Behavior on scale {
+            NumberAnimation { duration: 260; easing.bezierCurve: [0.22, 1.0, 0.36, 1.0] }
         }
-        
-        // Hide Animation - Material 3 emphasized accelerate
-        ParallelAnimation {
-            running: !root.shouldShow && panelContent.opacity > 0
-            NumberAnimation { 
-                target: panelContent
-                property: "scale"
-                to: 0.94
-                duration: Material3Anim.short4
-                easing.bezierCurve: Material3Anim.emphasizedAccelerate
-            }
-            NumberAnimation { 
-                target: panelContent
-                property: "opacity"
-                to: 0
-                duration: Material3Anim.short4
-                easing.bezierCurve: Material3Anim.standard
-            }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 180; easing.bezierCurve: Material3Anim.standard }
+        }
+
+        Behavior on revealOffsetX {
+            NumberAnimation { duration: 260; easing.bezierCurve: Material3Anim.emphasizedDecelerate }
+        }
+
+        Behavior on revealOffsetY {
+            NumberAnimation { duration: 260; easing.bezierCurve: Material3Anim.emphasizedDecelerate }
         }
         
         // Main Panel Background
-        Rectangle {
+        AuroraSurface {
             id: panel
             anchors.fill: parent
             color: root.cSurface
             radius: 24
-            border.color: root.cBorder
-            border.width: 1
+            strokeColor: root.cBorder
             clip: true
+            accentColor: root.cPrimary
+            elevation: 4
+            highlighted: root.shouldShow
             
             Behavior on color {
                 ColorAnimation {
@@ -363,6 +349,35 @@ PanelWindow {
                                 surfaceColor: root.cSurfaceContainerHigh
                                 textColor: root.cOnSurface
                                 onClicked: root.screenshot.takeScreenshot("screen")
+                            }
+
+                            QuickToggle {
+                                Layout.fillWidth: true
+                                icon: root.screenshot.isRecording ? "󰛿" : "󰻃"
+                                label: root.screenshot.isRecording ? "Stop Recording" : "Record Screen"
+                                subLabel: root.screenshot.isRecording ? "Recording in progress" : "Start wf-recorder"
+                                active: root.screenshot.isRecording
+                                activeColor: pywal.error
+                                surfaceColor: root.cSurfaceContainerHigh
+                                textColor: root.cOnSurface
+                                onClicked: {
+                                    if (root.screenshot.isRecording)
+                                        root.screenshot.stopRecording()
+                                    else
+                                        root.screenshot.startRecording()
+                                }
+                            }
+
+                            QuickToggle {
+                                Layout.fillWidth: true
+                                icon: "󰉋"
+                                label: "Open Captures"
+                                subLabel: "Screenshots & recordings"
+                                active: false
+                                activeColor: root.cSecondary
+                                surfaceColor: root.cSurfaceContainerHigh
+                                textColor: root.cOnSurface
+                                onClicked: screenshotsProcess.running = true
                             }
                         }
                         

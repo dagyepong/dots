@@ -9,147 +9,175 @@ import "../../components/effects"
 
 PanelWindow {
     id: root
-    
+
     required property var pywal
     property bool showing: false
-    
-    // Use VolumeMonitor for reliable OSD triggering (reads from /tmp/volume_osd)
-    readonly property var volumeMonitor: QsServices.VolumeMonitor
-    readonly property int currentVolume: volumeMonitor.percentage
-    readonly property bool currentMuted: volumeMonitor.muted
-    
-    // Track previous values to detect actual changes
+
+    readonly property var audio: QsServices.Audio
+    property int currentVolume: 0
+    property bool currentMuted: false
     property int prevVolume: -1
     property bool prevMuted: false
-    
+
     readonly property var appearance: QsConfig.AppearanceConfig
-    
+    readonly property var config: QsConfig.Config
+
     visible: showing
-    
-    // Top-right overlay position
+
     anchors {
         top: true
         right: true
     }
-    
+
     margins {
         top: 20
         right: 12
     }
-    
-    implicitWidth: 250
-    implicitHeight: 45
+
+    implicitWidth: 286
+    implicitHeight: 60
     color: "transparent"
-    
+
     mask: Region { item: container }
-    
-    // Auto-hide timer
+
     Timer {
         id: hideTimer
-        interval: 2000
+        interval: config.osd.volumeTimeoutMs
         onTriggered: root.showing = false
     }
-    
-    // Watch for volume changes using onChanged handlers
-    onCurrentVolumeChanged: {
-        if (prevVolume !== -1 && currentVolume !== prevVolume) {
-            show()
+
+    Connections {
+        target: audio
+
+        function onPercentageChanged() {
+            root.currentVolume = audio.percentage
+            if (prevVolume !== -1 && root.currentVolume !== prevVolume)
+                root.show()
+            prevVolume = root.currentVolume
         }
-        prevVolume = currentVolume
-    }
-    
-    onCurrentMutedChanged: {
-        if (currentMuted !== prevMuted) {
-            show()
+
+        function onMutedChanged() {
+            root.currentMuted = audio.muted
+            if (root.currentMuted !== prevMuted)
+                root.show()
+            prevMuted = root.currentMuted
         }
-        prevMuted = currentMuted
     }
-    
+
+    Timer {
+        interval: 150
+        running: true
+        repeat: true
+        onTriggered: {
+            const volume = audio.percentage
+            const muted = audio.muted
+
+            root.currentVolume = volume
+            root.currentMuted = muted
+
+            if (prevVolume !== -1 && volume !== prevVolume)
+                root.show()
+            if (muted !== prevMuted)
+                root.show()
+
+            prevVolume = volume
+            prevMuted = muted
+        }
+    }
+
+    Component.onCompleted: {
+        root.currentVolume = audio.percentage
+        root.currentMuted = audio.muted
+        prevVolume = root.currentVolume
+        prevMuted = root.currentMuted
+    }
+
     function show() {
         showing = true
         hideTimer.restart()
     }
-    
+
     Rectangle {
         id: container
         anchors.fill: parent
-        radius: 16
-        
-        color: Qt.rgba(
-            pywal?.background?.r ?? 0.1, 
-            pywal?.background?.g ?? 0.1, 
-            pywal?.background?.b ?? 0.1, 
-            0.95
-        )
+        radius: 22
+        color: pywal.surfaceContainerHighest
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.1)
-        
-        // Motion Design
+        border.color: pywal.outlineVariant
+
         opacity: root.showing ? 1.0 : 0.0
-        scale: root.showing ? 1.0 : 0.9
+        scale: root.showing ? 1.0 : 0.94
         transformOrigin: Item.Center
-        
+
         Behavior on opacity {
-            NumberAnimation { 
+            NumberAnimation {
                 duration: Material3Anim.short4
                 easing.bezierCurve: root.showing ? Material3Anim.emphasizedDecelerate : Material3Anim.emphasizedAccelerate
             }
         }
-        
+
         Behavior on scale {
-            NumberAnimation { 
+            NumberAnimation {
                 duration: Material3Anim.short4
                 easing.bezierCurve: root.showing ? Material3Anim.emphasizedDecelerate : Material3Anim.emphasizedAccelerate
             }
         }
-        
+
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 12
-            
-            // Icon - Material Design Icons
+            anchors.margins: 16
+            spacing: 14
+
             Text {
                 text: root.currentMuted ? "󰖁" : (root.currentVolume > 66 ? "󰕾" : (root.currentVolume > 33 ? "󰖀" : "󰕿"))
                 font.family: "Material Design Icons"
                 color: root.currentMuted ? Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.5) : pywal.primary
-                font.pixelSize: 20
+                font.pixelSize: 22
             }
-            
-            // Bar
+
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 6
-                radius: 3
-                color: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.15)
-                
+                Layout.preferredHeight: 10
+                radius: 5
+                color: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.12)
+
                 Rectangle {
                     width: parent.width * (root.currentVolume / 100)
                     height: parent.height
-                    radius: 3
+                    radius: 5
                     color: root.currentMuted ? Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.4) : pywal.primary
-                    
+
                     Behavior on width {
-                        NumberAnimation { 
+                        NumberAnimation {
                             duration: 100
                             easing.type: Easing.OutCubic
                         }
                     }
-                    
+
                     Behavior on color {
                         ColorAnimation { duration: 100 }
                     }
                 }
+
+                Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 6
+                    x: Math.max(0, Math.min(parent.width - width, parent.width * (root.currentVolume / 100) - width / 2))
+                    y: (parent.height - height) / 2
+                    color: root.currentMuted ? Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.55) : pywal.primary
+                    border.width: 2
+                    border.color: pywal.surfaceContainerHighest
+                }
             }
-            
-            // Text
+
             Text {
                 text: root.currentVolume + "%"
                 color: pywal.foreground
                 font.family: "Inter"
-                font.pixelSize: 13
+                font.pixelSize: 14
                 font.weight: Font.DemiBold
-                Layout.preferredWidth: 36
+                Layout.preferredWidth: 42
                 horizontalAlignment: Text.AlignRight
             }
         }

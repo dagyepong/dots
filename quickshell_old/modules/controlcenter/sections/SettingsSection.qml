@@ -10,10 +10,16 @@ Item {
     
     readonly property var pywal: QsServices.Pywal
     readonly property var audio: QsServices.Audio
-    readonly property var volumeMonitor: QsServices.VolumeMonitor
     readonly property var brightness: QsServices.Brightness
     readonly property var network: QsServices.Network
+    readonly property var bluetooth: QsServices.Bluetooth
     readonly property var idleInhibitor: QsServices.IdleInhibitor
+
+    Process { id: lockProc; command: ["loginctl", "lock-session"] }
+    Process { id: logoutProc; command: ["hyprctl", "dispatch", "exit"] }
+    Process { id: sleepProc; command: ["systemctl", "suspend"] }
+    Process { id: wifiSettingsProc; command: ["nm-connection-editor"] }
+    Process { id: bluetoothSettingsProc; command: ["blueman-manager"] }
     
     // DND state (simple toggle for now)
     property bool dndEnabled: false
@@ -68,8 +74,7 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            // Lock screen command
-                            console.log("Lock screen")
+                            lockProc.running = true
                         }
                         
                         onPressed: parent.color = Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
@@ -109,7 +114,7 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            console.log("Logout")
+                            logoutProc.running = true
                         }
                         
                         onPressed: parent.color = Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
@@ -149,7 +154,7 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            console.log("Sleep")
+                            sleepProc.running = true
                         }
                         
                         onPressed: parent.color = Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
@@ -189,7 +194,7 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            console.log("Power off")
+                            QsServices.Logger.debug("SettingsSection", "Power off")
                         }
                         
                         onPressed: parent.color = Qt.rgba(pywal.color1.r, pywal.color1.g, pywal.color1.b, 0.15)
@@ -412,8 +417,7 @@ Item {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        // TODO: Open WiFi selection dialog
-                        console.log("Open WiFi settings")
+                        wifiSettingsProc.running = true
                     }
                     
                     onPressed: parent.color = Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
@@ -437,22 +441,22 @@ Item {
                         Layout.preferredWidth: 36
                         Layout.preferredHeight: 36
                         radius: 18
-                        color: network.bluetoothConnected ? Qt.rgba(pywal.color2.r, pywal.color2.g, pywal.color2.b, 0.2) : "transparent"
+                        color: bluetooth.connected ? Qt.rgba(pywal.color2.r, pywal.color2.g, pywal.color2.b, 0.2) : "transparent"
                         
                         Text {
                             anchors.centerIn: parent
-                            text: network.bluetoothConnected ? "󰂯" : "󰂲"
+                            text: bluetooth.connected ? "󰂯" : "󰂲"
                             font.family: "Material Design Icons"
                             font.pixelSize: 20
-                            color: network.bluetoothConnected ? pywal.color2 : pywal.foreground
+                            color: bluetooth.connected ? pywal.color2 : pywal.foreground
                         }
                     }
                     
                     // Device name and status to the right of icon
                     Text {
                         Layout.fillWidth: true
-                        text: network.bluetoothConnected ? 
-                              (network.bluetoothDeviceName || "Connected") :
+                        text: bluetooth.connected ? 
+                              (bluetooth.deviceName || "Connected") :
                               "Bluetooth Disconnected"
                         font.family: "Inter"
                         font.pixelSize: 13
@@ -473,8 +477,7 @@ Item {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        // TODO: Open Bluetooth selection dialog
-                        console.log("Open Bluetooth settings")
+                        bluetoothSettingsProc.running = true
                     }
                     
                     onPressed: parent.color = Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
@@ -501,7 +504,7 @@ Item {
                     spacing: 12
                     
                     Text {
-                        text: volumeMonitor.muted ? "󰖁" : "󰕾"
+                        text: audio.muted ? "󰖁" : "󰕾"
                         font.family: "Material Design Icons"
                         font.pixelSize: 24
                         color: pywal.foreground
@@ -511,18 +514,10 @@ Item {
                         Layout.fillWidth: true
                         from: 0
                         to: 150
-                        value: volumeMonitor.percentage
+                        value: audio.percentage
                         
                         onMoved: {
-                            // Update using pamixer and write to file
                             audio.setVolume(value / 100)
-                            // Also update the file immediately for OSD
-                            volumeUpdateProc.running = true
-                        }
-                        
-                        Process {
-                            id: volumeUpdateProc
-                            command: ["sh", "-c", `pamixer --set-volume ${parent.value.toFixed(0)} && echo ${parent.value.toFixed(0)} > /tmp/volume_osd`]
                         }
                         
                         background: Rectangle {
@@ -554,7 +549,7 @@ Item {
                     }
                     
                     Text {
-                        text: volumeMonitor.percentage + "%"
+                        text: audio.percentage + "%"
                         font.family: "Inter"
                         font.pixelSize: 12
                         font.weight: Font.Medium
