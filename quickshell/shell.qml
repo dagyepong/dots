@@ -1,50 +1,30 @@
-//@ pragma IconTheme Papirus
-import QtQuick
+//@ pragma UseQApplication
+//@ pragma Env QT_QPA_PLATFORMTHEME=gtk3
+//@ pragma Env QS_NO_RELOAD_POPUP=1
+//@ pragma Env QSG_RENDER_LOOP=threaded
+//@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
+
 import Quickshell
+import Quickshell.Io
+import QtQuick
 import "bar"
+import "app-launcher"
 import "notifications"
+import "theme-switcher"
+import "wallpaper"
+import "media"
 import "osd"
-ShellRoot {
-    Variants {
-        model: Quickshell.screens
-        PanelWindow {
-            id: panelWin
-            required property var modelData
-            screen: modelData
-            anchors { top: true; left: true; right: true }
-            implicitHeight: 55
-            color: "transparent"
-            exclusiveZone: implicitHeight
-            Bar { id: bar; anchors.fill: parent }
-            AudioPopup {
-                anchor.window: panelWin
-                anchor.rect.x: bar.rightContainer.x + bar.rightBar.x + bar.rightBar.audioWidget.x + (bar.rightBar.audioWidget.width / 2) - (implicitWidth / 2)
-                anchor.rect.y: panelWin.height
-            }
-            PowerProfilePopup {
-                anchor.window: panelWin
-                anchor.rect.x: bar.rightContainer.x + bar.rightBar.x + bar.rightBar.batteryWidget.x + (bar.rightBar.batteryWidget.width / 2) - (implicitWidth / 2)
-                anchor.rect.y: panelWin.height
-            }
-            BluetoothPopup {
-                anchor.window: panelWin
-                anchor.rect.x: bar.rightContainer.x + bar.rightBar.x + bar.rightBar.bluetoothWidget.x + (bar.rightBar.bluetoothWidget.width / 2) - (implicitWidth / 2)
-                anchor.rect.y: panelWin.height
-            }
-        }
-    }
-    Variants {
-        model: Quickshell.screens
-        NotificationPopup {
-            required property var modelData
-            screen: modelData
-        }
-    }
-    Variants {
-        model: Quickshell.screens
-        SessionOSD {
-            required property var modelData
-            screen: modelData
-        }
-    }
+
+Scope {
+  ThemeSwitcher { id: ts }
+  Bar { theme: ts.theme }
+  AppLauncher { theme: ts.theme }
+  NotificationPopup { theme: ts.theme }
+  WallpaperManager { theme: ts.theme }
+  MediaControl { theme: ts.theme }
+  OSD { theme: ts.theme }
 }
+
+
+
+
