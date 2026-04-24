@@ -1,30 +1,36 @@
-//@ pragma UseQApplication
-//@ pragma Env QT_QPA_PLATFORMTHEME=gtk3
-//@ pragma Env QS_NO_RELOAD_POPUP=1
-//@ pragma Env QSG_RENDER_LOOP=threaded
-//@ pragma Env QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
-
 import Quickshell
-import Quickshell.Io
 import QtQuick
-import "bar"
-import "app-launcher"
-import "notifications"
-import "theme-switcher"
-import "wallpaper"
-import "media"
-import "osd"
+import "Panes" as Panes
+import "Data" as Dat
 
-Scope {
-  ThemeSwitcher { id: ts }
-  Bar { theme: ts.theme }
-  AppLauncher { theme: ts.theme }
-  NotificationPopup { theme: ts.theme }
-  WallpaperManager { theme: ts.theme }
-  MediaControl { theme: ts.theme }
-  OSD { theme: ts.theme }
+ShellRoot {
+  // uncomment this if you want to reserve space for the notch
+  Panes.PseudoReserved {}
+  Component.onCompleted: {
+    Dat.Globals.reservedShell = true
+  }
+
+  // uncomment this if you like particle effects
+  // on background that follow your mouse when you move it
+  // Panes.BottomLayer {
+  // }
+
+  Panes.Notch {
+  }
+
+  // Background clock, will add a toggle for this somewere later on
+  Panes.BackgroundClock {
+  }
+
+  // inhibit the reload popup
+  Connections {
+    function onReloadCompleted() {
+      Quickshell.inhibitReloadPopup();
+    }
+    function onReloadFailed() {
+      Quickshell.inhibitReloadPopup();
+    }
+
+    target: Quickshell
+  }
 }
-
-
-
-
