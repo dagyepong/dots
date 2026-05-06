@@ -1,36 +1,180 @@
-import Quickshell
+//@ pragma Env QS_NO_RELOAD_POPUP=1
+pragma ComponentBehavior: Bound
 import QtQuick
-import "Panes" as Panes
-import "Data" as Dat
+import Quickshell
+import Quickshell.Io
+import qs.services
+import "./modules/bar/"
 
 ShellRoot {
-  // uncomment this if you want to reserve space for the notch
-  Panes.PseudoReserved {}
-  Component.onCompleted: {
-    Dat.Globals.reservedShell = true
-  }
+    id: root
 
-  // uncomment this if you like particle effects
-  // on background that follow your mouse when you move it
-  // Panes.BottomLayer {
-  // }
+    // =========================================================================
+    // GLOBAL MODULE STATE
+    // =========================================================================
 
-  Panes.Notch {
-  }
+    property real osdTrackedVolume: 0
+    property bool osdTrackedMuted: false
+    property real osdTrackedBrightness: 1.0
+    property bool osdAudioReady: false
+    property bool osdBrightnessReady: false
+    readonly property bool suppressOsdInQuickSettings: OsdService.suppressed
 
-  // Background clock, will add a toggle for this somewere later on
-  Panes.BackgroundClock {
-  }
+    function maybeShowVolumeOsd() {
+        const volumeNow = Math.max(0, Math.min(1.5, AudioService.volumeForOsd));
+        const mutedNow = AudioService.muted;
 
-  // inhibit the reload popup
-  Connections {
-    function onReloadCompleted() {
-      Quickshell.inhibitReloadPopup();
+        if (!osdAudioReady) {
+            osdTrackedVolume = volumeNow;
+            osdTrackedMuted = mutedNow;
+            return;
+        }
+
+        const volumeChanged = Math.abs(volumeNow - osdTrackedVolume) > 0.003;
+        const muteChanged = mutedNow !== osdTrackedMuted;
+
+        osdTrackedVolume = volumeNow;
+        osdTrackedMuted = mutedNow;
+
+        if (!volumeChanged && !muteChanged)
+            return;
+        if (suppressOsdInQuickSettings)
+            return;
+
+        OsdService.showVolume(volumeNow, mutedNow);
     }
-    function onReloadFailed() {
-      Quickshell.inhibitReloadPopup();
+
+    function maybeShowBrightnessOsd() {
+        const brightnessNow = Math.max(0.05, Math.min(1.0, BrightnessService.brightness));
+
+        if (!osdBrightnessReady) {
+            osdTrackedBrightness = brightnessNow;
+            return;
+        }
+
+        const brightnessChanged = Math.abs(brightnessNow - osdTrackedBrightness) > 0.003;
+        osdTrackedBrightness = brightnessNow;
+
+        if (!brightnessChanged)
+            return;
+        if (suppressOsdInQuickSettings)
+            return;
+
+        OsdService.showBrightness(brightnessNow);
     }
 
-    target: Quickshell
-  }
+    Timer {
+        id: osdStateArmTimer
+        interval: 800
+        running: true
+        repeat: false
+        onTriggered: {
+            root.osdTrackedVolume = Math.max(0, Math.min(1.5, AudioService.volumeForOsd));
+            root.osdTrackedMuted = AudioService.muted;
+            root.osdTrackedBrightness = Math.max(0.05, Math.min(1.0, BrightnessService.brightness));
+            root.osdAudioReady = true;
+            root.osdBrightnessReady = true;
+        }
+    }
+
+    Connections {
+        target: AudioService
+
+        function onVolumeForOsdChanged() {
+            root.maybeShowVolumeOsd();
+        }
+
+        function onMutedChanged() {
+            root.maybeShowVolumeOsd();
+        }
+    }
+
+    Connections {
+        target: BrightnessService
+
+        function onBrightnessChanged() {
+            root.maybeShowBrightnessOsd();
+        }
+    }
+
+    // =========================================================================
+    // BLUETOOTH AGENT
+    // =========================================================================
+
+    readonly property string bluetoothAgentScriptPath: Qt.resolvedUrl("./scripts/bluetooth-agent.py").toString().replace("file://", "")
+
+    Process {
+        id: bluetoothAgent
+        command: ["python3", root.bluetoothAgentScriptPath]
+        running: true
+
+        stderr: SplitParser {
+            onRead: data => console.error("[BluetoothAgent]: " + data)
+        }
+    }
+
+    // =========================================================================
+    // IPC TARGETS
+    // =========================================================================
+
+    IpcHandler {
+        target: "power"
+
+        function showOverlay() {
+            PowerService.showOverlay();
+        }
+
+        function hideOverlay() {
+            PowerService.hideOverlay();
+        }
+
+        function toggleOverlay() {
+            if (PowerService.overlayVisible)
+                PowerService.hideOverlay();
+            else
+                PowerService.showOverlay();
+        }
+
+        function execute(actionId: string) {
+            PowerService.executeAction(actionId);
+        }
+    }
+
+    IpcHandler {
+        target: "theme"
+
+        function generateFromImage(imagePath: string) {
+            ThemeService.generateFromImage(imagePath);
+        }
+
+        function generateFromColor(hex: string) {
+            ThemeService.generateFromColor(hex);
+        }
+
+
+    }
+
+    // =========================================================================
+    // UI COMPONENTS - LAZY LOADING
+    // =========================================================================
+
+    // Bar - always active (main component)
+    Bar {}
+    // Notifications
+    Loader {
+        id: notificationLoader
+        active: NotificationService.activePopupCount > 0 || NotificationService.popups.length > 0
+        source: "./modules/notifications/NotificationOverlay.qml"
+    }
+    // Power Overlay
+    Loader {
+        id: powerLoader
+        active: PowerService.overlayVisible
+        source: "./modules/power/PowerOverlay.qml"
+    }
+    // OSD
+    Loader {
+        active: true
+        source: "./modules/osd/OsdOverlay.qml"
+    }
 }
