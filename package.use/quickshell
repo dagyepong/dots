@@ -1,0 +1,3 @@
+ gui-apps/quickshell -breakpad
+
+ ## use this for python3.13 issues with glibc for virt-manager when there is pending patch from devs
