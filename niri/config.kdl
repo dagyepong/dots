@@ -1,0 +1,200 @@
+// ~/.config/niri/config.kdl
+// Full polished config for Gentoo Hardened + OpenRC + Quickshell
+
+// --- INPUT ---
+input {
+    keyboard {
+        xkb {
+            layout "us" // Change to "de,us" if needed
+            // options "grp:win_space_toggle,compose:ralt,ctrl:nocaps" // Optional: CapsLock -> Ctrl
+        }
+        numlock
+    }
+    // Smooth mouse feel
+    focus-follows-mouse max-scroll-amount="0%"
+    
+    // Optional: Natural scrolling for touchpads
+    // touchpad { natural-scroll }
+}
+
+// --- LAYOUT & AESTHETICS ---
+layout {
+    gaps 20 // Space between windows
+    
+    // Focus Ring (Active Window Highlight)
+    focus-ring {
+        width 4
+        active-color "#7fc8ff" // Soft Blue
+        inactive-color "#4a4a4a" // Dark Grey
+    }
+
+    // Border (Always Visible)
+    border {
+        width 2
+        active-color "#ffc87f" // Warm Orange
+        inactive-color "#333333"
+    }
+
+    // Shadows (Depth)
+    shadow {
+        on
+        softness 30
+        spread 5
+        offset x=0 y=8
+        color "#000000aa" // Semi-transparent black
+    }
+
+    // Struts (Space for bars like Waybar/Quickshell)
+    struts {
+        top 40 // Reserve space for top bar
+        bottom 0
+        left 0
+        right 0
+    }
+}
+
+// --- VISUAL EFFECTS (The "Eye Candy") ---
+// Applies rounded corners and blur to ALL windows by default
+window-rule {
+    match app-id="^.*$" 
+    geometry-corner-radius 12 // 12px rounded corners
+    clip-to-geometry true // Ensures corners clip correctly
+    
+    background-effect {
+        blur true // Enable blur
+        xray true // Performance optimization (blurs only wallpaper)
+    }
+}
+
+// Specific rule for Launcher (fuzzel/rofi) to ensure it looks good
+layer-rule {
+    match namespace="^launcher$"
+    background-effect {
+        blur true
+        xray true
+    }
+}
+
+// --- ANIMATIONS ---
+animations {
+    // Uncomment 'off' to disable for snappiness
+    // off
+    slowdown 1.2 // Slightly slower, smoother animations
+}
+
+// --- STARTUP APPLICATIONS (Replaces Hyprland exec-once) ---
+// Note: spawn-sh-at-startup is used for commands with pipes/arguments
+
+// 1. PipeWire & Audio
+spawn-sh-at-startup "gentoo-pipewire-launcher restart"
+
+// 2. Wallpaper (Replaces hyprpaper)
+spawn-at-startup "swaybg" "-m" "fill" "-i" "/home/nana/Pictures/wallpaper/dopesmoker_gruvbox.png"
+
+// 3. Network Manager
+spawn-at-startup "nm-applet" "--indicator"
+
+// 4. Clipboard Manager (Replaces wl-paste --watch)
+spawn-sh-at-startup "wl-paste --watch cliphist store"
+
+// 5. KDE Connect
+spawn-at-startup "kdeconnectd"
+spawn-at-startup "kdeconnect-indicator"
+
+// 6. PolicyKit Agent (Required for GUI sudo)
+spawn-at-startup "/usr/libexec/polkit-gnome-authentication-agent-1"
+
+// 7. Quickshell (Your Custom Shell)
+spawn-at-startup "qs" "-p" "~/.config/quickshell/shell.qml"
+
+// 8. Idle & Lock (Replaces hypridle/hyprlock -> swayidle/swaylock)
+// Locks after 5 mins (300s), suspends after 15 mins (900s)
+spawn-sh-at-startup "swayidle" \
+    "timeout" "300" "swaylock -f -c 000000" \
+    "before-sleep" "swaylock -f -c 000000" \
+    "timeout" "900" "systemctl suspend"
+
+// --- KEYBINDS ---
+binds {
+    Mod+Shift+Slash { show-hotkey-overlay; } // Show keys
+
+    // --- Launchers & Apps ---
+    Mod+T { spawn "alacritty"; } // Terminal
+    Mod+D { spawn "fuzzel"; } // App Launcher (Install fuzzel if not present)
+    Mod+Shift+L { spawn "swaylock"; } // Manual Lock
+    Mod+E { spawn "thunar"; } // File Manager (Change to your preferred one)
+    
+    // --- Window Management ---
+    Mod+Q { close-window; }
+    Mod+F { maximize-column; }
+    Mod+V { toggle-window-floating; }
+    Mod+W { toggle-column-tabbed-display; }
+    
+    // Navigation (Standard Niri/Arrow keys)
+    Mod+Left { focus-column-left; }
+    Mod+Down { focus-window-down; }
+    Mod+Up { focus-window-up; }
+    Mod+Right { focus-column-right; }
+    
+    // Moving Windows
+    Mod+Ctrl+Left { move-column-left; }
+    Mod+Ctrl+Down { move-window-down; }
+    Mod+Ctrl+Up { move-window-up; }
+    Mod+Ctrl+Right { move-column-right; }
+    
+    // Workspaces
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+    
+    // Move Window to Workspace
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+    
+    // Width/Height Adjustments
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+Equal { set-column-width "+10%"; }
+    Mod+Shift+Minus { set-window-height "-10%"; }
+    Mod+Shift+Equal { set-window-height "+10%"; }
+    
+    // System Actions
+    Mod+Shift+E { quit; } // Quit Niri
+    Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; } // Safety hatch
+    
+    // Screenshots
+    Print { screenshot; }
+    Mod+Print { screenshot-screen; }
+    
+    // Volume Keys (PipeWire/WirePlumber)
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioMicMute allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+    
+    // Brightness
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "set" "+10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "set" "10%-"; }
+}
+
+// --- WINDOW RULES (Exceptions) ---
+// Example: Make Firefox PiP always floating
+window-rule {
+    match app-id="firefox"
+    title="^Picture-in-Picture$"
+    open-floating true
+}
+
+// Example: Hide focus ring for specific apps (optional)
+// window-rule {
+//     match app-id="^firefox$"
+//     focus-ring { off; }
+// }
