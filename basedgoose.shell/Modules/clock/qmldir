@@ -1,0 +1,4 @@
+module Clock
+Clock 1.0 Clock.qml
+CalendarPopup 1.0 CalendarPopup.qml
+

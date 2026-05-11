@@ -1,0 +1,25 @@
+module Widgets
+PopupWindow 1.0 PopupWindow.qml
+IconButton 1.0 IconButton.qml
+ToggleSwitch 1.0 ToggleSwitch.qml
+EmptyState 1.0 EmptyState.qml
+ActionButton 1.0 ActionButton.qml
+AppIcon 1.0 AppIcon.qml
+FilterButton 1.0 FilterButton.qml
+ImageGrid 1.0 ImageGrid.qml
+ImageGridItem 1.0 ImageGridItem.qml
+TabButton 1.0 TabButton.qml
+HoverButton 1.0 HoverButton.qml
+ListItem 1.0 ListItem.qml
+SectionLabel 1.0 SectionLabel.qml
+Divider 1.0 Divider.qml
+HeaderWithIcon 1.0 HeaderWithIcon.qml
+CustomSlider 1.0 CustomSlider.qml
+Badge 1.0 Badge.qml
+DropdownButton 1.0 DropdownButton.qml
+MenuItem 1.0 MenuItem.qml
+MenuButton 1.0 MenuButton.qml
+NavButton 1.0 NavButton.qml
+MediaControlButton 1.0 MediaControlButton.qml
+TextButton 1.0 TextButton.qml
+NotificationCard 1.0 NotificationCard.qml

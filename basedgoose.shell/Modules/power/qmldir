@@ -1,0 +1,4 @@
+module Power
+PowerMenuPopup 1.0 PowerMenuPopup.qml
+PowerButton 1.0 PowerButton.qml
+

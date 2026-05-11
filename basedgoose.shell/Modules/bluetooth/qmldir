@@ -1,0 +1,5 @@
+module Bluetooth
+Bluetooth 1.0 Bluetooth.qml
+BluetoothPopup 1.0 BluetoothPopup.qml
+
+

@@ -1,0 +1,5 @@
+module Notifications
+NotificationPopups 1.0 NotificationPopups.qml
+NotificationCenter 1.0 NotificationCenter.qml
+NotificationButton 1.0 NotificationButton.qml
+

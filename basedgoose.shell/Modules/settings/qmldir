@@ -1,0 +1,2 @@
+module Settings
+SettingsWindow 1.0 SettingsWindow.qml

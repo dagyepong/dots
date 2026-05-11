@@ -1,0 +1,14 @@
+CpuMonitor 1.0 CpuMonitor.qml
+MemoryMonitor 1.0 MemoryMonitor.qml
+DisplayManagerService 1.0 DisplayManagerService.qml
+
+singleton Audio 1.0 Audio.qml
+singleton Notifications 1.0 Notifications.qml
+singleton Players 1.0 Players.qml
+singleton VolumeMonitor 1.0 VolumeMonitor.qml
+singleton Bluetooth 1.0 Bluetooth.qml
+singleton Network 1.0 Network.qml
+singleton ConfigService 1.0 ConfigService.qml
+singleton WallpaperService 1.0 WallpaperService.qml
+singleton WallhavenAPIService 1.0 WallhavenAPIService.qml
+singleton ImageCacheService 1.0 ImageCacheService.qml
