@@ -30,7 +30,7 @@ custom-shader = shaders/cursor-trail.glsl
 
 #--- Fonts ---#
 font-family = "JetBrains Mono Nerd Font"
-font-size = 10
+font-size = 9
 font-feature = calt
 
 #--- Visuals ---#
@@ -62,5 +62,5 @@ keybind = ctrl+shift+r=reload_config
 #--------------------------------------------------------------------------------
 # Theme
 #--------------------------------------------------------------------------------
-theme = screy
+theme = kape
 
