@@ -25,12 +25,18 @@ Item {
         Text {
             id: batteryIcon
             text: {
-                if (charging) return "⚡"
-                if (percent >= 60) return "🔋"
-                if (percent >= 20) return "🔋"
-                return "🪫"
+                if (charging) return ""           // Nerd Font: plug icon
+                if (percent >= 90) return ""
+                if (percent >= 60) return ""
+                if (percent >= 30) return ""
+                if (percent >= 10) return ""
+                return ""
             }
-            font.pixelSize: Appearance.spacing.p2 * 1.5
+            font {
+                // Use the same font as your audio button (Nerd Fonts patched)
+                family: "JetBrainsMono Nerd Font"   // or "Symbols Nerd Font" – adjust to your installed font
+                pixelSize: Appearance.font.size3    // matches audio button
+            }
             color: {
                 if (charging) return Appearance.srcery.cyan
                 if (percent < 20) return Appearance.srcery.red
@@ -44,7 +50,10 @@ Item {
         Text {
             id: batteryLabel
             text: percent + "%"
-            font.pixelSize: 9
+            font {
+                family: "JetBrainsMono Nerd Font"   // same font
+                pixelSize: 9                        // keep your original small size
+            }
             color: Appearance.srcery.gray4
         }
     }
