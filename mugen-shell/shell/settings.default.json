@@ -1,0 +1,30 @@
+{
+  "autoCloseTimer": {
+    "interval": 5000
+  },
+  "barBackground": {
+    "gradientEnabled": true
+  },
+  "batteryIndicator": {
+    "enabled": true
+  },
+  "animations": {
+    "speed": "normal",
+    "durationMultiplier": 1.0
+  },
+  "notification": {
+    "sound": "None"
+  },
+  "timer": {
+    "sound": "None"
+  },
+  "lockTimer": {
+    "minutes": 10
+  },
+  "date": {
+    "format": "ddd M/d"
+  },
+  "ai": {
+    "barModel": ""
+  }
+}
