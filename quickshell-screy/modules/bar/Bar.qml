@@ -150,7 +150,7 @@ Item {
         // === DEBUG: Wrap rightSection in a Rectangle to see its bounds ===
         Rectangle {
           id: rightSection
-          color: "green"   // temporary debug, change to "transparent" later
+          color: "transparent"   // temporary debug, change to "transparent" later
           Layout.fillHeight: true
           Layout.preferredWidth: childrenRect.width
           RowLayout {
