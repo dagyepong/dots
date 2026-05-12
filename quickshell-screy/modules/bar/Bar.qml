@@ -110,7 +110,7 @@ Item {
           Layout.fillHeight: true
           Layout.fillWidth: true
           // === DEBUG: Green background to see if right section is visible ===
-          color: "green"   // change back to "transparent" when done
+          color: "transparent"   // change back to "transparent" when done
           RowLayout {
             spacing: Appearance.spacing.p1
             anchors.right: parent.right
@@ -186,7 +186,7 @@ Item {
         // === DEBUG: Wrap rightSection in a Rectangle to see its bounds ===
         Rectangle {
           id: rightSection
-          color: "green"   // temporary debug
+          color: "transparent"   // temporary debug
           Layout.fillHeight: true
           Layout.preferredWidth: childrenRect.width
           RowLayout {
