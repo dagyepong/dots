@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+qs_ensure_cache "music"
+
 # File to store the latest seek request
-SEEK_FILE="/tmp/quickshell_music_seek_data"
+SEEK_FILE="$QS_RUN_MUSIC/seek_data"
 
 # Arg mapping
 command=$1
@@ -23,7 +26,7 @@ case $command in
 
         # 2. CHECK: Is a worker already running?
         #    We check for a specific marker we create below.
-        lock_file="/tmp/quickshell_music_seek_lock"
+        lock_file="$QS_RUN_MUSIC/seek.lock"
         
         # If the lock file exists, a worker is already waiting to execute.
         # We just exit and let that worker pick up our new value from step 1.

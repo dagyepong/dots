@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-PIPE="/tmp/qs_battery_wait_$$.fifo"
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+
+PIPE="$QS_RUN_DIR/qs_battery_wait_$$.fifo"
 mkfifo "$PIPE" 2>/dev/null
-trap 'rm -f "$PIPE"; kill $(jobs -p) 2>/dev/null; exit 0' EXIT INT TERM
 
-# Catch instant AC plug/unplug events
-LC_ALL=C udevadm monitor --subsystem-match=power_supply 2>/dev/null | grep --line-buffered "change" > "$PIPE" &
+trap 'rm -f "$PIPE"; kill $MONITOR_PID 2>/dev/null; exit 0' EXIT INT TERM
 
-# Failsafe: Force a refresh every 30 seconds because the kernel doesn't 
-# always broadcast a udev event when the battery drops by 1% naturally.
-(sleep 30 && echo "timeout" > "$PIPE") &
+# Run udevadm isolated and capture its exact PID
+LC_ALL=C udevadm monitor --subsystem-match=power_supply 2>/dev/null > "$PIPE" &
+MONITOR_PID=$!
 
-read -r _ < "$PIPE"
-sleep 0.05
+# Blocks until udevadm catches a change, OR 30 seconds pass (your failsafe).
+# Either way, when this line finishes, the trap fires and cleans up perfectly.
+timeout 10 grep -m 1 "change" < "$PIPE" > /dev/null

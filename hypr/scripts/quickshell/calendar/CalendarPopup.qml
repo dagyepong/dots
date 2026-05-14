@@ -10,16 +10,48 @@ import "../"
 Item {
     id: window
 
+    Caching { id: paths }
+
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
-        // Uses the physical screen width so the popup scales synchronously
+        // Pass both width and height so the internal popup scale perfectly synchronizes
+        // with the master window's WindowRegistry.js calculations
         currentWidth: Screen.width
+        currentHeight: Screen.height
     }
     
-    // Helper function scoped to the root Item for easy access
+    // Expose reactive scale factor for all bindings
+    readonly property real sf: scaler.baseScale
+
+    // Keep helper function for backwards compatibility in pure JS blocks
     function s(val) { 
-        return scaler.s(val); 
+        return Math.round(val * window.sf); 
+    }
+
+    // -------------------------------------------------------------------------
+    // DYNAMIC MASTER WINDOW SCALING (Fixes Window Clipping)
+    // -------------------------------------------------------------------------
+    property real targetMasterHeight: window.scheduleModuleExists ? Math.round(750 * window.sf) : Math.round(510 * window.sf)
+    property real targetMasterWidth: Math.round(1450 * window.sf)
+    
+    onTargetMasterHeightChanged: {
+        if (typeof masterWindow !== "undefined") {
+            masterWindow.animH = window.targetMasterHeight;
+            masterWindow.targetH = window.targetMasterHeight;
+        }
+    }
+
+    onTargetMasterWidthChanged: {
+        if (typeof masterWindow !== "undefined") {
+            masterWindow.animW = window.targetMasterWidth;
+            masterWindow.targetW = window.targetMasterWidth;
+            
+            // Re-center horizontally to keep the popup perfectly in the middle when scaling changes
+            let newX = Math.floor((Screen.width / 2) - (window.targetMasterWidth / 2));
+            masterWindow.targetX = newX;
+            masterWindow.animX = newX;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -197,7 +229,12 @@ Item {
     // -------------------------------------------------------------------------
     property var weatherData: null
     property int weatherView: 0
-    property color activeWeatherHex: weatherData && weatherData.forecast && weatherData.forecast[weatherView] ? weatherData.forecast[weatherView].hex : window.mauve
+    property color activeWeatherHex: {
+        if (!window.weatherData) return window.mauve;
+        if (window.weatherView === 0 && window.weatherData.current_hex) return window.weatherData.current_hex;
+        if (window.weatherData.forecast && window.weatherData.forecast[window.weatherView]) return window.weatherData.forecast[window.weatherView].hex;
+        return window.mauve;
+    }
 
     // Transition Properties
     property int targetWeatherView: 0
@@ -212,7 +249,17 @@ Item {
     // -------------------------------------------------------------------------
     // TEMPERATURE LOGIC 
     // -------------------------------------------------------------------------
-    property real targetTemp: window.weatherData && window.weatherData.forecast[window.targetWeatherView] ? Number(window.weatherData.forecast[window.targetWeatherView].max) : 0
+    property real targetTemp: {
+        if (!window.weatherData) return 0;
+        if (window.targetWeatherView === 0 && window.weatherData.current_temp !== undefined) {
+            return Number(window.weatherData.current_temp);
+        }
+        if (window.weatherData.forecast && window.weatherData.forecast[window.targetWeatherView]) {
+            return Number(window.weatherData.forecast[window.targetWeatherView].max);
+        }
+        return 0;
+    }
+    
     property real displayedTemp: targetTemp
 
     Behavior on displayedTemp {
@@ -240,7 +287,7 @@ Item {
         id: weatherTransitionAnim
         ParallelAnimation {
             NumberAnimation { target: window; property: "weatherContentOpacity"; to: 0.0; duration: 250; easing.type: Easing.InSine }
-            NumberAnimation { target: window; property: "weatherContentOffset"; to: window.s(-40) * weatherAnimDirection; duration: 250; easing.type: Easing.InSine }
+            NumberAnimation { target: window; property: "weatherContentOffset"; to: Math.round(-40 * window.sf) * weatherAnimDirection; duration: 250; easing.type: Easing.InSine }
             
             // Spin the 3D orbit out and scale it down for depth
             NumberAnimation { target: window; property: "transitionSpin"; to: 180 * weatherAnimDirection; duration: 300; easing.type: Easing.InBack }
@@ -249,7 +296,7 @@ Item {
         ScriptAction { 
             script: { 
                 window.weatherView = window.targetWeatherView; 
-                window.weatherContentOffset = window.s(40) * weatherAnimDirection; // Move to opposite side while hidden
+                window.weatherContentOffset = Math.round(40 * window.sf) * weatherAnimDirection; // Move to opposite side while hidden
                 
                 // Reset the spin to the opposite side so it continues spinning into place seamlessly
                 window.transitionSpin = -180 * weatherAnimDirection;
@@ -328,7 +375,7 @@ Item {
     property var scheduleData: { "header": "Loading Schedule...", "link": "", "lessons": [] }
 
     // Dynamic offset based on whether the schedule module exists
-    property real centerOffset: window.scheduleModuleExists ? window.s(-100) : 0
+    property real centerOffset: window.scheduleModuleExists ? Math.round(-100 * window.sf) : 0
     Behavior on centerOffset { NumberAnimation { duration: 600; easing.type: Easing.OutQuart } }
 
     // Check if the schedule manager script actually exists before doing anything
@@ -343,15 +390,7 @@ Item {
                     schedulePoller.running = true; // Safe to start polling
                 } else {
                     window.scheduleModuleExists = false;
-                    
-                    // --- DYNAMICALLY SHRINK THE MASTER WINDOW ---
-                    // Reach out to the global 'masterWindow' ID and update both
-                    // the morphing wrapper (animH) and the content wrapper (targetH)
-                    if (typeof masterWindow !== "undefined") {
-                        let newHeight = window.s(510);
-                        masterWindow.animH = newHeight;
-                        masterWindow.targetH = newHeight;
-                    }
+                    // Shrinking is now automatically handled by the onTargetMasterHeightChanged watcher
                 }
             }
         }
@@ -394,12 +433,12 @@ Item {
         id: calendarTransitionAnim
         ParallelAnimation {
             NumberAnimation { target: window; property: "calendarContentOpacity"; to: 0.0; duration: 200; easing.type: Easing.InSine }
-            NumberAnimation { target: window; property: "calendarContentOffset"; to: window.s(-20) * calendarAnimDirection; duration: 200; easing.type: Easing.InSine }
+            NumberAnimation { target: window; property: "calendarContentOffset"; to: Math.round(-20 * window.sf) * calendarAnimDirection; duration: 200; easing.type: Easing.InSine }
         }
         ScriptAction {
             script: {
                 window.monthOffset = window.targetMonthOffset;
-                window.calendarContentOffset = window.s(20) * calendarAnimDirection;
+                window.calendarContentOffset = Math.round(20 * window.sf) * calendarAnimDirection;
             }
         }
         ParallelAnimation {
@@ -471,7 +510,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: window.s(20)
+            radius: Math.round(20 * window.sf)
             color: window.base
             border.color: window.surface0
             border.width: 1
@@ -481,27 +520,27 @@ Item {
             // AMBIENT WIDGET COLOR BLOBS (Spread Out)
             // =======================================================
             Rectangle {
-                width: window.s(parent.width * 0.5); height: width; radius: width / 2
-                x: (parent.width * 0.75 - width / 2) + Math.cos(window.globalOrbitAngle * 1.5) * window.s(350)
-                y: (parent.height * 0.3 - height / 2) + Math.sin(window.globalOrbitAngle * 1.5) * window.s(200)
+                width: parent.width * 0.5; height: width; radius: width / 2
+                x: (parent.width * 0.75 - width / 2) + Math.cos(window.globalOrbitAngle * 1.5) * Math.round(350 * window.sf)
+                y: (parent.height * 0.3 - height / 2) + Math.sin(window.globalOrbitAngle * 1.5) * Math.round(200 * window.sf)
                 opacity: 0.025 * window.introAmbient
                 color: window.activeWeatherHex
                 Behavior on color { ColorAnimation { duration: 1000 } }
             }
 
             Rectangle {
-                width: window.s(parent.width * 0.6); height: width; radius: width / 2
-                x: (parent.width * 0.25 - width / 2) + Math.sin(window.globalOrbitAngle * 1.2) * window.s(-300)
-                y: (parent.height * 0.7 - height / 2) + Math.cos(window.globalOrbitAngle * 1.2) * window.s(-250)
+                width: parent.width * 0.6; height: width; radius: width / 2
+                x: (parent.width * 0.25 - width / 2) + Math.sin(window.globalOrbitAngle * 1.2) * Math.round(-300 * window.sf)
+                y: (parent.height * 0.7 - height / 2) + Math.cos(window.globalOrbitAngle * 1.2) * Math.round(-250 * window.sf)
                 opacity: 0.02 * window.introAmbient
                 color: window.timeColor
                 Behavior on color { ColorAnimation { duration: 1000 } }
             }
 
             Rectangle {
-                width: window.s(parent.width * 0.45); height: width; radius: width / 2
-                x: (parent.width * 0.5 - width / 2) + Math.cos(window.globalOrbitAngle * -1.8) * window.s(400)
-                y: (parent.height * 0.5 - height / 2) + Math.sin(window.globalOrbitAngle * -1.8) * window.s(-350)
+                width: parent.width * 0.45; height: width; radius: width / 2
+                x: (parent.width * 0.5 - width / 2) + Math.cos(window.globalOrbitAngle * -1.8) * Math.round(400 * window.sf)
+                y: (parent.height * 0.5 - height / 2) + Math.sin(window.globalOrbitAngle * -1.8) * Math.round(-350 * window.sf)
                 opacity: 0.015 * window.introAmbient
                 color: window.timeAccent
                 Behavior on color { ColorAnimation { duration: 1000 } }
@@ -511,9 +550,14 @@ Item {
             Text {
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: window.centerOffset
-                text: window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].icon : ""
+                text: {
+                    if (!window.weatherData) return "";
+                    if (window.weatherView === 0 && window.weatherData.current_icon) return window.weatherData.current_icon;
+                    if (window.weatherData.forecast && window.weatherData.forecast[window.weatherView]) return window.weatherData.forecast[window.weatherView].icon;
+                    return "";
+                }
                 font.family: "Iosevka Nerd Font"
-                font.pixelSize: window.s(800)
+                font.pixelSize: Math.round(800 * window.sf)
                 color: window.activeWeatherHex
                 opacity: (0.03 + (0.01 * Math.sin(window.globalOrbitAngle * 4))) * window.introAmbient * window.weatherContentOpacity
                 z: 0
@@ -522,7 +566,7 @@ Item {
                 property real drift: 0
                 SequentialAnimation on drift {
                     loops: Animation.Infinite
-                    NumberAnimation { to: window.s(-20); duration: 6000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: Math.round(-20 * window.sf); duration: 6000; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 0; duration: 6000; easing.type: Easing.InOutSine }
                 }
                 
@@ -539,7 +583,7 @@ Item {
                 id: centralHub
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: window.centerOffset
-                width: window.s(1); height: window.s(1) 
+                width: Math.round(1 * window.sf); height: Math.round(1 * window.sf) 
                 z: 5
 
                 opacity: introClock
@@ -548,7 +592,7 @@ Item {
                 property real levitation: 0
                 SequentialAnimation on levitation {
                     loops: Animation.Infinite
-                    NumberAnimation { to: window.s(-15); duration: 4000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: Math.round(-15 * window.sf); duration: 4000; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 0; duration: 4000; easing.type: Easing.InOutSine }
                 }
 
@@ -583,7 +627,7 @@ Item {
                 }
                 
                 transform: [
-                    Translate { y: window.s(25) * (1.0 - introClock) },
+                    Translate { y: Math.round(25 * window.sf) * (1.0 - introClock) },
                     Translate { y: centralHub.levitation },
                     Rotation { axis { x: 1; y: 0; z: 0 } angle: centralHub.pitchBreath },
                     Rotation { axis { x: 0; y: 1; z: 0 } angle: centralHub.yawBreath },
@@ -595,10 +639,10 @@ Item {
                 Canvas {
                     id: orbitCanvas
                     z: -10
-                    x: window.s(-400)   // Widened to prevent clipping when scaled
-                    y: window.s(-200)   // Heightened to prevent clipping when scaled
-                    width: window.s(800)
-                    height: window.s(400)
+                    x: Math.round(-400 * window.sf)   // Widened to prevent clipping when scaled
+                    y: Math.round(-200 * window.sf)   // Heightened to prevent clipping when scaled
+                    width: Math.round(800 * window.sf)
+                    height: Math.round(400 * window.sf)
                     opacity: 0.25
 
                     scale: centralHub.orbitBreath
@@ -609,16 +653,16 @@ Item {
                         var ctx = getContext("2d");
                         ctx.clearRect(0, 0, width, height);
                         ctx.beginPath();
-                        var currentRx = window.s(320);
-                        var currentRy = window.s(140);
+                        var currentRx = Math.round(320 * window.sf);
+                        var currentRy = Math.round(140 * window.sf);
                         for (var i = 0; i <= Math.PI * 2; i += 0.05) {
                             var xx = width/2 + Math.cos(i) * currentRx;
                             var yy = height/2 + Math.sin(i) * currentRy;
                             if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
                         }
                         ctx.strokeStyle = window.textAccent;
-                        ctx.lineWidth = window.s(1.5);
-                        ctx.setLineDash([window.s(4), window.s(10)]);
+                        ctx.lineWidth = Math.max(1, Math.round(1.5 * window.sf));
+                        ctx.setLineDash([Math.round(4 * window.sf), Math.round(10 * window.sf)]);
                         ctx.stroke();
                     }
                     Behavior on opacity { NumberAnimation { duration: 1500 } }
@@ -633,12 +677,12 @@ Item {
                     
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        spacing: window.s(2)
+                        spacing: Math.round(2 * window.sf)
                         Text {
                             text: Qt.formatTime(window.currentTime, "HH:mm")
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: window.s(84)
+                            font.pixelSize: Math.round(84 * window.sf)
                             color: window.text
                             style: Text.Outline; styleColor: Qt.alpha(window.crust, 0.4)
                         }
@@ -646,10 +690,10 @@ Item {
                             text: Qt.formatTime(window.currentTime, ":ss")
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: window.s(32)
+                            font.pixelSize: Math.round(32 * window.sf)
                             color: window.textAccent
                             Layout.alignment: Qt.AlignBottom
-                            Layout.bottomMargin: window.s(15)
+                            Layout.bottomMargin: Math.round(15 * window.sf)
                             opacity: window.secondPulse > 1.02 ? 1.0 : 0.6 
                             style: Text.Outline; styleColor: Qt.alpha(window.crust, 0.4)
                             Behavior on color { ColorAnimation { duration: 1000 } }
@@ -661,7 +705,7 @@ Item {
                         text: Qt.formatDateTime(window.currentTime, "dddd, MMMM dd")
                         font.family: "JetBrains Mono"
                         font.weight: Font.Bold
-                        font.pixelSize: window.s(16)
+                        font.pixelSize: Math.round(16 * window.sf)
                         color: window.subtext0
                         opacity: 0.9
                     }
@@ -685,8 +729,8 @@ Item {
                             property bool isToday: window.weatherView === 0
                             property bool isHighlighted: isToday && index === window.activeHourIndex
                             
-                            property real rx: window.s(320) * centralHub.orbitBreath
-                            property real ry: window.s(140) * centralHub.orbitBreath
+                            property real rx: Math.round(320 * window.sf) * centralHub.orbitBreath
+                            property real ry: Math.round(140 * window.sf) * centralHub.orbitBreath
                             
                             property int relIdx: isToday ? (index - window.activeHourIndex) : index
                             
@@ -700,16 +744,16 @@ Item {
 
                             x: Math.cos(rad) * rx - width/2
                             y: Math.sin(rad) * ry - height/2
-                            z: Math.sin(rad) * window.s(100) 
+                            z: Math.sin(rad) * Math.round(100 * window.sf) 
                             
                             scale: isHighlighted ? 1.4 : (isToday ? (0.95 + 0.20 * Math.sin(rad)) : (0.90 + 0.25 * Math.sin(rad)))
                             opacity: isHighlighted ? 1.0 : (isToday ? (0.7 + 0.3 * ((Math.sin(rad) + 1) / 2)) : (0.65 + 0.35 * ((Math.sin(rad) + 1) / 2)))
 
-                            width: window.s(56); height: window.s(95)
+                            width: Math.round(56 * window.sf); height: Math.round(95 * window.sf)
                             
                             Rectangle {
                                 anchors.fill: parent
-                                radius: window.s(28)
+                                radius: Math.round(28 * window.sf)
                                 color: isHighlighted ? window.textAccent : (hrMa.containsMouse ? window.surface2 : window.surface0)
                                 border.color: isHighlighted ? "transparent" : (hrMa.containsMouse ? window.textAccent : window.surface1)
                                 border.width: 1
@@ -718,28 +762,28 @@ Item {
                                 
                                 ColumnLayout {
                                     anchors.centerIn: parent 
-                                    spacing: window.s(4)
+                                    spacing: Math.round(4 * window.sf)
                                     
                                     Text { 
                                         Layout.alignment: Qt.AlignHCenter
                                         text: modelData.time
-                                        font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: window.s(12)
+                                        font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: Math.round(12 * window.sf)
                                         color: isHighlighted ? window.base : (hrMa.containsMouse ? window.text : window.overlay1)
                                     }
                                     
                                     Text { 
                                         Layout.alignment: Qt.AlignHCenter
                                         text: modelData.icon || (window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].icon : "")
-                                        font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(18)
+                                        font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(18 * window.sf)
                                         color: isHighlighted ? window.base : (modelData.hex || window.text)
                                         
-                                        transform: Translate { y: hrMa.containsMouse ? window.s(-3) : 0 }
+                                        transform: Translate { y: hrMa.containsMouse ? Math.round(-3 * window.sf) : 0 }
                                         Behavior on transform { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                                     }
                                     
                                     Text { 
                                         Layout.alignment: Qt.AlignHCenter; text: modelData.temp + "°"
-                                        font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: window.s(14)
+                                        font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: Math.round(14 * window.sf)
                                         color: isHighlighted ? window.base : window.text 
                                     }
                                 }
@@ -757,36 +801,36 @@ Item {
                 id: calendarRect
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.margins: window.s(40)
-                width: window.s(320)
-                height: window.s(420)
+                anchors.margins: Math.round(40 * window.sf)
+                width: Math.round(320 * window.sf)
+                height: Math.round(420 * window.sf)
                 color: Qt.alpha(window.surface0, 0.2) 
-                radius: window.s(14)
+                radius: Math.round(14 * window.sf)
                 border.color: Qt.alpha(window.surface1, 0.4)
                 border.width: 1
                 z: 10 
 
                 opacity: introCalendar
-                transform: Translate { x: window.s(-40) * (1.0 - introCalendar) }
+                transform: Translate { x: Math.round(-40 * window.sf) * (1.0 - introCalendar) }
 
                 HoverHandler { id: calHover }
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: window.s(25)
-                    spacing: window.s(15)
+                    anchors.margins: Math.round(25 * window.sf)
+                    spacing: Math.round(15 * window.sf)
 
                     RowLayout {
                         Layout.fillWidth: true
                         
                         // "Return to Today" Home Button
                         Rectangle {
-                            width: window.s(32); height: window.s(32); radius: window.s(16)
+                            Layout.preferredWidth: Math.round(32 * window.sf); Layout.preferredHeight: Math.round(32 * window.sf); radius: Math.round(16 * window.sf)
                             color: homeMa.containsMouse ? window.surface1 : "transparent"
                             opacity: window.targetMonthOffset !== 0 ? 1.0 : 0.0
                             visible: opacity > 0
                             Behavior on opacity { NumberAnimation { duration: 200 } }
-                            Text { anchors.centerIn: parent; text: "󰃭"; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: window.s(16) }
+                            Text { anchors.centerIn: parent; text: "󰃭"; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: Math.round(16 * window.sf) }
                             MouseArea { 
                                 id: homeMa; anchors.fill: parent; hoverEnabled: window.targetMonthOffset !== 0; 
                                 onClicked: if (window.targetMonthOffset !== 0) window.setMonthOffset(0) 
@@ -794,9 +838,9 @@ Item {
                         }
 
                         Rectangle {
-                            width: window.s(32); height: window.s(32); radius: window.s(16)
+                            Layout.preferredWidth: Math.round(32 * window.sf); Layout.preferredHeight: Math.round(32 * window.sf); radius: Math.round(16 * window.sf)
                             color: prevMa.containsMouse ? window.surface1 : "transparent"
-                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: window.s(16) }
+                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: Math.round(16 * window.sf) }
                             MouseArea { id: prevMa; anchors.fill: parent; hoverEnabled: true; onClicked: window.setMonthOffset(window.targetMonthOffset - 1) }
                         }
                         
@@ -805,7 +849,9 @@ Item {
                             text: window.targetMonthName.toUpperCase()
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: window.s(16)
+                            font.pixelSize: Math.round(16 * window.sf)
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: Math.round(8 * window.sf)
                             color: window.text
                             horizontalAlignment: Text.AlignHCenter
                             
@@ -814,16 +860,16 @@ Item {
                         }
 
                         Rectangle {
-                            width: window.s(32); height: window.s(32); radius: window.s(16)
+                            Layout.preferredWidth: Math.round(32 * window.sf); Layout.preferredHeight: Math.round(32 * window.sf); radius: Math.round(16 * window.sf)
                             color: nextMa.containsMouse ? window.surface1 : "transparent"
-                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: window.s(16) }
+                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; color: window.text; font.pixelSize: Math.round(16 * window.sf) }
                             MouseArea { id: nextMa; anchors.fill: parent; hoverEnabled: true; onClicked: window.setMonthOffset(window.targetMonthOffset + 1) }
                         }
 
                         Rectangle {
-                            width: window.s(32); height: window.s(32); radius: window.s(16)
+                            Layout.preferredWidth: Math.round(32 * window.sf); Layout.preferredHeight: Math.round(32 * window.sf); radius: Math.round(16 * window.sf)
                             color: diaryMa.containsMouse ? window.surface1 : "transparent"
-                            Text { anchors.centerIn: parent; text: "+"; font.family: "Iosevka Nerd Font"; color: diaryMa.containsMouse ? window.mauve : window.text; font.pixelSize: window.s(32) }
+                            Text { anchors.centerIn: parent; text: "+"; font.family: "Iosevka Nerd Font"; color: diaryMa.containsMouse ? window.mauve : window.text; font.pixelSize: Math.round(32 * window.sf) }
                             MouseArea { 
                                 id: diaryMa; anchors.fill: parent; hoverEnabled: true; 
                                 onClicked: Quickshell.execDetached(["bash", window.scriptsDir + "/diary_manager.sh"]) 
@@ -841,7 +887,7 @@ Item {
                                 text: modelData
                                 font.family: "JetBrains Mono"
                                 font.weight: Font.Black
-                                font.pixelSize: window.s(14)
+                                font.pixelSize: Math.round(14 * window.sf)
                                 color: window.overlay0
                                 horizontalAlignment: Text.AlignHCenter
                             }
@@ -852,8 +898,8 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         columns: 7
-                        rowSpacing: window.s(6)
-                        columnSpacing: window.s(6)
+                        rowSpacing: Math.round(6 * window.sf)
+                        columnSpacing: Math.round(6 * window.sf)
 
                         opacity: window.calendarContentOpacity
                         transform: Translate { x: window.calendarContentOffset }
@@ -865,7 +911,7 @@ Item {
                                 Layout.fillHeight: true
                                 
                                 color: isToday ? window.textAccent : (dayMa.containsMouse ? Qt.alpha(window.surface2, 0.4) : "transparent")
-                                radius: window.s(10)
+                                radius: Math.round(10 * window.sf)
                                 scale: dayMa.containsMouse ? 1.2 : 1.0
                                 border.color: isToday ? window.surface0 : (dayMa.containsMouse ? window.overlay0 : "transparent")
                                 border.width: isToday || dayMa.containsMouse ? 1 : 0
@@ -878,7 +924,7 @@ Item {
                                     text: dayNum
                                     font.family: "JetBrains Mono"
                                     font.weight: isToday ? Font.Black : Font.Bold
-                                    font.pixelSize: window.s(14)
+                                    font.pixelSize: Math.round(14 * window.sf)
                                     color: isToday ? window.base : (isCurrentMonth ? window.text : window.surface0)
                                     Behavior on color { ColorAnimation { duration: 200 } }
                                 }
@@ -896,66 +942,69 @@ Item {
             Item {
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: window.s(40)
-                width: window.s(320)
-                height: window.s(420)
+                anchors.margins: Math.round(40 * window.sf)
+                width: Math.round(320 * window.sf)
+                height: Math.round(420 * window.sf)
                 z: 10 
 
                 opacity: introWeather
-                transform: Translate { x: window.s(40) * (1.0 - introWeather) }
+                transform: Translate { x: Math.round(40 * window.sf) * (1.0 - introWeather) }
 
                 ColumnLayout {
                     anchors.fill: parent
-                    spacing: window.s(20)
+                    spacing: Math.round(20 * window.sf)
 
                     RowLayout {
+                        Layout.fillWidth: true
                         Layout.alignment: Qt.AlignRight | Qt.AlignTop
-                        spacing: window.s(20)
+                        spacing: Math.round(20 * window.sf)
                         
                         MouseArea { 
-                            id: wPrevMa; width: window.s(30); height: window.s(30); hoverEnabled: true
+                            id: wPrevMa; Layout.preferredWidth: Math.round(30 * window.sf); Layout.preferredHeight: Math.round(30 * window.sf); hoverEnabled: true
                             onClicked: window.setWeatherView(window.targetWeatherView - 1) 
                             
                             property real pulseOffset: 0
                             SequentialAnimation on pulseOffset {
                                 loops: Animation.Infinite; running: true
-                                NumberAnimation { to: window.s(-3); duration: 1000; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: Math.round(-3 * window.sf); duration: 1000; easing.type: Easing.InOutSine }
                                 NumberAnimation { to: 0; duration: 1000; easing.type: Easing.InOutSine }
                             }
                             
                             Text { 
-                                anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(18)
+                                anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(18 * window.sf)
                                 color: parent.containsMouse ? window.textAccent : window.overlay1
-                                transform: Translate { x: parent.containsMouse ? window.s(-5) : wPrevMa.pulseOffset }
+                                transform: Translate { x: parent.containsMouse ? Math.round(-5 * window.sf) : wPrevMa.pulseOffset }
                                 Behavior on transform { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
                             }
                         }
                         
                         Text {
-                            Layout.preferredWidth: window.s(110) 
+                            Layout.fillWidth: true 
                             horizontalAlignment: Text.AlignHCenter 
                             text: window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].day_full.toUpperCase() : "LOADING..."
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: window.s(16)
+                            font.pixelSize: Math.round(16 * window.sf)
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: Math.round(8 * window.sf)
                             color: window.text
                         }
                         
                         MouseArea { 
-                            id: wNextMa; width: window.s(30); height: window.s(30); hoverEnabled: true
+                            id: wNextMa; Layout.preferredWidth: Math.round(30 * window.sf); Layout.preferredHeight: Math.round(30 * window.sf); hoverEnabled: true
                             onClicked: window.setWeatherView(window.targetWeatherView + 1)
                             
                             property real pulseOffset: 0
                             SequentialAnimation on pulseOffset {
                                 loops: Animation.Infinite; running: true
-                                NumberAnimation { to: window.s(3); duration: 1000; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: Math.round(3 * window.sf); duration: 1000; easing.type: Easing.InOutSine }
                                 NumberAnimation { to: 0; duration: 1000; easing.type: Easing.InOutSine }
                             }
                             
                             Text { 
-                                anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(18)
+                                anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(18 * window.sf)
                                 color: parent.containsMouse ? window.textAccent : window.overlay1
-                                transform: Translate { x: parent.containsMouse ? window.s(5) : wNextMa.pulseOffset }
+                                transform: Translate { x: parent.containsMouse ? Math.round(5 * window.sf) : wNextMa.pulseOffset }
                                 Behavior on transform { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
                             }
                         }
@@ -963,15 +1012,15 @@ Item {
 
                     ColumnLayout {
                         Layout.alignment: Qt.AlignRight 
-                        spacing: window.s(-5)
+                        spacing: Math.round(-5 * window.sf)
                         
                         // BIG TEMPERATURE TEXT - Anchored so it doesn't slide with the wrapper
                         Text {
-                            Layout.alignment: Qt.AlignHCenter 
+                            Layout.alignment: Qt.AlignRight 
                             text: Math.round(window.displayedTemp) + "°"
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: window.s(84)
+                            font.pixelSize: Math.round(84 * window.sf)
                             color: window.tempGlowColor
                             style: Text.Outline; 
                             styleColor: window.isTempAnimating ? Qt.alpha(window.tempGlowColor, 0.5) : Qt.alpha(window.crust, 0.4)
@@ -981,11 +1030,14 @@ Item {
                         }
                         
                         Text {
-                            Layout.alignment: Qt.AlignHCenter
+                            Layout.alignment: Qt.AlignRight
+                            Layout.maximumWidth: Math.round(320 * window.sf)
+                            horizontalAlignment: Text.AlignRight
                             text: window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].desc : ""
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: window.s(16)
+                            font.pixelSize: Math.round(16 * window.sf)
+                            wrapMode: Text.WordWrap
                             color: window.textAccent
                             Behavior on color { ColorAnimation { duration: 1000 } }
                             
@@ -996,19 +1048,20 @@ Item {
 
                     Item { Layout.fillHeight: true } 
 
+                    // FIX: Replaced explicit widths and manual vertical anchors with flexible ColumnLayout containers
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignRight
-                        Layout.rightMargin: window.s(10)
-                        spacing: window.s(20)
+                        Layout.alignment: Qt.AlignHCenter 
+                        spacing: Math.round(8 * window.sf)
 
                         Repeater {
                             model: 4
 
                             Item {
                                 id: gaugeWrapper
-                                width: window.s(68)
-                                height: window.s(100)
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Math.round(100 * window.sf) // Give wrapper bounds that can expand safely
+                                
                                 scale: gaugeMa.containsMouse ? 1.15 : 1.0
                                 Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
 
@@ -1031,90 +1084,96 @@ Item {
                                     Math.max(0.0, Math.min(1.0, (forecast.feels_like + 15) / 55.0))
                                 ) : 0.0
                                 
-                                Rectangle {
-                                    anchors.top: parent.top
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    width: window.s(68); height: window.s(68); radius: window.s(34)
-                                    color: window.textAccent
-                                    opacity: gaugeMa.containsMouse ? 0.3 : 0.0
-                                    Behavior on opacity { NumberAnimation { duration: 200 } }
-                                }
-
-                                Item {
-                                    id: circleItem
-                                    width: window.s(68); height: window.s(68)
-                                    anchors.top: parent.top
-                                    anchors.horizontalCenter: parent.horizontalCenter
+                                // FIX: Use ColumnLayout to enforce perfect relative positioning instead of absolute anchors
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: Math.round(6 * window.sf)
                                     
-                                    Canvas {
-                                        id: gaugeCanvas
-                                        anchors.fill: parent
-                                        rotation: -90 
+                                    Item {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.preferredWidth: Math.round(60 * window.sf)
+                                        Layout.preferredHeight: Math.round(60 * window.sf)
                                         
-                                        property real animProgress: gaugeWrapper.gaugeFill
-                                        
-                                        Behavior on animProgress {
-                                            NumberAnimation { duration: 1000; easing.type: Easing.OutExpo }
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: width / 2
+                                            color: window.textAccent
+                                            opacity: gaugeMa.containsMouse ? 0.3 : 0.0
+                                            Behavior on opacity { NumberAnimation { duration: 200 } }
                                         }
-                                        
-                                        // Ensuring canvas draws properly regardless of initialization speed
-                                        onAnimProgressChanged: requestPaint()
-                                        onWidthChanged: requestPaint()
-                                        Component.onCompleted: requestPaint()
-                                        
-                                        onPaint: {
-                                            var ctx = getContext("2d");
-                                            ctx.clearRect(0, 0, width, height);
-                                            var r = width / 2;
+
+                                        Canvas {
+                                            id: gaugeCanvas
+                                            anchors.fill: parent
+                                            rotation: -90 
                                             
-                                            ctx.beginPath();
-                                            ctx.arc(r, r, r - window.s(4), 0, 2 * Math.PI);
-                                            ctx.strokeStyle = Qt.alpha(window.text, 0.1);
-                                            ctx.lineWidth = window.s(3);
-                                            ctx.stroke();
+                                            property real animProgress: gaugeWrapper.gaugeFill
                                             
-                                            if (animProgress > 0) {
+                                            Behavior on animProgress {
+                                                NumberAnimation { duration: 1000; easing.type: Easing.OutExpo }
+                                            }
+                                            
+                                            onAnimProgressChanged: requestPaint()
+                                            onWidthChanged: requestPaint()
+                                            Component.onCompleted: requestPaint()
+                                            
+                                            onPaint: {
+                                                var ctx = getContext("2d");
+                                                ctx.clearRect(0, 0, width, height);
+                                                var r = width / 2;
+                                                
                                                 ctx.beginPath();
-                                                ctx.arc(r, r, r - window.s(4), 0, animProgress * 2 * Math.PI);
-                                                var grad = ctx.createLinearGradient(0, 0, width, height);
-                                                grad.addColorStop(0, window.timeAccent);
-                                                grad.addColorStop(1, window.sapphire);
-                                                ctx.strokeStyle = grad;
-                                                ctx.lineWidth = window.s(4);
-                                                ctx.lineCap = "round";
+                                                ctx.arc(r, r, r - Math.round(4 * window.sf), 0, 2 * Math.PI);
+                                                ctx.strokeStyle = Qt.alpha(window.text, 0.1);
+                                                ctx.lineWidth = Math.round(3 * window.sf);
                                                 ctx.stroke();
+                                                
+                                                if (animProgress > 0) {
+                                                    ctx.beginPath();
+                                                    ctx.arc(r, r, r - Math.round(4 * window.sf), 0, animProgress * 2 * Math.PI);
+                                                    var grad = ctx.createLinearGradient(0, 0, width, height);
+                                                    grad.addColorStop(0, window.timeAccent);
+                                                    grad.addColorStop(1, window.sapphire);
+                                                    ctx.strokeStyle = grad;
+                                                    ctx.lineWidth = Math.round(4 * window.sf);
+                                                    ctx.lineCap = "round";
+                                                    ctx.stroke();
+                                                }
                                             }
                                         }
+                                        
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: gaugeWrapper.gaugeVal
+                                            font.family: "JetBrains Mono"
+                                            font.weight: Font.Black
+                                            font.pixelSize: Math.round(12 * window.sf) // Slightly reduced to guarantee fit inside circle
+                                            color: window.text
+                                        }
                                     }
                                     
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: gaugeWrapper.gaugeVal
-                                        font.family: "JetBrains Mono"
-                                        font.weight: Font.Black
-                                        font.pixelSize: window.s(14)
-                                        color: window.text
-                                    }
-                                }
-                                
-                                RowLayout {
-                                    anchors.bottom: parent.bottom
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    spacing: window.s(4)
-                                    
-                                    Text { 
-                                        text: gaugeWrapper.gaugeIcon
-                                        font.family: "Iosevka Nerd Font"
-                                        font.pixelSize: window.s(14)
-                                        color: gaugeMa.containsMouse ? window.textAccent : window.overlay0
-                                        Behavior on color { ColorAnimation { duration: 200 } }
-                                    }
-                                    Text { 
-                                        text: gaugeWrapper.gaugeLbl
-                                        font.family: "JetBrains Mono"
-                                        font.weight: Font.Bold
-                                        font.pixelSize: window.s(12)
-                                        color: window.overlay0 
+                                    RowLayout {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.fillWidth: true
+                                        spacing: Math.round(4 * window.sf)
+                                        
+                                        Text { 
+                                            text: gaugeWrapper.gaugeIcon
+                                            font.family: "Iosevka Nerd Font"
+                                            font.pixelSize: Math.round(12 * window.sf)
+                                            color: gaugeMa.containsMouse ? window.textAccent : window.overlay0
+                                            Behavior on color { ColorAnimation { duration: 200 } }
+                                        }
+                                        Text { 
+                                            text: gaugeWrapper.gaugeLbl
+                                            Layout.fillWidth: true
+                                            font.family: "JetBrains Mono"
+                                            font.weight: Font.Bold
+                                            font.pixelSize: Math.round(11 * window.sf)
+                                            fontSizeMode: Text.Fit
+                                            minimumPixelSize: Math.round(6 * window.sf)
+                                            color: window.overlay0 
+                                        }
                                     }
                                 }
                                 
@@ -1137,11 +1196,11 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: window.s(240)
+                height: Math.round(240 * window.sf)
                 z: 20 
 
                 opacity: introSchedule
-                transform: Translate { y: window.s(50) * (1.0 - introSchedule) }
+                transform: Translate { y: Math.round(50 * window.sf) * (1.0 - introSchedule) }
 
                 Rectangle {
                     anchors.fill: parent
@@ -1163,7 +1222,7 @@ Item {
                     // Wave 1 - Mauve
                     Canvas {
                         id: wave1
-                        property real wLen: window.s(100) * 2 * Math.PI
+                        property real wLen: Math.round(100 * window.sf) * 2 * Math.PI
                         width: parent.width + wLen
                         height: parent.height
                         
@@ -1176,11 +1235,11 @@ Item {
                             var cy = height / 2;
                             ctx.beginPath();
                             ctx.moveTo(0, cy);
-                            for(var i = 0; i <= width + window.s(20); i += window.s(10)) {
-                                ctx.lineTo(i, cy + Math.sin(i/window.s(100)) * window.s(30));
+                            for(var i = 0; i <= width + Math.round(20 * window.sf); i += Math.round(10 * window.sf)) {
+                                ctx.lineTo(i, cy + Math.sin(i/Math.round(100 * window.sf)) * Math.round(30 * window.sf));
                             }
                             ctx.strokeStyle = window.mauve;
-                            ctx.lineWidth = window.s(2);
+                            ctx.lineWidth = Math.round(2 * window.sf);
                             ctx.stroke();
                         }
                     }
@@ -1188,7 +1247,7 @@ Item {
                     // Wave 2 - Sapphire
                     Canvas {
                         id: wave2
-                        property real wLen: window.s(120) * 2 * Math.PI
+                        property real wLen: Math.round(120 * window.sf) * 2 * Math.PI
                         width: parent.width + wLen
                         height: parent.height
                         
@@ -1201,11 +1260,11 @@ Item {
                             var cy = height / 2;
                             ctx.beginPath();
                             ctx.moveTo(0, cy);
-                            for(var i = 0; i <= width + window.s(20); i += window.s(10)) {
-                                ctx.lineTo(i, cy + Math.sin(i/window.s(120)) * window.s(40));
+                            for(var i = 0; i <= width + Math.round(20 * window.sf); i += Math.round(10 * window.sf)) {
+                                ctx.lineTo(i, cy + Math.sin(i/Math.round(120 * window.sf)) * Math.round(40 * window.sf));
                             }
                             ctx.strokeStyle = window.sapphire;
-                            ctx.lineWidth = window.s(2);
+                            ctx.lineWidth = Math.round(2 * window.sf);
                             ctx.stroke();
                         }
                     }
@@ -1213,7 +1272,7 @@ Item {
                     // Wave 3 - Peach
                     Canvas {
                         id: wave3
-                        property real wLen: window.s(80) * 2 * Math.PI
+                        property real wLen: Math.round(80 * window.sf) * 2 * Math.PI
                         width: parent.width + wLen
                         height: parent.height
                         
@@ -1226,11 +1285,11 @@ Item {
                             var cy = height / 2;
                             ctx.beginPath();
                             ctx.moveTo(0, cy);
-                            for(var i = 0; i <= width + window.s(20); i += window.s(10)) {
-                                ctx.lineTo(i, cy + Math.sin(i/window.s(80)) * window.s(20));
+                            for(var i = 0; i <= width + Math.round(20 * window.sf); i += Math.round(10 * window.sf)) {
+                                ctx.lineTo(i, cy + Math.sin(i/Math.round(80 * window.sf)) * Math.round(20 * window.sf));
                             }
                             ctx.strokeStyle = window.peach;
-                            ctx.lineWidth = window.s(2);
+                            ctx.lineWidth = Math.round(2 * window.sf);
                             ctx.stroke();
                         }
                     }
@@ -1238,39 +1297,41 @@ Item {
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: window.s(25)
-                    spacing: window.s(15)
+                    anchors.margins: Math.round(25 * window.sf)
+                    spacing: Math.round(15 * window.sf)
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: window.s(15)
+                        spacing: Math.round(15 * window.sf)
                         
                         Rectangle {
-                            width: window.s(40); height: window.s(40); radius: window.s(20); color: window.surface0
-                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(18); color: window.textAccent }
+                            Layout.preferredWidth: Math.round(40 * window.sf); Layout.preferredHeight: Math.round(40 * window.sf); radius: Math.round(20 * window.sf); color: window.surface0
+                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(18 * window.sf); color: window.textAccent }
                         }
                         
                         Text { 
+                            Layout.fillWidth: true // FIX: Ensures text shrinks/elides instead of expanding layout infinitely
                             text: window.scheduleData ? window.scheduleData.header : "Loading Schedule..."
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: window.s(16)
+                            font.pixelSize: Math.round(16 * window.sf)
                             color: window.overlay0
+                            elide: Text.ElideRight
                         }
                         
                         Item { Layout.fillWidth: true }
                         
                         Rectangle {
-                            width: window.s(120); height: window.s(36); radius: window.s(10)
+                            Layout.preferredWidth: Math.round(120 * window.sf); Layout.preferredHeight: Math.round(36 * window.sf); radius: Math.round(10 * window.sf)
                             color: schLinkMa.containsMouse ? window.mauve : Qt.alpha(window.surface1, 0.5)
                             border.color: window.mauve; border.width: 1
                             Behavior on color { ColorAnimation { duration: 150 } }
                             
                             RowLayout {
                                 anchors.centerIn: parent
-                                spacing: window.s(6)
-                                Text { text: "Open Web"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: window.s(14); color: schLinkMa.containsMouse ? window.base : window.text }
-                                Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(14); color: schLinkMa.containsMouse ? window.base : window.text }
+                                spacing: Math.round(6 * window.sf)
+                                Text { text: "Open Web"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: Math.round(14 * window.sf); color: schLinkMa.containsMouse ? window.base : window.text }
+                                Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(14 * window.sf); color: schLinkMa.containsMouse ? window.base : window.text }
                             }
                             
                             MouseArea {
@@ -1288,7 +1349,7 @@ Item {
                             text: "Data stream offline. No scheduled events."
                             font.family: "JetBrains Mono"
                             font.italic: true
-                            font.pixelSize: window.s(14)
+                            font.pixelSize: Math.round(14 * window.sf)
                             color: window.overlay0
                             visible: window.scheduleData && window.scheduleData.lessons.length === 0
                             anchors.centerIn: parent
@@ -1298,7 +1359,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            height: window.s(2)
+                            height: Math.round(2 * window.sf)
                             color: Qt.alpha(window.surface1, 0.4)
                             visible: window.scheduleData && window.scheduleData.lessons.length > 0
                         }
@@ -1338,8 +1399,8 @@ Item {
                                         Item {
                                             id: classNode
                                             anchors.fill: parent
-                                            anchors.topMargin: window.s(10)
-                                            anchors.bottomMargin: window.s(10)
+                                            anchors.topMargin: Math.round(10 * window.sf)
+                                            anchors.bottomMargin: Math.round(10 * window.sf)
                                             visible: parent.isClass
                                             
                                             property bool isActive: parent.isClass && window.currentEpoch >= (modelData.start || 0) && window.currentEpoch <= (modelData.end || 0)
@@ -1361,8 +1422,8 @@ Item {
                                                     ctx.clearRect(0, 0, width, height);
                                                     ctx.beginPath();
                                                     ctx.moveTo(0, height);
-                                                    for(var x = 0; x <= width; x += window.s(10)) {
-                                                        ctx.lineTo(x, height/2 + Math.sin(x/window.s(25) + wavePhase) * window.s(20));
+                                                    for(var x = 0; x <= width; x += Math.round(10 * window.sf)) {
+                                                        ctx.lineTo(x, height/2 + Math.sin(x/Math.round(25 * window.sf) + wavePhase) * Math.round(20 * window.sf));
                                                     }
                                                     ctx.lineTo(width, height);
                                                     ctx.lineTo(0, height);
@@ -1376,11 +1437,11 @@ Item {
 
                                             Rectangle {
                                                 id: accentLine
-                                                width: classNode.isActive || classMa.containsMouse ? window.s(4) : window.s(2)
+                                                width: classNode.isActive || classMa.containsMouse ? Math.round(4 * window.sf) : Math.round(2 * window.sf)
                                                 anchors.left: parent.left
                                                 anchors.top: parent.top
                                                 anchors.bottom: parent.bottom
-                                                radius: window.s(2)
+                                                radius: Math.round(2 * window.sf)
                                                 color: classNode.isActive ? window.mauve : (classNode.isPast ? window.surface1 : window.surface2)
                                                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                                                 Behavior on color { ColorAnimation { duration: 200 } }
@@ -1390,15 +1451,15 @@ Item {
                                                 anchors.left: accentLine.right
                                                 anchors.right: parent.right
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                anchors.leftMargin: classMa.containsMouse ? window.s(25) : window.s(15)
+                                                anchors.leftMargin: classMa.containsMouse ? Math.round(25 * window.sf) : Math.round(15 * window.sf)
                                                 Behavior on anchors.leftMargin { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
-                                                spacing: window.s(6)
+                                                spacing: Math.round(6 * window.sf)
 
                                                 Text {
                                                     text: modelData.subject || ""
                                                     font.family: "JetBrains Mono"
                                                     font.weight: Font.Black
-                                                    font.pixelSize: window.s(16)
+                                                    font.pixelSize: Math.round(16 * window.sf)
                                                     color: classNode.isActive ? window.mauve : (classNode.isPast ? window.overlay0 : window.text)
                                                     elide: Text.ElideRight
                                                     Layout.fillWidth: true
@@ -1406,16 +1467,16 @@ Item {
 
                                                 RowLayout {
                                                     visible: !modelData.is_compact
-                                                    spacing: window.s(8)
-                                                    Text { text: "󰅐"; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(14); color: classNode.isActive ? window.mauve : window.overlay1 }
-                                                    Text { text: modelData.time || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: window.s(14); color: classNode.isActive ? window.text : window.overlay1 }
+                                                    spacing: Math.round(8 * window.sf)
+                                                    Text { text: "󰅐"; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(14 * window.sf); color: classNode.isActive ? window.mauve : window.overlay1 }
+                                                    Text { text: modelData.time || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: Math.round(14 * window.sf); color: classNode.isActive ? window.text : window.overlay1 }
                                                 }
 
                                                 RowLayout {
                                                     visible: !modelData.is_compact && (modelData.room || "") !== ""
-                                                    spacing: window.s(8)
-                                                    Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(14); color: classNode.isPast ? window.surface2 : window.peach }
-                                                    Text { text: modelData.room || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: window.s(14); color: window.subtext1; elide: Text.ElideRight; Layout.fillWidth: true }
+                                                    spacing: Math.round(8 * window.sf)
+                                                    Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: Math.round(14 * window.sf); color: classNode.isPast ? window.surface2 : window.peach }
+                                                    Text { text: modelData.room || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: Math.round(14 * window.sf); color: window.subtext1; elide: Text.ElideRight; Layout.fillWidth: true }
                                                 }
                                             }
 
@@ -1430,7 +1491,7 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 anchors.left: parent.left
                                                 anchors.right: parent.right
-                                                height: gapMa.containsMouse ? window.s(4) : window.s(2)
+                                                height: gapMa.containsMouse ? Math.round(4 * window.sf) : Math.round(2 * window.sf)
                                                 color: gapMa.containsMouse ? window.mauve : "transparent"
                                                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
                                                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -1438,9 +1499,9 @@ Item {
 
                                             Rectangle {
                                                 anchors.centerIn: parent
-                                                width: breakText.width + window.s(16)
-                                                height: window.s(24)
-                                                radius: window.s(6)
+                                                width: breakText.width + Math.round(16 * window.sf)
+                                                height: Math.round(24 * window.sf)
+                                                radius: Math.round(6 * window.sf)
                                                 color: window.mantle
                                                 border.color: window.surface2
                                                 border.width: 1
@@ -1455,7 +1516,7 @@ Item {
                                                     text: modelData.desc || ""
                                                     font.family: "JetBrains Mono"
                                                     font.weight: Font.Bold
-                                                    font.pixelSize: window.s(14)
+                                                    font.pixelSize: Math.round(14 * window.sf)
                                                     color: window.mauve
                                                 }
                                             }

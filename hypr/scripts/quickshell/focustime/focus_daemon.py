@@ -10,22 +10,34 @@ import calendar
 import re
 import signal
 import sys
+import shutil
+import glob
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 
 current_app_class = "Desktop"
 current_app_title = "Desktop"
 
-DB_DIR = os.path.expanduser("~/.local/share/focustime")
+# Use standardized dynamic paths securely
+DB_DIR = os.environ.get("QS_STATE_FOCUSTIME", os.path.expanduser("~/.local/state/quickshell/focustime"))
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "focustime.db")
 
-# Cache fallback adheres to tmpfs priority but securely falls back
-XDG_RUNTIME = os.environ.get("XDG_RUNTIME_DIR")
-if not XDG_RUNTIME:
-    XDG_RUNTIME = os.path.expanduser("~/.cache/focustime")
-    os.makedirs(XDG_RUNTIME, exist_ok=True)
-STATE_FILE = os.path.join(XDG_RUNTIME, "focustime_state.json")
+# Database Migration Fallback
+OLD_DB_DIR = os.path.expanduser("~/.local/share/focustime")
+OLD_DB_BASE = os.path.join(OLD_DB_DIR, "focustime.db")
+
+if not os.path.exists(DB_PATH) and os.path.exists(OLD_DB_BASE):
+    try:
+        # Move the main db and any shm/wal/journal files safely
+        for old_file in glob.glob(OLD_DB_BASE + "*"):
+            shutil.move(old_file, DB_DIR)
+    except Exception:
+        pass
+
+RUN_DIR = os.environ.get("QS_RUN_FOCUSTIME", "/tmp/quickshell/focustime")
+os.makedirs(RUN_DIR, exist_ok=True)
+STATE_FILE = os.path.join(RUN_DIR, "focustime_state.json")
 
 DESKTOP_CACHE_NAME = {}
 DESKTOP_CACHE_ICON = {}
@@ -169,7 +181,7 @@ def listen_hyprland_ipc():
     hypr_sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
     if not hypr_sig: return
 
-    sock_path = f"{XDG_RUNTIME}/hypr/{hypr_sig}/.socket2.sock"
+    sock_path = f"{os.environ.get('XDG_RUNTIME_DIR', '/tmp')}/hypr/{hypr_sig}/.socket2.sock"
     if not os.path.exists(sock_path):
         sock_path = f"/tmp/hypr/{hypr_sig}/.socket2.sock"
 

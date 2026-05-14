@@ -8,10 +8,13 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pam
-import "../" // Assuming scaler.qml is available here
+import "../"
 
 ShellRoot {
     id: root
+
+    Caching { id: paths }
+
     MatugenColors { id: _theme }
     readonly property color base: _theme.base
     readonly property color crust: _theme.crust
@@ -30,10 +33,9 @@ ShellRoot {
     readonly property color blue: _theme.blue
     readonly property color green: _theme.green
 
-    // Persistent Settings
-    Settings {
+    // Session Settings (Changed from Settings to QtObject to fix the Qt 6.11 initialization error)
+    QtObject {
         id: lockSettings
-        category: "QuickshellLockscreen"
         property bool hidePassword: false
         property int revealDuration: 300
     }
@@ -46,11 +48,19 @@ ShellRoot {
         property string statusText: "Locked"
     }
 
+    // Timer to safely decouple PAM execution from the main QML event loop
+    Timer {
+        id: pamActionTimer
+        interval: 50
+        onTriggered: pam.start()
+    }
+
     // System Authentication hook
     PamContext {
         id: pam
         
-        Component.onCompleted: pam.start()
+        // Defer start until after component initialization to prevent memory segfaults
+        Component.onCompleted: pamActionTimer.start()
 
         onCompleted: (result) => {
             lockUI.authenticating = false;
@@ -60,7 +70,8 @@ ShellRoot {
             } else {
                 lockUI.failed = true;
                 lockUI.statusText = "Access Denied";
-                pam.start();
+                // Defer the restart to prevent a recursive crash loop
+                pamActionTimer.start();
             }
         }
     }
@@ -101,7 +112,7 @@ ShellRoot {
                 readonly property real sc: scaler.baseScale
                 // --------------------------------
 
-                property string staticWallpaperPath: "file:///tmp/lock_bg.png"
+                property string staticWallpaperPath: "file://" + paths.getCacheDir("wallpaper_picker") + "/current_wallpaper.png"
 
                 property string batPct: "100"
                 property string batStatus: "AC"

@@ -2,11 +2,16 @@
 
 QUERY="$1"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-CACHE_DIR="$HOME/.cache/wallpaper_picker"
+
+# Import dynamic caching system
+source "$SCRIPT_DIR/../../caching.sh"
+qs_ensure_cache "wallpaper_picker"
+
+CACHE_DIR="$QS_CACHE_WALLPAPER_PICKER"
 SEARCH_DIR="$CACHE_DIR/search_thumbs"
 MAP_FILE="$CACHE_DIR/search_map.txt"
-CONTROL_FILE="/tmp/ddg_search_control"
-LOG_FILE="/tmp/qs_ddg_downloader.log"
+CONTROL_FILE="$QS_RUN_WALLPAPER_PICKER/ddg_search_control"
+LOG_FILE="$QS_LOG_DIR/ddg_downloader.log"
 
 echo "=== Starting search for: $QUERY ===" > "$LOG_FILE"
 
@@ -14,7 +19,7 @@ echo "=== Starting search for: $QUERY ===" > "$LOG_FILE"
 mkdir -p "$SEARCH_DIR"
 
 # 2. The Pipe: Python provides links, OS provides backpressure
-python3 -u "$SCRIPT_DIR/get_ddg_links.py" "$QUERY" | while IFS='|' read -r thumb_url full_url; do
+python3 -u "$SCRIPT_DIR/quickshell/wallpaper/get_ddg_links.py" "$QUERY" | while IFS='|' read -r thumb_url full_url; do
     
     # 3. Safely read control file
     state=$(cat "$CONTROL_FILE" 2>/dev/null | tr -d '[:space:]')

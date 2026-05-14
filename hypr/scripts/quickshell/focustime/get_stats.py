@@ -5,10 +5,10 @@ import os
 import argparse
 import calendar
 import re
+import shutil
+import glob
 from datetime import date, timedelta
 from collections import defaultdict
-
-DB_PATH = os.path.expanduser("~/.local/share/focustime/focustime.db")
 
 DESKTOP_CACHE_NAME = {}
 DESKTOP_CACHE_ICON = {}
@@ -91,24 +91,41 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("date", nargs="?", default=date.today().isoformat())
     parser.add_argument("--app", type=str, default=None, help="Filter stats by app_class")
+    parser.add_argument("--db-dir", type=str, default=None, help="Dynamic directory for the database")
     args = parser.parse_args()
 
     target_date_str = args.date
     app_filter = args.app
+    
+    db_dir = args.db_dir if args.db_dir else os.environ.get("QS_STATE_FOCUSTIME", os.path.expanduser("~/.local/state/quickshell/focustime"))
+    db_path = os.path.join(db_dir, "focustime.db")
+
+    # Database Migration Fallback
+    old_db_dir = os.path.expanduser("~/.local/share/focustime")
+    old_db_base = os.path.join(old_db_dir, "focustime.db")
+    
+    if not os.path.exists(db_path) and os.path.exists(old_db_base):
+        os.makedirs(db_dir, exist_ok=True)
+        try:
+            # Move the main db and any shm/wal/journal files safely
+            for old_file in glob.glob(old_db_base + "*"):
+                shutil.move(old_file, db_dir)
+        except Exception:
+            pass
 
     try:
         target_date = date.fromisoformat(target_date_str)
     except ValueError:
         target_date = date.today()
 
-    if not os.path.exists(DB_PATH):
+    if not os.path.exists(db_path):
         print(json.dumps({
             "total": 0, "average": 0, "week_range": "", "yesterday": 0, "current": "History", 
             "apps": [], "week_apps": [], "week": [], "month": [], "hourly": [0]*48, "week_heatmap": [[0]*24 for _ in range(7)], "peak_usage_str": "N/A"
         }))
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     yesterday = target_date - timedelta(days=1)

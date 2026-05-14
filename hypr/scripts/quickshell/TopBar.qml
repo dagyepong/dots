@@ -1,4 +1,3 @@
-//@pragma UseQApplication
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
@@ -14,7 +13,16 @@ Variants {
         PanelWindow {
             id: barWindow
             property bool pendingReload: false
+            
+	    Caching { id: paths }
 
+	    Component.onCompleted: {
+ 	        console.log("runDir:", paths.runDir)
+ 	        console.log("manual path:", paths.runDir + "/workspaces")
+ 	        console.log("env test:", Quickshell.env("QS_RUN_WORKSPACES"))
+ 	        console.log("wsPath:", paths.getRunDir("workspaces"))
+	    }	     	
+        
             IpcHandler {
                 target: "topbar"
                 function forceReload() {
@@ -26,6 +34,9 @@ Variants {
                     } else {
                         barWindow.pendingReload = true
                     }
+                }
+                function toggleUpdate() {
+                    barWindow.forceUpdateShow = !barWindow.forceUpdateShow
                 }
             }
 
@@ -53,7 +64,7 @@ Variants {
 
             height: barHeight
             margins { top: s(8); bottom: 0; left: s(4); right: s(4) }
-            exclusiveZone: barHeight + s(4)
+            exclusiveZone: barHeight 
             color: "transparent"
 
             MatugenColors {
@@ -62,11 +73,21 @@ Variants {
 
             property bool showHelpIcon: true
             property bool isRecording: false
+            
             property bool updateAvailable: false
+            property bool forceUpdateShow: false
+            property bool isUpdateVisible: updateAvailable || forceUpdateShow
+            
             property int workspaceCount: 8
             
             property string activeWidget: "" 
             property bool isSettingsOpen: activeWidget === "settings"
+
+            property real settingsSlideProgress: isSettingsOpen ? 1.0 : 0.0
+            Behavior on settingsSlideProgress { 
+                enabled: barWindow.startupCascadeFinished
+                NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
+            }
 
             onIsSettingsOpenChanged: {
                 if (!barWindow.isSettingsOpen && barWindow.pendingReload) {
@@ -77,7 +98,7 @@ Variants {
 
             Process {
                 id: widgetPoller
-                command: ["bash", "-c", "cat /tmp/qs_current_widget 2>/dev/null || echo ''"]
+                command: ["bash", "-c", "cat " + paths.runDir + "/current_widget 2>/dev/null || echo ''"]
                 running: true
                 stdout: StdioCollector {
                     onStreamFinished: {
@@ -89,7 +110,7 @@ Variants {
 
             Process {
                 id: widgetWatcher
-                command: ["bash", "-c", "while [ ! -f /tmp/qs_current_widget ]; do sleep 1; done; inotifywait -qq -e modify,close_write /tmp/qs_current_widget"]
+                command: ["bash", "-c", "while [ ! -f " + paths.runDir + "/current_widget ]; do sleep 1; done; inotifywait -qq -e modify,close_write " + paths.runDir + "/current_widget"]
                 running: true
                 onExited: {
                     widgetPoller.running = false;
@@ -101,7 +122,7 @@ Variants {
             
             Process {
                 id: recPoller
-                command: ["bash", "-c", "if [ -s ~/.cache/qs_recording_state/rec_pid ] && kill -0 $(cat ~/.cache/qs_recording_state/rec_pid) 2>/dev/null; then echo '1'; else echo '0'; fi"]
+                command: ["bash", "-c", "if [ -s " + paths.getCacheDir("recording") + "/rec_pid ] && kill -0 $(cat " + paths.getCacheDir("recording") + "/rec_pid) 2>/dev/null; then echo '1'; else echo '0'; fi"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         barWindow.isRecording = (this.text.trim() === "1");
@@ -109,32 +130,40 @@ Variants {
                 }
             }
 
-            Timer {
-                interval: 500; running: true; repeat: true
-                onTriggered: {
-                    recPoller.running = false;
-                    recPoller.running = true;
-                }
-            }
-
             Process {
-                id: updatePoller
-                command: ["bash", "-c", "if [ -f ~/.cache/qs_update_pending ]; then echo '1'; else echo '0'; fi"]
-                stdout: StdioCollector {
-                    onStreamFinished: {
-                        barWindow.updateAvailable = (this.text.trim() === "1");
-                    }
-                }
-            }
-
-            Timer {
-                interval: 2000; running: true; repeat: true
-                onTriggered: {
-                    updatePoller.running = false;
-                    updatePoller.running = true;
-                }
-            }
-            
+ 	    	id: recWatcher
+ 		running: true
+ 		command: ["bash", "-c", "inotifywait -qq -e create,delete,modify,close_write " + paths.getCacheDir("recording") + "/ 2>/dev/null || sleep 2"]
+ 	        onExited: {
+ 	        	recPoller.running = false;
+ 	         	recPoller.running = true;
+ 	         	running = false;
+ 	         	running = true;
+ 	        }
+	    }	  
+            Process {
+	        id: updatePoller
+	        command: ["bash", "-c", "if [ -f " + paths.getCacheDir("updater") + "/update_pending ]; then echo '1'; else echo '0'; fi"]
+	        running: true
+	        stdout: StdioCollector {
+	            onStreamFinished: {
+	                barWindow.updateAvailable = (this.text.trim() === "1");
+	            }
+	        }
+	    }
+	    
+	    Process {
+	        id: updateWatcher
+	        running: true
+	        command: ["bash", "-c", "inotifywait -qq -e create,delete,close_write " + paths.getCacheDir("updater") + "/ 2>/dev/null || sleep 5"]
+	        onExited: {
+	            updatePoller.running = false;
+	            updatePoller.running = true;
+	            running = false;
+	            running = true;
+	        }
+	    }
+	                
             Process {
                 id: settingsReader
                 command: ["bash", "-c", "cat ~/.config/hypr/settings.json 2>/dev/null || echo '{}'"]
@@ -248,7 +277,7 @@ Variants {
             property bool isMediaActive: barWindow.musicData.status !== "Stopped" && barWindow.musicData.title !== ""
             property bool isWifiOn: barWindow.wifiStatus.toLowerCase() === "enabled" || barWindow.wifiStatus.toLowerCase() === "on"
             property bool isBtOn: barWindow.btStatus.toLowerCase() === "enabled" || barWindow.btStatus.toLowerCase() === "on"
-            property bool showEthernet: barWindow.isDesktop && !barWindow.isWifiOn
+            property bool showEthernet: barWindow.ethStatus === "Connected" || (barWindow.isDesktop && !barWindow.isWifiOn)
             
             property bool isSoundActive: !barWindow.isMuted && parseInt(barWindow.volPercent) > 0
             property int batCap: parseInt(barWindow.batPercent) || 0
@@ -262,13 +291,14 @@ Variants {
 
             Process {
                 id: wsDaemon
-                command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/workspaces.sh"]
+                command: ["bash", "-c", "~/.config/hypr/scripts/workspaces.sh"]
                 running: true
             }
 
             Process {
-                id: wsReader
-                command: ["cat", "/tmp/qs_workspaces.json"]
+		id: wsReader
+		running: true
+                command: ["cat", paths.getRunDir("workspaces") + "/workspaces.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();
@@ -310,7 +340,7 @@ Variants {
             Process {
                 id: wsWatcher
                 running: true
-                command: ["bash", "-c", "inotifywait -qq -e close_write,modify /tmp/qs_workspaces.json"]
+                command: ["bash", "-c", "inotifywait -qq -e close_write,modify " + paths.getRunDir("workspaces") + "/workspaces.json"]
                 onExited: {
                     wsReader.running = false;
                     wsReader.running = true;
@@ -322,7 +352,7 @@ Variants {
             Process {
                 id: musicForceRefresh
                 running: true
-                command: ["bash", "-c", "bash ~/.config/hypr/scripts/quickshell/music/music_info.sh | tee /tmp/music_info.json"]
+                command: ["bash", "-c", "bash ~/.config/hypr/scripts/quickshell/music/music_info.sh | tee " + paths.getRunDir("music") + "/music_info.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();
@@ -335,7 +365,7 @@ Variants {
 
             Timer {
                 interval: 1000
-                running: true
+                running: barWindow.musicData !== null && barWindow.musicData.status === "Playing"
                 repeat: true
                 onTriggered: {
                     if (!barWindow.musicData || barWindow.musicData.status !== "Playing") return;
@@ -390,6 +420,17 @@ Variants {
                     musicForceRefresh.running = true;
                     running = false;
                     running = true;
+                }
+            }
+
+            Timer {
+                id: artRetryTimer
+                interval: 500
+                repeat: true
+                running: barWindow.displayArtUrl && barWindow.displayArtUrl.indexOf("placeholder_blank.png") !== -1
+                onTriggered: {
+                    musicForceRefresh.running = false;
+                    musicForceRefresh.running = true;
                 }
             }
 
@@ -496,7 +537,6 @@ Variants {
             }
             Process { id: batteryWaiter; command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/watchers/battery_wait.sh"]; onExited: { batteryPoller.running = false; batteryPoller.running = true; } }
 
-
             Process {
                 id: weatherPoller
                 command: ["bash", "-c", `
@@ -568,13 +608,13 @@ Variants {
                         onTriggered: leftContent.showLayout = true
                     }
 
-                    property real targetWidth: leftLayout.width + barWindow.s(16)
-                    width: targetWidth
-                    Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                    width: leftLayout.width + barWindow.s(16)
 
                     Row {
                         id: leftLayout
-                        anchors.centerIn: parent
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.leftMargin: barWindow.s(8)
                         spacing: barWindow.s(4)
                         
                         property int pillHeight: barWindow.s(34)
@@ -633,7 +673,7 @@ Variants {
                                 id: searchMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/rofi_show.sh drun"])
+                                onClicked: Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs_manager.sh toggle applauncher"])
                             }
                         }
 
@@ -665,35 +705,55 @@ Variants {
                         Rectangle {
                             id: updateButton
                             property bool isHovered: updateMouse.containsMouse
-                            color: isHovered ? Qt.rgba(mocha.surface1.r, mocha.surface1.g, mocha.surface1.b, 0.6) : "transparent"
+                            color: isHovered ? Qt.rgba(mocha.green.r, mocha.green.g, mocha.green.b, 0.15) : "transparent"
                             radius: barWindow.s(10)
                             
-                            property real targetWidth: barWindow.updateAvailable ? barWindow.s(34) : 0
-                            width: targetWidth
+                            width: barWindow.isUpdateVisible ? barWindow.s(34) : 0
                             height: parent.pillHeight
                             
-                            visible: targetWidth > 0 || opacity > 0
-                            opacity: barWindow.updateAvailable ? 1.0 : 0.0
-                            clip: true
+                            visible: width > 0 || opacity > 0
+                            opacity: barWindow.isUpdateVisible ? 1.0 : 0.0
+                            clip: false 
                             
                             Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                             Behavior on opacity { NumberAnimation { duration: 300 } }
                             Behavior on color { ColorAnimation { duration: 200 } }
                             
-                            property color pulseColor: mocha.green
-                            SequentialAnimation on pulseColor {
-                                running: barWindow.updateAvailable
-                                loops: Animation.Infinite
-                                ColorAnimation { to: mocha.teal; duration: 1500; easing.type: Easing.InOutSine }
-                                ColorAnimation { to: mocha.green; duration: 1500; easing.type: Easing.InOutSine }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width
+                                height: parent.height
+                                radius: parent.radius
+                                color: mocha.green
+                                z: -1
+                                
+                                SequentialAnimation on scale {
+                                    running: barWindow.isUpdateVisible && !updateButton.isHovered
+                                    loops: Animation.Infinite
+                                    NumberAnimation { from: 1.0; to: 1.3; duration: 2000; easing.type: Easing.OutCubic }
+                                }
+                                SequentialAnimation on opacity {
+                                    running: barWindow.isUpdateVisible && !updateButton.isHovered
+                                    loops: Animation.Infinite
+                                    NumberAnimation { from: 0.15; to: 0.0; duration: 2000; easing.type: Easing.OutCubic }
+                                }
                             }
                             
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰚰"
                                 font.family: "Iosevka Nerd Font"; font.pixelSize: barWindow.s(22)
-                                color: parent.isHovered ? mocha.text : parent.pulseColor
+                                color: parent.isHovered ? mocha.text : mocha.green
                                 Behavior on color { ColorAnimation { duration: 200 } }
+                                
+                                rotation: parent.isHovered ? 360 : 0
+                                Behavior on rotation {
+                                    NumberAnimation { 
+                                        duration: 600
+                                        easing.type: Easing.OutBack
+                                    }
+                                }
+
                                 scale: parent.isHovered ? 1.15 : 1.0
                                 Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
                             }
@@ -704,7 +764,8 @@ Variants {
                                 hoverEnabled: true
                                 onClicked: {
                                     barWindow.updateAvailable = false;
-                                    Quickshell.execDetached(["bash", "-c", "rm -f ~/.cache/qs_update_pending && ~/.config/hypr/scripts/qs_manager.sh toggle updater"]);
+                                    barWindow.forceUpdateShow = false;
+                                    Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs_manager.sh toggle updater"]);
                                 }
                             }
                         }
@@ -719,25 +780,17 @@ Variants {
                     y: (parent.height - barWindow.barHeight) / 2
                     clip: true
                     
-                    property real targetWidth: workspacesModel.count > 0 ? wsLayout.implicitWidth + barWindow.s(20) : 0
+                    width: workspacesModel.count > 0 ? wsLayout.implicitWidth + barWindow.s(20) : 0
                     
-                    property real defaultX: leftContent.width + barWindow.s(4)
-                    property real settingsX: mediaBox.settingsX - targetWidth - (targetWidth > 0 ? barWindow.s(4) : 0)
+                    property real defaultX: leftContent.x + leftContent.width + barWindow.s(4)
+                    property real settingsX: mediaBox.settingsX - width - (width > 0 ? barWindow.s(4) : 0)
                                         
-                    property real targetX: barWindow.isSettingsOpen ? settingsX : defaultX
-                    x: targetX
-                    Behavior on x { 
-                        enabled: barWindow.startupCascadeFinished
-                        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
-                    }
+                    x: defaultX + (settingsX - defaultX) * barWindow.settingsSlideProgress
 
                     property bool limitActive: barWindow.isSettingsOpen && barWindow.isMediaActive
 
-                    width: targetWidth
-                    visible: targetWidth > 0 || opacity > 0
+                    visible: width > 0 || opacity > 0
                     opacity: workspacesModel.count > 0 ? 1 : 0
-                    
-                    Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                     Behavior on opacity { NumberAnimation { duration: 300 } }
 
                     Rectangle {
@@ -760,7 +813,9 @@ Variants {
                             prevIdx = curIdx;
                         }
 
-                        property real targetLeft: wsLayout.x + curIdx * barWindow.s(38)
+                        // FIXED: Calculate step size to perfectly match the rounded width + rounded spacing of the Row elements.
+                        property real stepSize: barWindow.s(32) + barWindow.s(6)
+                        property real targetLeft: wsLayout.x + (curIdx * stepSize)
                         property real targetRight: targetLeft + barWindow.s(32)
 
                         property real actualLeft: targetLeft
@@ -859,26 +914,16 @@ Variants {
                     height: barWindow.barHeight
                     clip: true 
                     
-                    property real activeMediaWidth: innerMediaLayout.implicitWidth
-                    Behavior on activeMediaWidth { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                    width: barWindow.isMediaActive ? innerMediaLayout.implicitWidth + barWindow.s(24) : 0
+                    Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
 
-                    property real targetWidth: barWindow.isMediaActive ? activeMediaWidth + barWindow.s(24) : 0
+                    property real defaultX: workspacesBox.defaultX + workspacesBox.width + (workspacesBox.width > 0 ? barWindow.s(4) : 0)
+                    property real settingsX: centerBox.settingsX - width - (width > 0 ? barWindow.s(4) : 0)
 
-                    property real defaultX: workspacesBox.defaultX + workspacesBox.targetWidth + (workspacesBox.targetWidth > 0 ? barWindow.s(4) : 0)
-                    property real settingsX: centerBox.settingsX - targetWidth - (targetWidth > 0 ? barWindow.s(4) : 0)
+                    x: defaultX + (settingsX - defaultX) * barWindow.settingsSlideProgress
 
-                    property real targetX: barWindow.isSettingsOpen ? settingsX : defaultX
-                    x: targetX
-                    Behavior on x { 
-                        enabled: barWindow.startupCascadeFinished
-                        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
-                    }
-
-                    width: targetWidth
-                    visible: targetWidth > 0 || opacity > 0
+                    visible: width > 0 || opacity > 0
                     opacity: barWindow.isMediaActive ? 1.0 : 0.0
-
-                    Behavior on width { NumberAnimation { duration: 700; easing.type: Easing.OutQuint } }
                     Behavior on opacity { NumberAnimation { duration: 400 } }
                     
                     Item {
@@ -1013,21 +1058,15 @@ Variants {
                     y: (parent.height - barWindow.barHeight) / 2
                     height: barWindow.barHeight
                     
-                    property real targetWidth: centerLayout.implicitWidth + barWindow.s(36)
-                    width: targetWidth
+                    width: centerLayout.implicitWidth + barWindow.s(36)
                     Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
                     
-                    property real pureCenter: (parent.width - targetWidth) / 2
-                    property real minCenterDefaultX: mediaBox.defaultX + mediaBox.targetWidth + (mediaBox.targetWidth > 0 ? barWindow.s(4) : 0)
-                    property real settingsX: barWindow.width - rightContent.width - targetWidth - barWindow.s(4)
+                    property real pureCenter: (parent.width - width) / 2
+                    property real minCenterDefaultX: mediaBox.defaultX + mediaBox.width + (mediaBox.width > 0 ? barWindow.s(4) : 0)
+                    property real settingsX: barWindow.width - rightContent.width - width - barWindow.s(4)
                     property real defaultX: Math.max(minCenterDefaultX, pureCenter)
                     
-                    property real targetX: barWindow.isSettingsOpen ? settingsX : defaultX
-                    x: targetX
-                    Behavior on x { 
-                        enabled: barWindow.startupCascadeFinished
-                        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
-                    }
+                    x: defaultX + (settingsX - defaultX) * barWindow.settingsSlideProgress
                     
                     property bool showLayout: false
                     opacity: showLayout ? 1 : 0
@@ -1451,9 +1490,7 @@ Variants {
 
                                 Row { 
                                     id: batLayoutRow
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: barWindow.s(12)
+                                    anchors.centerIn: parent
                                     spacing: barWindow.s(8)
                                     Text { 
                                         anchors.verticalCenter: parent.verticalCenter
@@ -1471,11 +1508,10 @@ Variants {
                                     }
                                 }
                                 MouseArea { id: batMouse; hoverEnabled: true; anchors.fill: parent; onClicked: Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs_manager.sh toggle battery"]) }
-                            }
-                        }
-                    }
-                    
-                    Rectangle {
+                            }                       
+                 }
+            }
+            Rectangle {
                         id: recButton
                         property bool isHovered: recMouse.containsMouse
                         
@@ -1530,7 +1566,7 @@ Variants {
                                 Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/screenshot.sh"]); 
                             }
                         }
-                    }                   
+                    }
                 }
             }
         }

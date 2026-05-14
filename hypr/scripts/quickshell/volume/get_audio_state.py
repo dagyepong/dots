@@ -22,22 +22,38 @@ def get_valid_string(*args):
             return str(arg)
     return ""
 
+def get_wpctl_default(node_target):
+    """Gets the accurate default node name directly from WirePlumber."""
+    try:
+        out = run_cmd(f"wpctl inspect {node_target}")
+        for line in out.splitlines():
+            if "node.name" in line:
+                parts = line.split("=", 1)
+                if len(parts) == 2:
+                    return parts[1].strip().strip('"')
+    except:
+        pass
+    return ""
+
 def get_data():
     sinks = parse_pactl(run_cmd("pactl -f json list sinks"))
     sources = parse_pactl(run_cmd("pactl -f json list sources"))
     sink_inputs = parse_pactl(run_cmd("pactl -f json list sink-inputs"))
     
-    # Get defaults
-    try:
-        info = parse_pactl(run_cmd("pactl -f json info"))
-        default_sink = info.get("default_sink_name", "")
-        default_source = info.get("default_source_name", "")
-    except:
-        default_sink = ""
-        default_source = ""
+    # Use wpctl for accurate default nodes under PipeWire
+    default_sink = get_wpctl_default("@DEFAULT_AUDIO_SINK@")
+    default_source = get_wpctl_default("@DEFAULT_AUDIO_SOURCE@")
+
+    # Fallback to pactl info if wpctl fails
+    if not default_sink or not default_source:
+        try:
+            info = parse_pactl(run_cmd("pactl -f json info"))
+            if not default_sink: default_sink = info.get("default_sink_name", "")
+            if not default_source: default_source = info.get("default_source_name", "")
+        except:
+            pass
 
     def format_node(n, is_default=False, is_app=False):
-        # Extract volume gracefully
         vol = 0
         if "volume" in n and isinstance(n["volume"], dict):
             if "front-left" in n["volume"]:
@@ -66,16 +82,23 @@ def get_data():
             "icon": icon
         }
 
-    # Filter out empty apps/system sounds
     apps = []
     for s in sink_inputs:
         props = s.get("properties", {})
         if props.get("application.id") != "org.PulseAudio.pavucontrol":
             apps.append(format_node(s, is_app=True))
 
+    # Filter out monitor sources so outputs don't show up in the inputs tab
+    real_inputs = []
+    for s in sources:
+        props = s.get("properties", {})
+        if props.get("device.class") == "monitor" or str(s.get("name", "")).endswith(".monitor"):
+            continue
+        real_inputs.append(format_node(s, s.get("name") == default_source))
+
     out = {
         "outputs": [format_node(s, s.get("name") == default_sink) for s in sinks],
-        "inputs": [format_node(s, s.get("name") == default_source) for s in sources],
+        "inputs": real_inputs,
         "apps": apps
     }
     

@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 
-# Force standard C locale for number formatting (fixes printf decimal/comma issues on varying OS locales)
-export LC_NUMERIC=C
+# -----------------------------------------------------------------------------
+# CACHING & MIGRATION
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+qs_ensure_cache "weather"
+
+# Force standard C locale for number formatting and date parsing (fixes printf and date command issues on varying OS locales)
+export LC_ALL=C
 
 # Paths
-cache_dir="$HOME/.cache/quickshell/weather"
+cache_dir="$QS_CACHE_WEATHER"
 json_file="${cache_dir}/weather.json"
 view_file="${cache_dir}/view_id"
 daily_cache_file="${cache_dir}/daily_weather_cache.json"
@@ -22,15 +28,22 @@ KEY="$OPENWEATHER_KEY"
 ID="$OPENWEATHER_CITY_ID"
 UNIT="${OPENWEATHER_UNIT:-metric}" # Default to metric if not set
 
+# Determine temperature symbol based on unit
+case "$UNIT" in
+    "imperial") UNIT_SYM="°F" ;;
+    "standard") UNIT_SYM="K" ;;
+    *) UNIT_SYM="°C" ;;
+esac
+
 mkdir -p "${cache_dir}"
 
 get_icon() {
     case $1 in
-        "50d"|"50n") icon=""; quote="Mist" ;;
+        "50d"|"50n") icon="󰖑"; quote="Mist" ;;
         "01d") icon=""; quote="Sunny" ;;
         "01n") icon=""; quote="Clear" ;;
         "02d"|"02n"|"03d"|"03n"|"04d"|"04n") icon=""; quote="Cloudy" ;;
-        "09d"|"09n"|"10d"|"10n") icon=""; quote="Rainy" ;;
+        "09d"|"09n"|"10d"|"10n") icon="󰖗"; quote="Rainy" ;;
         "11d"|"11n") icon=""; quote="Storm" ;;
         "13d"|"13n") icon=""; quote="Snow" ;;
         *) icon=""; quote="Unknown" ;;
@@ -77,7 +90,7 @@ write_dummy_data() {
         },"
     done
     final_json="${final_json%,}]"
-    echo "{ \"forecast\": ${final_json} }" > "${json_file}"
+    echo "{ \"current_temp\": \"0.0\", \"current_icon\": \"\", \"current_hex\": \"#cdd6f4\", \"forecast\": ${final_json} }" > "${json_file}"
 }
 
 get_data() {
@@ -95,13 +108,28 @@ get_data() {
     forecast_url="http://api.openweathermap.org/data/2.5/forecast?APPID=${KEY}&id=${ID}&units=${UNIT}"
     raw_api=$(curl -sf "$forecast_url")
     
-    # Check if curl failed OR if OpenWeather returned an error (like 401 for pending keys)
+    weather_url="http://api.openweathermap.org/data/2.5/weather?APPID=${KEY}&id=${ID}&units=${UNIT}"
+    raw_weather=$(curl -sf "$weather_url")
+    
+    # Check if curl failed OR if OpenWeather returned an error
     api_cod=$(echo "$raw_api" | jq -r '.cod' 2>/dev/null)
     
-    if [ -z "$raw_api" ] || [[ "$api_cod" != "200" ]]; then
-        write_dummy_data
+    if [ -z "$raw_api" ] || [ -z "$raw_weather" ] || [[ "$api_cod" != "200" ]]; then
+        # If curl failed (network glitch, rate limit, API downtime), don't destroy
+        # the existing working cache. Just abort the update.
+        # If there is NO cache at all, then fall back to dummy data.
+        if [ ! -f "$json_file" ]; then
+            write_dummy_data
+        fi
         return
     fi
+
+    # Parse LIVE current weather conditions to bypass UTC boundary issues
+    c_temp=$(echo "$raw_weather" | jq -r '.main.temp')
+    c_temp=$(printf "%.1f" "$c_temp")
+    c_code=$(echo "$raw_weather" | jq -r '.weather[0].icon')
+    c_icon=$(get_icon "$c_code" | cut -d'|' -f1)
+    c_hex=$(get_hex "$c_code")
 
     current_date=$(date +%Y-%m-%d)
     tomorrow_date=$(date -d "tomorrow" +%Y-%m-%d)
@@ -212,7 +240,7 @@ get_data() {
         done
         final_json="${final_json%,}]"
 
-        echo "{ \"forecast\": ${final_json} }" > "${json_file}"
+        echo "{ \"current_temp\": \"${c_temp}\", \"current_icon\": \"${c_icon}\", \"current_hex\": \"${c_hex}\", \"forecast\": ${final_json} }" > "${json_file}"
     fi
 }
 
@@ -274,22 +302,32 @@ elif [[ "$1" == "--icon" ]]; then
 
 elif [[ "$1" == "--temp" ]]; then 
     t=$(cat "$json_file" | jq -r '.forecast[0].max')
-    echo "${t}°C"
+    echo "${t}${UNIT_SYM}"
 
 elif [[ "$1" == "--hex" ]]; then 
     cat "$json_file" | jq -r '.forecast[0].hex'
 
-# --- NEW HOURLY MODES FOR TOPBAR ---
 elif [[ "$1" == "--current-icon" ]]; then
-    curr_time=$(date +%H:%M)
-    cat "$json_file" | jq -r --arg ct "$curr_time" '(.forecast[0].hourly | map(select(.time <= $ct)) | last) // .forecast[0].hourly[0] | .icon'
+    icon=$(cat "$json_file" | jq -r '.current_icon // empty')
+    if [[ -z "$icon" || "$icon" == "null" ]]; then 
+        get_data
+        icon=$(cat "$json_file" | jq -r '.current_icon')
+    fi
+    echo "$icon"
 
 elif [[ "$1" == "--current-temp" ]]; then 
-    curr_time=$(date +%H:%M)
-    t=$(cat "$json_file" | jq -r --arg ct "$curr_time" '(.forecast[0].hourly | map(select(.time <= $ct)) | last) // .forecast[0].hourly[0] | .temp')
-    echo "${t}°C"
+    t=$(cat "$json_file" | jq -r '.current_temp // empty')
+    if [[ -z "$t" || "$t" == "null" ]]; then 
+        get_data
+        t=$(cat "$json_file" | jq -r '.current_temp')
+    fi
+    echo "${t}${UNIT_SYM}"
 
 elif [[ "$1" == "--current-hex" ]]; then
-    curr_time=$(date +%H:%M)
-    cat "$json_file" | jq -r --arg ct "$curr_time" '(.forecast[0].hourly | map(select(.time <= $ct)) | last) // .forecast[0].hourly[0] | .hex'
+    hex=$(cat "$json_file" | jq -r '.current_hex // empty')
+    if [[ -z "$hex" || "$hex" == "null" ]]; then 
+        get_data
+        hex=$(cat "$json_file" | jq -r '.current_hex')
+    fi
+    echo "$hex"
 fi

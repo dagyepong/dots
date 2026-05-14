@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 
+# -----------------------------------------------------------------------------
+# CACHING & MIGRATION
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/caching.sh"
+qs_ensure_cache "workspaces"
+
 # ============================================================================
 # 1. ZOMBIE PREVENTION
 # Kills any older instances of this script. When Quickshell reloads, 
 # it can leave the old listener pipelines running in the background infinitely.
 # ============================================================================
-for pid in $(pgrep -f "quickshell/workspaces.sh"); do
+for pid in $(pgrep -f "workspaces.sh"); do
     if [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ]; then
         kill -9 "$pid" 2>/dev/null
     fi
@@ -19,7 +25,7 @@ trap cleanup EXIT SIGTERM SIGINT
 
 # --- Special Cleanup for Network/Bluetooth ---
 # The network toggle starts a background bluetooth scan that must be killed explicitly.
-BT_PID_FILE="$HOME/.cache/bt_scan_pid"
+BT_PID_FILE="$QS_RUN_WORKSPACES/bt_scan_pid"
 
 if [ -f "$BT_PID_FILE" ]; then
     kill $(cat "$BT_PID_FILE") 2>/dev/null
@@ -68,9 +74,9 @@ print_workspaces() {
                 tooltip: $win
             }
         )
-    ' > /tmp/qs_workspaces.tmp
+    ' > "$QS_RUN_WORKSPACES/workspaces.tmp"
     
-    mv /tmp/qs_workspaces.tmp /tmp/qs_workspaces.json
+    mv "$QS_RUN_WORKSPACES/workspaces.tmp" "$QS_RUN_WORKSPACES/workspaces.json"
 }
 
 # Print initial state

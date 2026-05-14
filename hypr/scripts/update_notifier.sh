@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/caching.sh"
+
 # Check interval in seconds (600s = 10 minutes)
 INTERVAL=600
 
 # Cache file to prevent notification spam if the script is restarted
-CACHE_FILE="$HOME/.cache/qs_update_notified_version"
+CACHE_FILE="$QS_CACHE_UPDATER/notified_version"
 # State file to tell the topbar to show the update button
-PENDING_FILE="$HOME/.cache/qs_update_pending"
+PENDING_FILE="$QS_CACHE_UPDATER/update_pending"
 
 while true; do
     # Fetch local version

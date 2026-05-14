@@ -20,6 +20,8 @@ PanelWindow {
     width: screen.width
     height: screen.height
 
+    Caching { id: paths }
+
     Scaler { id: scaler; currentWidth: width }
     function s(val) { return scaler.s(val); }
     
@@ -35,7 +37,7 @@ PanelWindow {
     property bool isVideoMode: cachedMode === "true"
 
     onIsVideoModeChanged: {
-        Quickshell.execDetached(["bash", "-c", "echo '" + (root.isVideoMode ? "true" : "false") + "' > ~/.cache/qs_screenshot_mode"]);
+        Quickshell.execDetached(["bash", "-c", "echo '" + (root.isVideoMode ? "true" : "false") + "' > " + paths.getCacheDir("screenshot") + "/video_mode"]);
         
         // Smart Geometry Snapping for Portal Support
         if (root.isVideoMode) {
@@ -70,7 +72,7 @@ PanelWindow {
 
     function saveAudioPrefs() {
         let data = `${deskVol},${deskMute},${micVol},${micMute},${micDevice}`
-        Quickshell.execDetached(["bash", "-c", `echo '${data}' > ~/.cache/qs_audio_prefs`])
+        Quickshell.execDetached(["bash", "-c", `echo '${data}' > ${paths.getStateDir("screenshot")}/audio_prefs`])
     }
 
     // --- Dynamic Mic Loader ---
@@ -123,7 +125,7 @@ PanelWindow {
     property real selW: Math.abs(endX - startX)
     property real selH: Math.abs(endY - startY)
     
-    property string geometryString: `${Math.round(selX)},${Math.round(selY)} ${Math.round(selW)}x${Math.round(selH)}`
+    property string geometryString: `${Math.round(selX + screen.x)},${Math.round(selY + screen.y)} ${Math.round(selW)}x${Math.round(selH)}`
     property int interactionMode: 0
     property real anchorX: 0; property real anchorY: 0
     property real initX: 0; property real initY: 0
@@ -138,7 +140,7 @@ PanelWindow {
     function saveCache() {
         if (root.hasSelection && !root.isVideoMode) {
             let data = Math.round(root.selX) + "," + Math.round(root.selY) + "," + Math.round(root.selW) + "," + Math.round(root.selH);
-            Quickshell.execDetached(["bash", "-c", "echo '" + data + "' > ~/.cache/qs_screenshot_geom"]);
+            Quickshell.execDetached(["bash", "-c", "echo '" + data + "' > " + paths.getCacheDir("screenshot") + "/geometry"]);
         }
     }
 
@@ -859,7 +861,7 @@ PanelWindow {
     Process {
         id: qrReaderProcess
         property string accumulated: ""
-        command: ["cat", "/tmp/qs_qr_result"]
+        command: ["cat", paths.getRunDir("screenshot") + "/qr_result"]
         stdout: SplitParser { splitMarker: ""; onRead: data => qrReaderProcess.accumulated += data }
         
         onExited: (exitCode) => {
@@ -949,7 +951,7 @@ PanelWindow {
 
             root.isQrSuccess = anySuccess;
             root.showQrPopup = true
-            Quickshell.execDetached(["bash", "-c", "rm -f /tmp/qs_qr_result"])
+            Quickshell.execDetached(["bash", "-c", "rm -f " + paths.getRunDir("screenshot") + "/qr_result"])
         }
     }
     
@@ -961,7 +963,7 @@ PanelWindow {
     }
     
     function performQrScan() {
-        Quickshell.execDetached(["bash", "-c", "rm -f /tmp/qs_qr_result"])
+        Quickshell.execDetached(["bash", "-c", "rm -f " + paths.getRunDir("screenshot") + "/qr_result"])
         root.isScanningQr = true; root.showQrPopup = false; qrModel.clear()
         let cmd = `bash ~/.config/hypr/scripts/screenshot.sh --geometry "${root.geometryString}" --scan-qr`
         Quickshell.execDetached(["bash", "-c", cmd])
@@ -971,7 +973,7 @@ PanelWindow {
     Timer {
         id: captureTimer
         property string pendingCmd: ""
-        interval: 80
+        interval: 200
         repeat: false
         onTriggered: {
             Quickshell.execDetached(["bash", "-c", pendingCmd])

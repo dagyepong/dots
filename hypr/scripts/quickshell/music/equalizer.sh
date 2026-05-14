@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-STATE_FILE="/tmp/eq_state.json"
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+qs_ensure_cache "music"
+
+STATE_FILE="$QS_RUN_MUSIC/eq_state.json"
 PRESET_DIR="$HOME/.config/easyeffects/output"
 PRESET_NAME="live_eq"
 PRESET_FILE="$PRESET_DIR/${PRESET_NAME}.json"
@@ -80,4 +83,3 @@ case $cmd in
         apply_eq
         ;;
 esac
-

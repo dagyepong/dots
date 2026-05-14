@@ -11,6 +11,8 @@ import "../"
 Item {
     id: window
 
+    Caching { id: paths }
+
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
@@ -106,8 +108,7 @@ Item {
     readonly property bool isTodaySelected: window.selectedDateStr === getIsoDate(new Date())
 
     readonly property string scriptsDir: Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/focustime"
-    readonly property string xdgRuntime: Quickshell.env("XDG_RUNTIME_DIR") || (Quickshell.env("HOME") + "/.cache/focustime")
-    readonly property string stateFilePath: window.xdgRuntime + "/focustime_state.json"
+    readonly property string stateFilePath: paths.getRunDir("focustime") + "/focustime_state.json"
 
     // --- ENHANCED CHOREOGRAPHED STARTUP STATES ---
     property real introMain: 0.0
@@ -266,6 +267,8 @@ Item {
                 cmd.push("--app");
                 cmd.push(window.selectedAppClass);
             }
+            cmd.push("--db-dir");
+            cmd.push(paths.getStateDir("focustime"));
             statsPoller.command = cmd;
             statsPoller.running = true;
         }

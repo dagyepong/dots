@@ -11,6 +11,8 @@ Item {
     id: root
     focus: true
 
+    Caching { id: paths }
+
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
@@ -73,7 +75,7 @@ Item {
         event.accepted = true;
     }
     Keys.onLeftPressed: {
-        if (currentTab === 3) { 
+        if (currentTab === 2) { 
             if (selectedModuleIndex > 0) {
                 selectedModuleIndex--;
                 modulesList.positionViewAtIndex(selectedModuleIndex, ListView.Contain);
@@ -82,7 +84,7 @@ Item {
         }
     }
     Keys.onRightPressed: {
-        if (currentTab === 3) { 
+        if (currentTab === 2) { 
             if (selectedModuleIndex < modulesDataModel.count - 1) {
                 selectedModuleIndex++;
                 modulesList.positionViewAtIndex(selectedModuleIndex, ListView.Contain);
@@ -91,7 +93,7 @@ Item {
         }
     }
     Keys.onReturnPressed: {
-        if (currentTab === 3) { 
+        if (currentTab === 2) { 
             let target = modulesDataModel.get(selectedModuleIndex).target;
             Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "toggle", target]);
             event.accepted = true;
@@ -193,7 +195,7 @@ Item {
         running: true
         command: [
             "bash", "-c",
-            "CACHE=\"$HOME/.cache/qs_sysinfo.txt\"; " +
+            "CACHE=\"" + paths.getCacheDir("guide") + "/sysinfo.txt\"; " +
             "if [ ! -f \"$CACHE\" ]; then " +
             "  ICON=\"\"; if [ -f ~/.face.icon ]; then ICON=$(readlink -f ~/.face.icon); elif [ -f ~/.face ]; then ICON=$(readlink -f ~/.face); fi; " +
             "  echo \"$(whoami)|$(hostname)|$(uname -r)|$(cat /etc/os-release | grep '^PRETTY_NAME=' | cut -d'=' -f2 | tr -d '\\\"')|$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | xargs)|$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | tail -n1 | cut -d':' -f3 | xargs)|$ICON\" > \"$CACHE\"; " +
@@ -218,160 +220,12 @@ Item {
     }
 
     // -------------------------------------------------------------------------
-    // LIVE RESOURCE TELEMETRY (OPTIMIZED POLLING)
-    // -------------------------------------------------------------------------
-    property int cpuUsage: 0
-    property int memUsage: 0
-    property int sysTemp: 0
-    property real globalTotalDisk: 1
-    property real globalUsedDisk: 0
-
-    Timer {
-        id: resTimer
-        interval: 2000
-        running: root.currentTab === 2
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: { 
-            resProc.running = false; 
-            resProc.running = true; 
-        }
-    }
-
-    Process {
-        id: resProc
-        command: [
-            "bash", "-c", 
-            "c1=($(awk '/^cpu / {print $2+$3+$4+$6+$7+$8, $5}' /proc/stat)); sleep 0.2; " +
-            "c2=($(awk '/^cpu / {print $2+$3+$4+$6+$7+$8, $5}' /proc/stat)); act=$((c2[0] - c1[0])); tot=$((act + c2[1] - c1[1])); " +
-            "cpu=$((tot > 0 ? act * 100 / tot : 0)); mem=$(awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END {print int((t-a)/t*100)}' /proc/meminfo); " +
-            "temp=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n1 || echo 0); up=$(awk '{print int($1/3600)\"h \"int(($1%3600)/60)\"m\"}' /proc/uptime 2>/dev/null || echo '0h 0m'); " +
-            "echo \"$cpu|$mem|$((temp / 1000))|$up\""
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let parts = this.text ? this.text.trim().split("|") : [];
-                if (parts.length >= 4) {
-                    root.cpuUsage = parseInt(parts[0]) || 0;
-                    root.memUsage = parseInt(parts[1]) || 0;
-                    root.sysTemp = parseInt(parts[2]) || 0;
-                    root.sysUptime = parts[3];
-                }
-            }
-        }
-    }
-
-    Timer {
-        id: diskTimer
-        interval: 60000
-        running: root.currentTab === 2
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: diskProc.running = true
-    }
-
-    Process {
-        id: diskProc
-        command: ["bash", "-c", "df -B1 -x tmpfs -x devtmpfs -x efivarfs -x squashfs | awk 'NR>1 && !seen[$1]++ {tot+=$2; use+=$3} END {print tot\"|\"use}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let p = this.text ? this.text.trim().split("|") : [];
-                if(p.length >= 2) {
-                    root.globalTotalDisk = parseFloat(p[0]) || 0;
-                    root.globalUsedDisk = parseFloat(p[1]) || 0;
-                }
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // NETWORK SPEEDTEST PIPELINE
-    // -------------------------------------------------------------------------
-    property int netState: 0
-    property real finalPing: 0
-    property real finalDown: 0
-    property real finalUp: 0
-    property real displayPing: 0
-    property real displayDown: 0
-    property real displayUp: 0
-
-    NumberAnimation { 
-        id: pingAnim
-        target: root
-        property: "displayPing"
-        from: 0
-        to: root.finalPing
-        duration: 1000
-        easing.type: Easing.OutQuart 
-    }
-    
-    NumberAnimation { 
-        id: downAnim
-        target: root
-        property: "displayDown"
-        from: 0
-        to: root.finalDown
-        duration: 1500
-        easing.type: Easing.OutQuart 
-    }
-    
-    NumberAnimation { 
-        id: upAnim
-        target: root
-        property: "displayUp"
-        from: 0
-        to: root.finalUp
-        duration: 1500
-        easing.type: Easing.OutQuart 
-    }
-
-    Process {
-        id: pingProc
-        command: ["bash", "-c", "ping -c 1 1.1.1.1 | awk -F'/' 'END{printf \"%.0f\", $5}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.finalPing = parseFloat(this.text ? this.text.trim() : "0") || 0;
-                pingAnim.restart(); 
-                root.netState = 2; 
-                downProc.running = false; 
-                downProc.running = true;
-            }
-        }
-    }
-    
-    Process {
-        id: downProc
-        command: ["bash", "-c", "curl -m 5 -s -w '%{speed_download}' -o /dev/null https://speed.cloudflare.com/__down?bytes=50000000 | awk '{printf \"%.1f\", ($1 * 8) / 1000000}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.finalDown = parseFloat(this.text ? this.text.trim() : "0") || 0;
-                downAnim.restart(); 
-                root.netState = 3; 
-                upProc.running = false; 
-                upProc.running = true;
-            }
-        }
-    }
-    
-    Process {
-        id: upProc
-        command: ["bash", "-c", "dd if=/dev/zero bs=1M count=10 2>/dev/null | curl -m 5 -s -w '%{speed_upload}' --data-binary @- -o /dev/null https://speed.cloudflare.com/__up | awk '{printf \"%.1f\", ($1 * 8) / 1000000}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.finalUp = parseFloat(this.text ? this.text.trim() : "0") || 0;
-                upAnim.restart(); 
-                root.netState = 4;
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
     // STATE MANAGEMENT & DATA
     // -------------------------------------------------------------------------
     property int currentTab: 1
     property int selectedModuleIndex: 0
-    property var tabNames: ["Settings", "System", "Resources", "Modules", "Matugen", "About"]
-    property var tabIcons: ["", "", "󰣖", "󰣆", "󰏘", ""]
+    property var tabNames: ["Settings", "System", "Modules", "Matugen", "About"]
+    property var tabIcons: ["", "", "󰣆", "󰏘", ""]
 
     property real introBase: 0.0
     property real introSidebar: 0.0
@@ -461,7 +315,7 @@ Item {
     }
 
     // -------------------------------------------------------------------------
-    // BACKGROUND AMBIENCE
+    // BACKGROUND AMBIENCE (Enhanced with more/bigger orbs)
     // -------------------------------------------------------------------------
     Item {
         anchors.fill: parent
@@ -485,26 +339,41 @@ Item {
                 running: true 
             }
             
+            // Orb 1
             Rectangle {
-                width: root.s(600)
-                height: root.s(600)
-                radius: root.s(300)
-                x: parent.width * 0.6 + Math.cos(parent.time) * root.s(100)
-                y: parent.height * 0.1 + Math.sin(parent.time * 1.5) * root.s(100)
+                width: root.s(800)
+                height: root.s(800)
+                radius: root.s(400)
+                x: parent.width * 0.5 + Math.cos(parent.time) * root.s(150)
+                y: parent.height * 0.1 + Math.sin(parent.time * 1.5) * root.s(150)
                 color: root.ambientPurple
-                opacity: 0.04
+                opacity: 0.06
                 layer.enabled: true
-                layer.effect: MultiEffect { blurEnabled: true; blurMax: 80; blur: 1.0 }
+                layer.effect: MultiEffect { blurEnabled: true; blurMax: 100; blur: 1.0 }
             }
             
+            // Orb 2
+            Rectangle {
+                width: root.s(900)
+                height: root.s(900)
+                radius: root.s(450)
+                x: parent.width * 0.1 + Math.sin(parent.time * 0.8) * root.s(200)
+                y: parent.height * 0.4 + Math.cos(parent.time * 1.2) * root.s(150)
+                color: root.ambientBlue
+                opacity: 0.05
+                layer.enabled: true
+                layer.effect: MultiEffect { blurEnabled: true; blurMax: 110; blur: 1.0 }
+            }
+
+            // Orb 3
             Rectangle {
                 width: root.s(700)
                 height: root.s(700)
                 radius: root.s(350)
-                x: parent.width * 0.1 + Math.sin(parent.time * 0.8) * root.s(150)
-                y: parent.height * 0.4 + Math.cos(parent.time * 1.2) * root.s(100)
-                color: root.ambientBlue
-                opacity: 0.03
+                x: parent.width * 0.3 + Math.cos(parent.time * 1.1) * root.s(120)
+                y: parent.height * 0.6 + Math.sin(parent.time * 0.9) * root.s(180)
+                color: Qt.tint(root.peach, Qt.rgba(root.yellow.r, root.yellow.g, root.yellow.b, colorBlend))
+                opacity: 0.04
                 layer.enabled: true
                 layer.effect: MultiEffect { blurEnabled: true; blurMax: 90; blur: 1.0 }
             }
@@ -589,85 +458,119 @@ Item {
                     Layout.bottomMargin: root.s(10) 
                 }
 
-                Repeater {
-                    model: root.tabNames.length
-                    
-                    ColumnLayout {
-                        Layout.fillWidth: true
+                // --- MORPHING TABS LOGIC ---
+                Item {
+                    Layout.fillWidth: true
+                    // Dynamically set height based on elements: (Tabs count * 44) + 1 Divider (21)
+                    Layout.preferredHeight: root.s(65) + (root.tabNames.length - 1) * root.s(44)
+
+                    // The Morphing Highlight Background
+                    Rectangle {
+                        id: activeHighlight
+                        width: parent.width
+                        height: root.s(44)
+                        radius: root.s(8)
+                        color: root.mauve
+                        z: 0
+
+                        property int curIdx: root.currentTab
+                        // Index 0 starts at 0. Index 1 starts after Index 0 (44) and Divider (21) = 65
+                        property real targetY: curIdx === 0 ? 0 : root.s(65) + (curIdx - 1) * root.s(44)
+                        y: targetY
+
+                        Behavior on y {
+                            NumberAnimation { duration: 400; easing.type: Easing.OutExpo }
+                        }
+                    }
+
+                    Column {
+                        anchors.fill: parent
                         spacing: 0
                         
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: root.s(44)
-                            radius: root.s(8)
-                            property bool isActive: root.currentTab === index && index !== 0
-                            color: isActive ? root.surface1 : (tabMa.containsMouse ? Qt.alpha(root.surface1, 0.5) : "transparent")
+                        Repeater {
+                            model: root.tabNames.length
                             
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Column {
+                                width: parent.width
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: root.s(15)
-                                spacing: root.s(12)
+                                Rectangle {
+                                    width: parent.width
+                                    height: root.s(44)
+                                    radius: root.s(8)
+                                    z: 1
+                                    
+                                    property bool isActive: root.currentTab === index
+                                    // Make it transparent if active so the highlight shows through
+                                    color: isActive ? "transparent" : (tabMa.containsMouse ? Qt.alpha(root.surface1, 0.5) : "transparent")
+                                    
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: root.s(15)
+                                        spacing: root.s(12)
+
+                                        // The "Slide Right" text effect from snippet 2
+                                        property real contentShift: parent.isActive ? root.s(6) : 0
+                                        Behavior on contentShift { NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
+                                        transform: Translate { x: contentShift }
+                                        
+                                        Item {
+                                            Layout.preferredWidth: root.s(24)
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Text { 
+                                                anchors.centerIn: parent
+                                                text: root.tabIcons[index]
+                                                font.family: "Iosevka Nerd Font"
+                                                font.pixelSize: root.s(18)
+                                                // Dynamic colors (crust vs subtext0) for contrast
+                                                color: parent.parent.parent.isActive ? root.crust : root.subtext0
+                                                Behavior on color { ColorAnimation { duration: 150 } } 
+                                            }
+                                        }
+                                        
+                                        Text { 
+                                            text: root.tabNames[index]
+                                            font.family: "JetBrains Mono"
+                                            font.weight: parent.parent.isActive ? Font.Bold : Font.Medium
+                                            font.pixelSize: root.s(13)
+                                            // Dynamic colors (crust vs subtext0) for contrast
+                                            color: parent.parent.isActive ? root.crust : root.subtext0
+                                            Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Behavior on color { ColorAnimation { duration: 150 } } 
+                                        }
+                                    }
+                                    
+                                    MouseArea { 
+                                        id: tabMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (index === 0) {
+                                                Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "toggle", "settings"]);
+                                            } else {
+                                                root.currentTab = index;
+                                            }
+                                        } 
+                                    }
+                                }
                                 
+                                // Divider natively wrapped to provide spacing
                                 Item {
-                                    Layout.preferredWidth: root.s(24)
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text { 
+                                    visible: index === 0
+                                    width: parent.width
+                                    height: root.s(21) // 10 top + 1 mid + 10 bot
+                                    
+                                    Rectangle {
                                         anchors.centerIn: parent
-                                        text: root.tabIcons[index]
-                                        font.family: "Iosevka Nerd Font"
-                                        font.pixelSize: root.s(18)
-                                        color: parent.parent.parent.isActive ? root.ambientPurple : root.subtext0
-                                        Behavior on color { ColorAnimation { duration: 150 } } 
+                                        width: parent.width
+                                        height: 1
+                                        color: Qt.alpha(root.surface1, 0.5)
                                     }
                                 }
-                                
-                                Text { 
-                                    text: root.tabNames[index]
-                                    font.family: "JetBrains Mono"
-                                    font.weight: parent.parent.isActive ? Font.Bold : Font.Medium
-                                    font.pixelSize: root.s(13)
-                                    color: parent.parent.isActive ? root.text : root.subtext0
-                                    Layout.fillWidth: true
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Behavior on color { ColorAnimation { duration: 150 } } 
-                                }
                             }
-                            
-                            Rectangle { 
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: root.s(3)
-                                height: parent.isActive ? root.s(20) : 0
-                                radius: root.s(2)
-                                color: root.ambientPurple
-                                Behavior on height { NumberAnimation { duration: 250; easing.type: Easing.OutBack } } 
-                            }
-                            
-                            MouseArea { 
-                                id: tabMa
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (index === 0) { // 0 = Settings Tab
-                                        Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "toggle", "settings"]);
-                                    } else {
-                                        root.currentTab = index;
-                                    }
-                                } 
-                            }
-                        }
-                        
-                        // Divider specifically below Settings (index 0)
-                        Rectangle {
-                            visible: index === 0
-                            Layout.fillWidth: true
-                            height: 1
-                            color: Qt.alpha(root.surface1, 0.5)
-                            Layout.topMargin: root.s(10)
-                            Layout.bottomMargin: root.s(10)
                         }
                     }
                 }
@@ -798,7 +701,7 @@ Item {
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.topMargin: root.s(15) // Fixed offset matching the sidebar
+                    anchors.topMargin: root.s(15)
                     anchors.leftMargin: root.s(20)
                     anchors.rightMargin: root.s(20)
                     anchors.bottomMargin: root.s(20)
@@ -1089,8 +992,7 @@ Item {
                         Repeater {
                             model: [ 
                                 { name: "Settings", icon: "", color: "mauve", targetTab: 0, isToggle: true }, 
-                                { name: "Resources", icon: "󰣖", color: "green", targetTab: 2, isToggle: false }, 
-                                { name: "Modules", icon: "󰣆", color: "blue", targetTab: 3, isToggle: false } 
+                                { name: "Modules", icon: "󰣆", color: "blue", targetTab: 2, isToggle: false } 
                             ]
                             
                             Rectangle {
@@ -1200,405 +1102,11 @@ Item {
             }
 
             // ------------------------------------------
-            // TAB 2: RESOURCES 
+            // TAB 2: MODULES
             // ------------------------------------------
             Item {
                 anchors.fill: parent
                 visible: root.currentTab === 2
-                opacity: visible ? 1.0 : 0.0
-                property real slideY: visible ? 0 : root.s(10)
-                
-                Behavior on slideY { NumberAnimation { duration: 250; easing.type: Easing.OutQuart } }
-                transform: Translate { y: slideY }
-                Behavior on opacity { NumberAnimation { duration: 250 } }
-
-                ScrollView {
-                    anchors.fill: parent
-                    anchors.topMargin: root.s(15) // Applied safely to ScrollView, preventing crash!
-                    anchors.leftMargin: root.s(20)
-                    anchors.rightMargin: root.s(20)
-                    anchors.bottomMargin: root.s(20)
-                    contentWidth: availableWidth
-                    clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    
-                    ColumnLayout {
-                        width: parent.width
-                        spacing: root.s(15)
-
-                        // --- Integrated System Info Grid ---
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: sysInfoCol.implicitHeight + root.s(40)
-                            radius: root.s(16)
-                            color: Qt.alpha(root.surface0, 0.4)
-                            border.color: root.surface1
-                            border.width: 1
-
-                            ColumnLayout {
-                                id: sysInfoCol
-                                anchors.top: parent.top
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.margins: root.s(20)
-                                spacing: root.s(15)
-
-                                RowLayout {
-                                    Text { text: "󰇄"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.mauve }
-                                    Text { text: "System Specifications"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(14); color: root.text }
-                                }
-                                Rectangle { Layout.fillWidth: true; height: 1; color: Qt.alpha(root.surface1, 0.5) }
-
-                                GridLayout {
-                                    Layout.fillWidth: true
-                                    columns: 2
-                                    rowSpacing: root.s(15)
-                                    columnSpacing: root.s(30)
-                                    
-                                    RowLayout { 
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.blue, 0.15); Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.blue } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "Operating System"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysOS; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text } } 
-                                    }
-                                    RowLayout { 
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.peach, 0.15); Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.peach } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "Kernel Version"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysKernel; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text } } 
-                                    }
-                                    RowLayout { 
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.green, 0.15); Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.green } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "Active User"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysUser + "@" + root.sysHost; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text } } 
-                                    }
-                                    RowLayout { 
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.yellow, 0.15); Text { anchors.centerIn: parent; text: "󰔟"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.yellow } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "System Uptime"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysUptime; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text } } 
-                                    }
-                                    RowLayout { 
-                                        Layout.columnSpan: 2
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.sapphire, 0.15); Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.sapphire } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "Processor (CPU)"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysCPU; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text; elide: Text.ElideRight; Layout.maximumWidth: root.s(450) } } 
-                                    }
-                                    RowLayout { 
-                                        Layout.columnSpan: 2
-                                        spacing: root.s(12)
-                                        Rectangle { width: root.s(36); height: root.s(36); radius: root.s(8); color: Qt.alpha(root.red, 0.15); Text { anchors.centerIn: parent; text: "󰢮"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(18); color: root.red } } 
-                                        ColumnLayout { spacing: root.s(2); Text { text: "Graphics (GPU)"; font.family: "JetBrains Mono"; font.pixelSize: root.s(11); color: root.subtext0 } Text { text: root.sysGPU; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(13); color: root.text; elide: Text.ElideRight; Layout.maximumWidth: root.s(450) } } 
-                                    }
-                                }
-                            }
-                        }
-
-                        // --- Circular Gauges ---
-                        GridLayout {
-                            Layout.fillWidth: true
-                            columns: 3
-                            columnSpacing: root.s(15)
-                            
-                            Repeater {
-                                model: 3
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: root.s(200)
-                                    radius: root.s(16)
-                                    property real targetValue: index === 0 ? root.cpuUsage : (index === 1 ? root.memUsage : Math.min(root.sysTemp, 100))
-                                    property string txtValue: index === 0 ? root.cpuUsage + "%" : (index === 1 ? root.memUsage + "%" : (root.sysTemp > 0 ? root.sysTemp + "°C" : "N/A"))
-                                    property string cKey: index === 0 ? "sapphire" : (index === 1 ? "peach" : "red")
-                                    property string tTitle: index === 0 ? "CPU LOAD" : (index === 1 ? "MEMORY" : "THERMALS")
-                                    property string iIcon: index === 0 ? "" : (index === 1 ? "󰍛" : "")
-
-                                    color: Qt.alpha(root.surface0, 0.4)
-                                    border.color: Qt.alpha(root[cKey], 0.2)
-                                    border.width: 1
-                                    clip: true
-
-                                    ColumnLayout {
-                                        anchors.centerIn: parent
-                                        spacing: root.s(15)
-                                        
-                                        Item {
-                                            Layout.alignment: Qt.AlignHCenter
-                                            Layout.preferredWidth: root.s(130)
-                                            Layout.preferredHeight: root.s(130)
-                                            
-                                            Canvas {
-                                                id: gaugeCanvas
-                                                anchors.fill: parent
-                                                property real animatedValue: targetValue
-                                                Behavior on animatedValue { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
-                                                onAnimatedValueChanged: requestPaint()
-                                                onPaint: {
-                                                    var ctx = getContext("2d"); 
-                                                    ctx.clearRect(0, 0, width, height);
-                                                    var cx = width / 2; 
-                                                    var cy = height / 2; 
-                                                    var r = width / 2 - root.s(8);
-                                                    
-                                                    ctx.beginPath(); 
-                                                    ctx.arc(cx, cy, r, 0, 2 * Math.PI); 
-                                                    ctx.lineWidth = root.s(12); 
-                                                    ctx.strokeStyle = Qt.alpha(root.surface1, 0.4); 
-                                                    ctx.stroke();
-                                                    
-                                                    var start = -Math.PI / 2; 
-                                                    var end = start + (animatedValue / 100) * 2 * Math.PI;
-                                                    
-                                                    ctx.beginPath(); 
-                                                    ctx.arc(cx, cy, r, start, end); 
-                                                    ctx.lineWidth = root.s(12); 
-                                                    ctx.strokeStyle = root[cKey]; 
-                                                    ctx.lineCap = "round"; 
-                                                    ctx.stroke();
-                                                }
-                                            }
-                                            
-                                            ColumnLayout { 
-                                                anchors.centerIn: parent
-                                                spacing: root.s(2)
-                                                Text { text: iIcon; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(26); color: root[cKey]; Layout.alignment: Qt.AlignHCenter } 
-                                                Text { text: txtValue; font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: root.s(18); color: root.text; Layout.alignment: Qt.AlignHCenter } 
-                                            }
-                                        }
-                                        
-                                        Text { 
-                                            text: tTitle; 
-                                            font.family: "JetBrains Mono"; 
-                                            font.weight: Font.Bold; 
-                                            font.pixelSize: root.s(12); 
-                                            color: root.subtext0; 
-                                            Layout.alignment: Qt.AlignHCenter 
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // --- Consolidated Storage Block ---
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: root.s(80)
-                            radius: root.s(16)
-                            color: Qt.alpha(root.surface0, 0.4)
-                            border.color: root.surface1
-                            border.width: 1
-                            
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: root.s(20)
-                                spacing: root.s(10)
-                                
-                                RowLayout {
-                                    Text { text: "󰋊"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(16); color: root.mauve }
-                                    Text { text: "Storage"; font.family: "JetBrains Mono"; font.weight: Font.Bold; color: root.text; font.pixelSize: root.s(14) }
-                                    Item { Layout.fillWidth: true }
-                                    Text { 
-                                        text: root.formatBytes(root.globalUsedDisk) + " / " + root.formatBytes(root.globalTotalDisk) + " (" + (root.globalTotalDisk > 0 ? Math.round((root.globalUsedDisk / root.globalTotalDisk) * 100) : 0) + "%)"
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: root.s(12)
-                                        color: root.subtext0 
-                                    }
-                                }
-                                
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: root.s(8)
-                                    radius: root.s(4)
-                                    color: Qt.alpha(root.surface1, 0.4)
-                                    clip: true
-                                    
-                                    Rectangle { 
-                                        height: parent.height
-                                        radius: root.s(4)
-                                        width: root.globalTotalDisk > 0 ? parent.width * (root.globalUsedDisk / root.globalTotalDisk) : 0
-                                        color: root.mauve
-                                        Behavior on width { NumberAnimation { duration: 1000; easing.type: Easing.OutQuart } } 
-                                    }
-                                }
-                            }
-                        }
-
-                        // --- OOKLA Inspired Network Dashboard ---
-                        Rectangle {
-                            id: netContainer
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: root.s(160)
-                            radius: root.s(16)
-                            color: Qt.alpha(root.surface0, 0.4)
-                            border.color: root.surface1
-                            border.width: 1
-                            clip: true
-
-                            Rectangle {
-                                id: goBtn
-                                width: root.s(90)
-                                height: root.s(90)
-                                radius: root.s(45)
-                                x: root.netState === 0 ? (parent.width - width) / 2 : root.s(30)
-                                y: (parent.height - height) / 2
-                                color: Qt.alpha(root.blue, 0.15)
-                                border.color: (root.netState > 0 && root.netState < 4) ? root.blue : root.surface2
-                                border.width: root.s(2)
-                                Behavior on x { NumberAnimation { duration: 600; easing.type: Easing.OutBack; easing.overshoot: 1.1 } }
-
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: parent.width
-                                    height: parent.height
-                                    radius: parent.radius
-                                    color: "transparent"
-                                    border.color: root.sapphire
-                                    border.width: root.s(2)
-                                    opacity: 0
-                                    SequentialAnimation on opacity { 
-                                        running: root.netState > 0 && root.netState < 4
-                                        loops: Animation.Infinite
-                                        NumberAnimation { from: 1; to: 0; duration: 1000 } 
-                                    }
-                                    SequentialAnimation on scale { 
-                                        running: root.netState > 0 && root.netState < 4
-                                        loops: Animation.Infinite
-                                        NumberAnimation { from: 1.0; to: 1.5; duration: 1000 } 
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    spacing: root.s(2)
-                                    Item {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        width: root.s(32)
-                                        height: root.s(32)
-                                        Text { 
-                                            anchors.centerIn: parent
-                                            text: root.netState === 0 ? "GO" : (root.netState === 4 ? "󰑐" : "󰑮")
-                                            font.family: root.netState === 0 ? "JetBrains Mono" : "Iosevka Nerd Font"
-                                            font.weight: Font.Black
-                                            font.pixelSize: root.netState === 0 ? root.s(28) : root.s(32)
-                                            color: (root.netState > 0 && root.netState < 4) ? root.blue : root.text
-                                            horizontalAlignment: Text.AlignHCenter
-                                            verticalAlignment: Text.AlignVCenter
-                                            transformOrigin: Item.Center
-                                            RotationAnimation on rotation { 
-                                                running: root.netState > 0 && root.netState < 4
-                                                loops: Animation.Infinite
-                                                from: 0
-                                                to: 360
-                                                duration: 1000 
-                                            } 
-                                        }
-                                    }
-                                    Text { 
-                                        text: "SPEEDTEST"
-                                        font.family: "JetBrains Mono"
-                                        font.weight: Font.Bold
-                                        font.pixelSize: root.s(9)
-                                        color: root.subtext0
-                                        visible: root.netState === 0
-                                        Layout.alignment: Qt.AlignHCenter 
-                                    }
-                                }
-                            }
-                            MouseArea { 
-                                anchors.fill: parent
-                                hoverEnabled: root.netState === 0 || root.netState === 4
-                                cursorShape: (root.netState === 0 || root.netState === 4) ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: { 
-                                    if (root.netState === 0 || root.netState === 4) { 
-                                        root.netState = 1; 
-                                        root.displayPing = 0; 
-                                        root.finalPing = 0; 
-                                        root.displayDown = 0; 
-                                        root.finalDown = 0; 
-                                        root.displayUp = 0; 
-                                        root.finalUp = 0; 
-                                        pingProc.running = false; 
-                                        pingProc.running = true; 
-                                    } 
-                                } 
-                            }
-                        }
-
-                        RowLayout {
-                            id: netResults
-                            x: root.netState === 0 ? parent.width : root.s(150)
-                            y: (parent.height - height) / 2
-                            opacity: root.netState === 0 ? 0 : 1
-                            spacing: root.s(40)
-                            Behavior on x { NumberAnimation { duration: 600; easing.type: Easing.OutBack; easing.overshoot: 1.05 } }
-                            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
-
-                            ColumnLayout {
-                                spacing: root.s(4)
-                                opacity: root.netState >= 1 ? 1.0 : 0.0
-                                Behavior on opacity { NumberAnimation { duration: 400 } }
-                                RowLayout { 
-                                    spacing: root.s(6)
-                                    Item { 
-                                        Layout.preferredWidth: root.s(16)
-                                        Layout.preferredHeight: root.s(16)
-                                        Text { anchors.centerIn: parent; text: "󰅸"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(16); color: root.peach } 
-                                    } 
-                                    Text { text: "PING"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(12); color: root.subtext0 } 
-                                }
-                                RowLayout { 
-                                    spacing: root.s(4)
-                                    Text { text: root.netState >= 2 ? root.displayPing.toFixed(0) : "..."; font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: root.s(28); color: root.text } 
-                                    Text { text: "ms"; font.family: "JetBrains Mono"; font.pixelSize: root.s(12); color: root.subtext0; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: root.s(5); visible: root.netState >= 2 } 
-                                }
-                            }
-                            
-                            ColumnLayout {
-                                spacing: root.s(4)
-                                opacity: root.netState >= 2 ? 1.0 : 0.0
-                                Behavior on opacity { NumberAnimation { duration: 400 } }
-                                RowLayout { 
-                                    spacing: root.s(6)
-                                    Item { 
-                                        Layout.preferredWidth: root.s(16)
-                                        Layout.preferredHeight: root.s(16)
-                                        Text { anchors.centerIn: parent; text: "󰇚"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(16); color: root.green } 
-                                    } 
-                                    Text { text: "DOWNLOAD"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(12); color: root.subtext0 } 
-                                }
-                                RowLayout { 
-                                    spacing: root.s(4)
-                                    Text { text: root.netState >= 3 ? root.displayDown.toFixed(1) : "..."; font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: root.s(28); color: root.green } 
-                                    Text { text: "Mbps"; font.family: "JetBrains Mono"; font.pixelSize: root.s(12); color: root.subtext0; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: root.s(5); visible: root.netState >= 3 } 
-                                }
-                            }
-                            
-                            ColumnLayout {
-                                spacing: root.s(4)
-                                opacity: root.netState >= 3 ? 1.0 : 0.0
-                                Behavior on opacity { NumberAnimation { duration: 400 } }
-                                RowLayout { 
-                                    spacing: root.s(6)
-                                    Item { 
-                                        Layout.preferredWidth: root.s(16)
-                                        Layout.preferredHeight: root.s(16)
-                                        Text { anchors.centerIn: parent; text: "󰕒"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(16); color: root.mauve } 
-                                    } 
-                                    Text { text: "UPLOAD"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(12); color: root.subtext0 } 
-                                }
-                                RowLayout { 
-                                    spacing: root.s(4)
-                                    Text { text: root.netState >= 4 ? root.displayUp.toFixed(1) : "..."; font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: root.s(28); color: root.mauve } 
-                                    Text { text: "Mbps"; font.family: "JetBrains Mono"; font.pixelSize: root.s(12); color: root.subtext0; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: root.s(5); visible: root.netState >= 4 } 
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ------------------------------------------
-            // TAB 3: MODULES
-            // ------------------------------------------
-            Item {
-                anchors.fill: parent
-                visible: root.currentTab === 3
                 opacity: visible ? 1.0 : 0.0
                 property real slideY: visible ? 0 : root.s(10)
                 
@@ -1788,11 +1296,11 @@ Item {
             }
 
             // ------------------------------------------
-            // TAB 4: MATUGEN ENGINE
+            // TAB 3: MATUGEN ENGINE
             // ------------------------------------------
             Item {
                 anchors.fill: parent
-                visible: root.currentTab === 4
+                visible: root.currentTab === 3
                 opacity: visible ? 1.0 : 0.0
                 property real slideY: visible ? 0 : root.s(10)
                 
@@ -1856,13 +1364,13 @@ Item {
                                             y: parent.height / 2 - root.s(3)
                                             SequentialAnimation on x { 
                                                 loops: Animation.Infinite
-                                                running: root.currentTab === 4
+                                                running: root.currentTab === 3
                                                 PauseAnimation { duration: index * 400 }
                                                 NumberAnimation { from: 0; to: parent.width; duration: 1200; easing.type: Easing.InOutSine } 
                                             } 
                                             SequentialAnimation on opacity { 
                                                 loops: Animation.Infinite
-                                                running: root.currentTab === 4
+                                                running: root.currentTab === 3
                                                 PauseAnimation { duration: index * 400 }
                                                 NumberAnimation { from: 0; to: 1; duration: 300 }
                                                 PauseAnimation { duration: 600 }
@@ -1883,7 +1391,7 @@ Item {
                                 
                                 SequentialAnimation on border.width { 
                                     loops: Animation.Infinite
-                                    running: root.currentTab === 4
+                                    running: root.currentTab === 3
                                     NumberAnimation { from: root.s(1); to: root.s(4); duration: 1000; easing.type: Easing.InOutSine }
                                     NumberAnimation { from: root.s(4); to: root.s(1); duration: 1000; easing.type: Easing.InOutSine } 
                                 }
@@ -1905,7 +1413,7 @@ Item {
                                                 color: modelData
                                                 SequentialAnimation on scale { 
                                                     loops: Animation.Infinite
-                                                    running: root.currentTab === 4
+                                                    running: root.currentTab === 3
                                                     PauseAnimation { duration: index * 150 }
                                                     NumberAnimation { to: 1.3; duration: 300; easing.type: Easing.OutQuart }
                                                     NumberAnimation { to: 1.0; duration: 400; easing.type: Easing.OutQuart }
@@ -1934,13 +1442,13 @@ Item {
                                             y: parent.height / 2 - root.s(3)
                                             SequentialAnimation on x { 
                                                 loops: Animation.Infinite
-                                                running: root.currentTab === 4
+                                                running: root.currentTab === 3
                                                 PauseAnimation { duration: index * 400 }
                                                 NumberAnimation { from: 0; to: parent.width; duration: 1200; easing.type: Easing.InOutSine } 
                                             } 
                                             SequentialAnimation on opacity { 
                                                 loops: Animation.Infinite
-                                                running: root.currentTab === 4
+                                                running: root.currentTab === 3
                                                 PauseAnimation { duration: index * 400 }
                                                 NumberAnimation { from: 0; to: 1; duration: 300 }
                                                 PauseAnimation { duration: 600 }
@@ -2017,11 +1525,11 @@ Item {
             }
 
             // ------------------------------------------
-            // TAB 5: ABOUT
+            // TAB 4: ABOUT
             // ------------------------------------------
             Item {
                 anchors.fill: parent
-                visible: root.currentTab === 5
+                visible: root.currentTab === 4
                 opacity: visible ? 1.0 : 0.0
                 property real slideY: visible ? 0 : root.s(10)
                 
@@ -2029,12 +1537,61 @@ Item {
                 transform: Translate { y: slideY }
                 Behavior on opacity { NumberAnimation { duration: 250 } }
 
-                Text {
+                RowLayout {
                     anchors.centerIn: parent
-                    text: "coming soon"
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: root.s(24)
-                    color: root.subtext0
+                    spacing: root.s(30)
+
+                    Repeater {
+                        model: [
+                            { name: "NixOS Config", icon: "", color: "blue", url: "https://github.com/ilyamiro/nixos-configuration" },
+                            { name: "Imperative Dots", icon: "󰣇", color: "mauve", url: "https://github.com/ilyamiro/imperative-dots" },
+                            { name: "Wallpapers", icon: "", color: "peach", url: "https://github.com/ilyamiro/shell-wallpapers" }
+                        ]
+
+                        Rectangle {
+                            Layout.preferredWidth: root.s(140)
+                            Layout.preferredHeight: root.s(140)
+                            radius: root.s(16)
+                            color: repoMa.containsMouse ? Qt.alpha(root[modelData.color], 0.15) : Qt.alpha(root.surface0, 0.4)
+                            border.color: repoMa.containsMouse ? root[modelData.color] : root.surface1
+                            border.width: 1
+                            scale: repoMa.pressed ? 0.95 : (repoMa.containsMouse ? 1.05 : 1.0)
+
+                            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                            Behavior on border.color { ColorAnimation { duration: 200 } }
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: root.s(15)
+
+                                Text {
+                                    text: modelData.icon
+                                    font.family: "Iosevka Nerd Font"
+                                    font.pixelSize: root.s(42)
+                                    color: root[modelData.color]
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: modelData.name
+                                    font.family: "JetBrains Mono"
+                                    font.weight: Font.Bold
+                                    font.pixelSize: root.s(13)
+                                    color: root.text
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                            }
+
+                            MouseArea {
+                                id: repoMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["xdg-open", modelData.url])
+                            }
+                        }
+                    }
                 }
             }
         }

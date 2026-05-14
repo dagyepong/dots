@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 
 # --- CONFIGURATION ---
-# Set to 'true' to hide unpaired devices that only broadcast a MAC address (filters out public BLE spam).
-# Set to 'false' if you are trying to pair a stubborn new device that won't show its name.
 STRICT_SPAM_FILTER=true
 # ---------------------
 
-# Use XDG_RUNTIME_DIR if available for ram-backed speed, else fallback to ~/.cache
-CACHE_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/quickshell_network_cache"
-mkdir -p "$CACHE_DIR"
-PID_FILE="$CACHE_DIR/bt_scan_pid"
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/../../caching.sh"
+qs_ensure_cache "network"
+
+CACHE_DIR="$QS_CACHE_NETWORK"
+PID_FILE="$QS_RUN_DIR/bt_scan_pid"
 
 get_icon() {
     local type="${1,,}"
@@ -26,9 +26,10 @@ get_icon() {
 
 get_audio_profile() {
     local mac="$1"
+    local cards_data="$2"
     local mac_us="${mac//:/_}"
     
-    local active=$(pactl list cards 2>/dev/null | awk -v mac="$mac_us" '
+    local active=$(echo "$cards_data" | awk -v mac="$mac_us" '
         tolower($0) ~ "name:.*"tolower(mac) { found=1 }
         found && tolower($0) ~ "active profile:" { 
             sub(/.*Active Profile: /, ""); print; exit 
@@ -37,7 +38,6 @@ get_audio_profile() {
     ')
     
     if [[ -z "$active" || "$active" == "off" ]]; then echo "None"; return; fi
-    
     if [[ "$active" == *"a2dp"* ]]; then echo "Hi-Fi (A2DP)"; return; fi
     if [[ "$active" == *"headset"* || "$active" == *"hfp"* ]]; then echo "Headset (HFP)"; return; fi
     
@@ -45,8 +45,28 @@ get_audio_profile() {
 }
 
 get_status() {
+    # 1. Zero-latency hardware presence check (Bypasses the 1-second timeout entirely)
+    if ! ls -1d /sys/class/bluetooth/hci* &>/dev/null; then
+        echo "{\"present\":false,\"power\":\"off\",\"connected\":[],\"devices\":[]}"
+        return
+    fi
+
+    # 2. Check if bluetoothctl is even installed to prevent command errors
+    if ! command -v bluetoothctl &> /dev/null; then
+        echo "{\"present\":false,\"power\":\"off\",\"connected\":[],\"devices\":[]}"
+        return
+    fi
+
+    # We keep the timeout here just in case the bluetoothd daemon is frozen, 
+    # but the sysfs check above prevents this from running at all on machines without BT.
+    controller=$(timeout 1 bluetoothctl list 2>/dev/null | head -n1)
+    if [[ -z "$controller" || "$controller" == *"Waiting"* ]]; then
+        echo "{\"present\":false,\"power\":\"off\",\"connected\":[],\"devices\":[]}"
+        return
+    fi
+
     power="off"
-    if bluetoothctl show | grep -q "Powered: yes"; then power="on"; fi
+    if timeout 1 bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then power="on"; fi
 
     connected_json="[]"
     devices_json="[]"
@@ -56,11 +76,14 @@ get_status() {
         mapfile -t devices < <(bluetoothctl devices)
         mapfile -t connected_info_lines < <(bluetoothctl devices Connected)
         
+        # THE FIX: Cache pactl output ONCE per script execution with a strict timeout
+        cached_cards=$(timeout 0.5 pactl list cards 2>/dev/null)
+        
         connected_macs=""
         connected_list_objs=()
         devices_list_objs=()
 
-        # 1. PROCESS CONNECTED DEVICES (Always shown)
+        # 1. PROCESS CONNECTED DEVICES
         for c_line in "${connected_info_lines[@]}"; do
             [ -z "$c_line" ] && continue
             rest="${c_line#Device }"
@@ -76,7 +99,9 @@ get_status() {
                 info=$(bluetoothctl info "$mac")
                 icon_type=$(echo "$info" | awk -F': ' '/Icon:/ {print $2}')
                 icon=$(get_icon "$icon_type" "$name")
-                profile=$(get_audio_profile "$mac")
+                
+                # THE FIX: Pass the cached output instead of calling pactl again
+                profile=$(get_audio_profile "$mac" "$cached_cards")
                 
                 echo "CACHE_NAME=\"${name//\"/\\\"}\"" > "$CACHE_FILE"
                 echo "CACHE_ICON=\"${icon//\"/\\\"}\"" >> "$CACHE_FILE"
@@ -112,8 +137,6 @@ get_status() {
                 action="Connect"
             else
                 action="Pair"
-                
-                # --- CONFIGURABLE SPAM FILTER ---
                 if [[ "$STRICT_SPAM_FILTER" == true ]]; then
                     mac_hyphens="${mac//:/-}"
                     if [[ "$name" == "$mac" || "$name" == "$mac_hyphens" || -z "$name" ]]; then
@@ -133,7 +156,7 @@ get_status() {
         fi
     fi
 
-    echo "{\"power\":\"$power\",\"connected\":$connected_json,\"devices\":$devices_json}"
+    echo "{\"present\":true,\"power\":\"$power\",\"connected\":$connected_json,\"devices\":$devices_json}"
 }
 
 toggle_power() {

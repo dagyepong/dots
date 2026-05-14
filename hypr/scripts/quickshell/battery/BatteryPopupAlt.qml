@@ -10,8 +10,46 @@ import "../"
 Item {
     id: window
 
+    Caching { id: paths }
+
     // --- RECEIVE THE DBUS LIST FROM MAIN.QML ---
     property var notifModel
+    property var liveNotifs // <-- ADDED: Receive the live QObject map from Main.qml
+
+    // Ensure actionable notifications are continually bubbled to the top
+    onNotifModelChanged: Qt.callLater(window.enforceNotificationSort)
+    
+    Connections {
+        target: window.notifModel
+        function onCountChanged() {
+            Qt.callLater(window.enforceNotificationSort);
+        }
+    }
+
+    function enforceNotificationSort() {
+        if (!notifModel || notifModel.count <= 1) return;
+        let firstNonAction = -1;
+        for (let i = 0; i < notifModel.count; i++) {
+            let item = notifModel.get(i);
+            let hasAction = false;
+            try {
+                let parsed = item.actionsJson ? JSON.parse(item.actionsJson) : [];
+                // Fix applied: removed filter so default actions correctly flag the notification as actionable
+                hasAction = parsed.length > 0;
+            } catch(e) {}
+
+            if (hasAction) {
+                if (firstNonAction !== -1 && i > firstNonAction) {
+                    notifModel.move(i, firstNonAction, 1);
+                    firstNonAction++;
+                }
+            } else {
+                if (firstNonAction === -1) {
+                    firstNonAction = i;
+                }
+            }
+        }
+    }
 
     // State object for collapsible notification groups
     property var collapsedGroups: ({})
@@ -31,6 +69,10 @@ Item {
         if (!notifModel) return;
         for (let i = notifModel.count - 1; i >= 0; i--) {
             if (notifModel.get(i).appName === appName) {
+                let uid = notifModel.get(i).uid;
+                if (window.liveNotifs && window.liveNotifs[uid]) {
+                    delete window.liveNotifs[uid]; // <-- ADDED: Memory cleanup
+                }
                 notifModel.remove(i);
             }
         }
@@ -80,10 +122,7 @@ Item {
     Settings {
         id: widgetCache
         category: "SystemMonitorCache"
-        property int cpuUsage: 0
-        property int ramUsage: 0
         property int diskUsage: 0
-        property int sysTemp: 0
         property string powerProfile: "balanced"
         property int upHours: 0
         property int upMins: 0
@@ -96,11 +135,16 @@ Item {
     // -------------------------------------------------------------------------
     // STATE & POLLING
     // -------------------------------------------------------------------------
-    property int cpuUsage: widgetCache.cpuUsage
-    property int ramUsage: widgetCache.ramUsage
-    property int diskUsage: widgetCache.diskUsage
-    property int sysTemp: widgetCache.sysTemp
+    Component.onCompleted: SysData.subscribe()
+    Component.onDestruction: SysData.unsubscribe()
 
+    // Bound directly to the global singleton
+    property int cpuUsage: SysData.cpu
+    property int ramUsage: SysData.ramPercent
+    property int sysTemp: SysData.temp
+
+    // Standard properties updated via local poller
+    property int diskUsage: widgetCache.diskUsage
     property string powerProfile: widgetCache.powerProfile
     
     property int upHours: widgetCache.upHours
@@ -137,7 +181,7 @@ Item {
     Process {
         id: dndInit
         running: true
-        command: ["bash", "-c", "mkdir -p ~/.cache && cat ~/.cache/qs_dnd 2>/dev/null || echo '0'"]
+    command: ["bash", "-c", "cat " + paths.getCacheDir("dnd") + "/state 2>/dev/null || echo '0'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 window.dndEnabled = (this.text.trim() === "1");
@@ -159,12 +203,9 @@ Item {
 
     Process {
         id: sysPoller
-        // HIGHLY ROBUST BASH COMMANDS
+        // Stripped down to only the properties not provided by SysData.qml
         command: ["bash", "-c", 
-            "vmstat 1 2 | tail -1 | awk '{print 100 - $15}' || echo '0'; " +
-            "free -m | awk '/Mem:/ {print int($3/$2 * 100)}' || echo '0'; " +
             "df -h / | awk 'NR==2 {print $5}' | tr -d '%' || echo '0'; " +
-            "temp=$(sensors 2>/dev/null | grep -m 1 -E 'Package id 0|Tctl|Tdie|edge|temp1' | grep -oE '\\+[0-9]+\\.[0-9]+' | head -n 1 | tr -d '+' | cut -d. -f1); [ -z \"$temp\" ] && temp=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1 | awk '{print int($1/1000)}'); echo \"${temp:-0}\"; " +
             "powerprofilesctl get 2>/dev/null || echo 'balanced'; " +
             "awk '{print int($1/3600)\"h \"int(($1%3600)/60)\"m\"}' /proc/uptime 2>/dev/null || echo '0h 0m'; " +
             "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2*100), ($3==\"[MUTED]\"?\"off\":\"on\")}' || echo '0 on'; " +
@@ -174,23 +215,14 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 let lines = this.text.trim().split("\n");
-                if (lines.length >= 8) {
-                    window.cpuUsage = parseInt(lines[0]) || 0;
-                    widgetCache.cpuUsage = window.cpuUsage;
-
-                    window.ramUsage = parseInt(lines[1]) || 0;
-                    widgetCache.ramUsage = window.ramUsage;
-
-                    window.diskUsage = parseInt(lines[2]) || 0;
+                if (lines.length >= 5) {
+                    window.diskUsage = parseInt(lines[0]) || 0;
                     widgetCache.diskUsage = window.diskUsage;
-
-                    window.sysTemp = parseInt(lines[3]) || 0;
-                    widgetCache.sysTemp = window.sysTemp;
                     
-                    window.powerProfile = lines[4];
+                    window.powerProfile = lines[1];
                     widgetCache.powerProfile = window.powerProfile;
                     
-                    let upParts = lines[5].split("h ");
+                    let upParts = lines[2].split("h ");
                     if (upParts.length === 2) {
                         window.upHours = parseInt(upParts[0]) || 0;
                         widgetCache.upHours = window.upHours;
@@ -199,7 +231,7 @@ Item {
                     }
 
                     if (!window.isDraggingVol) {
-                        let volParts = (lines[6] || "0 on").trim().split(" ");
+                        let volParts = (lines[3] || "0 on").trim().split(" ");
                         window.sysVolume = parseInt(volParts[0]) || 0;
                         widgetCache.sysVolume = window.sysVolume;
                         window.sysMuted = (volParts[1] === "off");
@@ -207,7 +239,7 @@ Item {
                     }
                     
                     if (!window.isDraggingBri) {
-                        window.sysBrightness = parseInt(lines[7]) || 0;
+                        window.sysBrightness = parseInt(lines[4]) || 0;
                         widgetCache.sysBrightness = window.sysBrightness;
                     }
                 }
@@ -407,7 +439,7 @@ Item {
                                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         window.dndEnabled = !window.dndEnabled;
-                                        Quickshell.execDetached(["sh", "-c", "mkdir -p ~/.cache && echo '" + (window.dndEnabled ? "1" : "0") + "' > ~/.cache/qs_dnd"]);
+                                        Quickshell.execDetached(["sh", "-c", "echo '" + (window.dndEnabled ? "1" : "0") + "' > " + paths.getCacheDir("dnd") + "/state"]);
                                     }
                                 }
                             }
@@ -559,6 +591,39 @@ Item {
                                 Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
                                 Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
 
+                                // <-- ADDED: Retrieve the raw QObject to restore method calls & bindings
+                                property var realNotif: window.liveNotifs ? window.liveNotifs[model.uid] : null
+
+                                // Auto-clean linkage to DBus so if it's accepted via hotkey/elsewhere, it deletes here
+                                Connections {
+                                    target: delegateWrapper.realNotif || null
+                                    function onClosed() {
+                                        delegateWrapper.removeThisNotif();
+                                    }
+                                }
+
+                                function removeThisNotif() {
+                                    if (!window.notifModel) return;
+                                    for (let i = 0; i < window.notifModel.count; i++) {
+                                        if (window.notifModel.get(i).uid === model.uid) {
+                                            if (window.liveNotifs && window.liveNotifs[model.uid]) {
+                                                delete window.liveNotifs[model.uid]; // <-- ADDED: Memory cleanup
+                                            }
+                                            window.notifModel.remove(i);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                property var actionArray: {
+                                    try {
+                                        let parsed = model.actionsJson ? JSON.parse(model.actionsJson) : [];
+                                        return parsed; // Fix applied: removed filter so default actions show up correctly
+                                    } catch (e) {
+                                        return [];
+                                    }
+                                }
+
                                 Rectangle {
                                     id: innerCard
                                     width: parent.width
@@ -575,6 +640,28 @@ Item {
                                         id: cardHover
                                         anchors.fill: parent
                                         hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if ((model.appName === "Screenshot" || model.appName === "Screen Recorder") && model.iconPath !== "") {
+                                                let folderPath = model.iconPath.substring(0, model.iconPath.lastIndexOf('/'))
+                                                Quickshell.execDetached(["xdg-open", folderPath])
+                                            } else {
+                                                // <-- CHANGED: Use realNotif to call invoke
+                                                if (delegateWrapper.realNotif && delegateWrapper.realNotif.actions) {
+                                                    for (var i = 0; i < delegateWrapper.realNotif.actions.length; i++) {
+                                                        if (delegateWrapper.realNotif.actions[i].identifier === "default") {
+                                                            delegateWrapper.realNotif.actions[i].invoke();
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // <-- CHANGED: Use realNotif to call close
+                                            if (delegateWrapper.realNotif && typeof delegateWrapper.realNotif.close === "function") {
+                                                delegateWrapper.realNotif.close()
+                                            }
+                                            delegateWrapper.removeThisNotif();
+                                        }
                                     }
 
                                     // Left side accent stripe
@@ -606,6 +693,7 @@ Item {
                                                 color: window.text
                                                 Layout.fillWidth: true
                                                 wrapMode: Text.Wrap
+                                                textFormat: Text.StyledText
                                             }
 
                                             // Individual Dismiss Button
@@ -628,9 +716,7 @@ Item {
                                                 MouseArea {
                                                     id: itemClearMa
                                                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        if(window.notifModel) window.notifModel.remove(index);
-                                                    }
+                                                    onClicked: delegateWrapper.removeThisNotif();
                                                 }
                                             }
                                         }
@@ -644,7 +730,69 @@ Item {
                                             Layout.fillWidth: true
                                             wrapMode: Text.Wrap
                                             visible: text !== ""
-                                            textFormat: Text.PlainText 
+                                            textFormat: Text.StyledText 
+                                            onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
+                                        }
+
+                                        // Action Buttons Dock 
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Layout.topMargin: delegateWrapper.actionArray.length > 0 ? window.s(6) : 0
+                                            spacing: window.s(8)
+                                            visible: delegateWrapper.actionArray.length > 0
+
+                                            Repeater {
+                                                model: delegateWrapper.actionArray
+                                                delegate: Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: window.s(28)
+                                                    radius: window.s(8)
+
+                                                    property bool isPrimary: index === 0
+
+                                                    color: {
+                                                        if (isPrimary) {
+                                                            return actionMouseArea.containsMouse ? window.blue : Qt.darker(window.blue, 1.2)
+                                                        } else {
+                                                            return actionMouseArea.containsMouse ? window.surface2 : window.surface1
+                                                        }
+                                                    }
+                                                    
+                                                    border.color: isPrimary ? window.blue : window.surface2
+                                                    border.width: 1
+                                                    
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: modelData.text || "Action"
+                                                        font.family: "JetBrains Mono"
+                                                        font.weight: Font.Bold
+                                                        font.pixelSize: window.s(11)
+                                                        color: isPrimary ? window.crust : window.text
+                                                    }
+
+                                                    MouseArea {
+                                                        id: actionMouseArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+
+                                                        onClicked: {
+                                                            // <-- CHANGED: Loop through actions on the real QObject
+                                                            if (delegateWrapper.realNotif && delegateWrapper.realNotif.actions) {
+                                                                for (var i = 0; i < delegateWrapper.realNotif.actions.length; i++) {
+                                                                    if (delegateWrapper.realNotif.actions[i].identifier === modelData.id) {
+                                                                        delegateWrapper.realNotif.actions[i].invoke();
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                            delegateWrapper.removeThisNotif();
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -676,6 +824,7 @@ Item {
                                 color: "transparent"
                                 border.color: window.ambientSecondary
                                 border.width: 1
+                                Behavior on border.color { ColorAnimation { duration: 1000 } }
                                 opacity: 0.06 - (index * 0.02)
                             }
                         }
@@ -808,8 +957,9 @@ Item {
                             anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { 
                                 exitAnim.start(); // Trigger graceful UI exit
-                                Quickshell.execDetached(["sh", "-c", "loginctl kill-session $XDG_SESSION_ID"]); 
-                                Quickshell.execDetached(["sh", "-c", "echo 'close' > /tmp/qs_widget_state"]); 
+                                Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/exit.sh"]); 
+                Quickshell.execDetached(["sh", "-c", "echo 'close' > " + paths.runDir + "/widget_state"]);
+
                             }
                         }
                     }
@@ -852,6 +1002,7 @@ Item {
 
                             Canvas {
                                 id: cpuCanvas; anchors.fill: parent; rotation: 180
+                                Connections { target: window; function onBaseChanged() { cpuCanvas.requestPaint() } }
                                 onPaint: {
                                     var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height);
                                     var cX = width/2; var cY = height/2; var rad = (width/2)-window.s(8);
@@ -897,6 +1048,7 @@ Item {
 
                             Canvas {
                                 id: ramCanvas; anchors.fill: parent; rotation: 180
+                                Connections { target: window; function onBaseChanged() { ramCanvas.requestPaint() } }
                                 onPaint: {
                                     var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height);
                                     var cX = width/2; var cY = height/2; var rad = (width/2)-window.s(8);
@@ -942,6 +1094,7 @@ Item {
 
                             Canvas {
                                 id: diskCanvas; anchors.fill: parent; rotation: 180
+                                Connections { target: window; function onBaseChanged() { diskCanvas.requestPaint() } }
                                 onPaint: {
                                     var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height);
                                     var cX = width/2; var cY = height/2; var rad = (width/2)-window.s(8);
@@ -987,6 +1140,7 @@ Item {
 
                             Canvas {
                                 id: tempCanvas; anchors.fill: parent; rotation: 180
+                                Connections { target: window; function onBaseChanged() { tempCanvas.requestPaint() } }
                                 onPaint: {
                                     var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height);
                                     var cX = width/2; var cY = height/2; var rad = (width/2)-window.s(8);
@@ -1090,8 +1244,8 @@ Item {
 
                                                 gradient: Gradient {
                                                     orientation: Gradient.Horizontal
-                                                    GradientStop { position: 0.0; color: window.blue }
-                                                    GradientStop { position: 1.0; color: window.sapphire }
+                                                    GradientStop { position: 0.0; color: window.blue; Behavior on color { ColorAnimation { duration: 300 } } }
+                                                    GradientStop { position: 1.0; color: window.sapphire; Behavior on color { ColorAnimation { duration: 300 } } }
                                                 }
                                             }
                                         }
@@ -1224,7 +1378,7 @@ Item {
                             Repeater {
                                 model: ListModel {
                                     ListElement { cmd: "bash ~/.config/hypr/scripts/lock.sh"; icon: ""; baseColor: "mauve"; weight: 1.0 }
-                                    ListElement { cmd: "bash ~/.config/hypr/scripts/lock.sh & systemctl suspend"; icon: "ᶻ 𝗓 𐰁"; baseColor: "blue"; weight: 1.0 }
+                                    ListElement { cmd: "bash ~/.config/hypr/scripts/lock.sh & systemctl suspend"; icon: "ᶻ 𝗓 𝗓"; baseColor: "blue"; weight: 1.0 }
                                     ListElement { cmd: "systemctl reboot"; icon: "󰑓"; baseColor: "yellow"; weight: 2.5 }
                                     ListElement { cmd: "systemctl poweroff -i"; icon: ""; baseColor: "red"; weight: 3.5 }
                                 }
@@ -1266,6 +1420,7 @@ Item {
                                         }
                                         onWavePhaseChanged: requestPaint()
                                         Connections { target: actionCapsule; function onFillLevelChanged() { actionWaveCanvas.requestPaint() } }
+                                        Connections { target: window; function onBaseChanged() { actionWaveCanvas.requestPaint() } }
                                         
                                         onPaint: {
                                             var ctx = getContext("2d");
@@ -1366,7 +1521,7 @@ Item {
 
                                     Timer {
                                         id: exitTimer; interval: 500 
-                                        onTriggered: { Quickshell.execDetached(["sh", "-c", cmd]); Quickshell.execDetached(["sh", "-c", "echo 'close' > /tmp/qs_widget_state"]); }
+                                        onTriggered: { Quickshell.execDetached(["sh", "-c", cmd]); Quickshell.execDetached(["sh", "-c", "echo 'close' > " + paths.runDir + "/widget_state"]); }
                                     }
                                 }
                             }

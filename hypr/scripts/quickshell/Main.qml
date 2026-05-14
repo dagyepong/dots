@@ -12,46 +12,89 @@ import "notifications" as Notifs
 PanelWindow {
     id: masterWindow
     color: "transparent"
-    
+
+    Caching { id: paths }
+
     IpcHandler {
         target: "main"
-    
-        function forceReload() {
-            Quickshell.reload(true) 
+
+        function forceReload(): void {
+            Quickshell.reload(true)
+        }
+
+        function handleCommand(cmd: string, targetWidget: string, arg: string): void {
+            cmd = cmd || "";
+            targetWidget = targetWidget || "";
+            arg = arg || "";
+
+            let isClosing = (masterWindow.currentActive !== "hidden" && !masterWindow.isVisible);
+            let effectivelyActive = isClosing ? "hidden" : masterWindow.currentActive;
+
+            if (cmd === "close") {
+                switchWidget("hidden", "");
+            } else if (cmd === "toggle" || cmd === "open") {
+                delayedClear.stop();
+
+                if (targetWidget === effectivelyActive) {
+                    let currentItem = widgetStack.currentItem;
+
+                    if (arg !== "" && currentItem && currentItem.activeMode !== undefined && currentItem.activeMode !== arg) {
+                        currentItem.activeMode = arg;
+                    } else if (cmd === "toggle") {
+                        switchWidget("hidden", "");
+                    }
+                } else if (getLayout(targetWidget)) {
+                    switchWidget(targetWidget, arg);
+                }
+            } else if (getLayout(cmd)) {
+                let legacyArg = targetWidget;
+                delayedClear.stop();
+
+                if (cmd === effectivelyActive) {
+                    let currentItem = widgetStack.currentItem;
+                    if (legacyArg !== "" && currentItem && currentItem.activeMode !== undefined && currentItem.activeMode !== legacyArg) {
+                        currentItem.activeMode = legacyArg;
+                    } else {
+                        switchWidget("hidden", "");
+                    }
+                } else {
+                    switchWidget(cmd, legacyArg);
+                }
+            }
         }
     }
 
     WlrLayershell.namespace: "qs-master"
     WlrLayershell.layer: WlrLayer.Overlay
-    
-    exclusionMode: ExclusionMode.Ignore 
+
+    exclusionMode: ExclusionMode.Ignore
     focusable: true
 
-    // FIXED: Bind directly to the window's actual screen boundaries rather than the global singleton.
     implicitWidth: masterWindow.screen.width
     implicitHeight: masterWindow.screen.height
 
     visible: isVisible
 
     mask: Region { item: topBarHole; intersection: Intersection.Xor }
-    
+
     Item {
         id: topBarHole
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 65 
+        height: 48
 
-        // Dynamically shrink the hole away from the active widget so it doesn't punch through it.
-        // If the sidebar is open on the left, push the hole's left edge out of the way.
-        anchors.leftMargin: (masterWindow.currentActive !== "hidden" && masterWindow.animX < 10) ? masterWindow.animW : 0
-        
-        // If a widget (like a notification center) is on the right, push the hole's right edge out of the way.
-        anchors.rightMargin: (masterWindow.currentActive !== "hidden" && (masterWindow.animX + masterWindow.animW) > (parent.width - 10)) ? masterWindow.animW : 0
-        
-        // Animate the mask to perfectly follow the morphing widget
-        Behavior on anchors.leftMargin { NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
-        Behavior on anchors.rightMargin { NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
+        anchors.leftMargin: (masterWindow.currentActive !== "hidden" && masterWindow.animX < 10 && masterWindow.animY < height) ? masterWindow.animW : 0
+        anchors.rightMargin: (masterWindow.currentActive !== "hidden" && (masterWindow.animX + masterWindow.animW) > (parent.width - 10) && masterWindow.animY < height) ? masterWindow.animW : 0
+
+        Behavior on anchors.leftMargin {
+            enabled: masterWindow.currentActive !== "hidden"
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
+        }
+        Behavior on anchors.rightMargin {
+            enabled: masterWindow.currentActive !== "hidden"
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
+        }
     }
 
     MouseArea {
@@ -60,28 +103,64 @@ PanelWindow {
         onClicked: switchWidget("hidden", "")
     }
 
-    Component.onCompleted: {
-        // State is now strictly in memory; no need to write to /tmp on startup.
+    // =========================================================
+    // --- DAEMON: PRELOADING SYSTEM
+    // =========================================================
+    Item {
+        id: preloaderContainer
+        visible: false
     }
+
+    property var widgetCache: ({})
+
+    function preloadWidget(name) {
+        if (widgetCache[name]) return;
+        let t = getLayout(name);
+        if (!t || !t.comp) return;
+        let obj = t.comp.createObject(preloaderContainer, {
+            "notifModel": masterWindow.notifModel,
+            "liveNotifs": masterWindow.liveNotifs,
+            "visible": false
+        });
+        if (obj) widgetCache[name] = obj;
+    }
+
+    Component.onCompleted: {
+        Qt.callLater(() => preloadWidget("settings"));
+        preloadStaggerTimer.start();
+    }
+
+    Timer {
+        id: preloadStaggerTimer
+        interval: 900
+        repeat: false
+        onTriggered: {
+            preloadWidget("search");
+            preloadWidget("help");
+        }
+    }
+
+    // =========================================================
 
     property string currentActive: "hidden"
 
     onCurrentActiveChanged: {
-        // Broadcast active state so TopBar knows when to morph
-        Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > /tmp/qs_current_widget"]);
+        Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > " + paths.runDir + "/current_widget"]);
     }
 
     property bool isVisible: false
     property string activeArg: ""
-    property bool disableMorph: false 
-    property int morphDuration: 250
-    property int exitDuration: 150 // Controls how fast the outgoing widget disappears
+    property bool disableMorph: false
+
+    property int morphDuration: 230
+    property int morphDurationSwitch: 210
+    property int exitDuration: 160
 
     property real animW: 1
     property real animH: 1
     property real animX: 0
     property real animY: 0
-    
+
     property real targetW: 1
     property real targetH: 1
 
@@ -90,17 +169,19 @@ PanelWindow {
     // =========================================================
     // --- DAEMON: NOTIFICATION HANDLING
     // =========================================================
-    // 1. Permanent History (For the Notification Center)
-    ListModel {
-        id: globalNotificationHistory
-    }
+    ListModel { id: globalNotificationHistory }
+    ListModel { id: activePopupsModel }
 
-    // 2. Transient Popups (For the OSD)
-    ListModel {
-        id: activePopupsModel
-    }
-
+    property var liveNotifs: ({})
     property int _popupCounter: 0
+
+    // --- NEW: Startup Grace Period Flag & Timer ---
+    property bool isStartup: true
+    Timer {
+        interval: 500
+        running: true
+        onTriggered: masterWindow.isStartup = false
+    }
 
     function removePopup(uid) {
         for (let i = 0; i < activePopupsModel.count; i++) {
@@ -109,7 +190,7 @@ PanelWindow {
                 break;
             }
         }
-    }
+    } 
 
     NotificationServer {
         id: globalNotificationServer
@@ -118,43 +199,59 @@ PanelWindow {
         imageSupported: true
 
         onNotification: (n) => {
-            console.log("Saving to history:", n.appName, "-", n.summary);
-            
+            n.tracked = true;
+
+            let extractedActions = [];
+            if (n.actions) {
+                for (let i = 0; i < n.actions.length; i++) {
+                    extractedActions.push({
+                        "id": n.actions[i].identifier || "",
+                        "text": n.actions[i].text || n.actions[i].name || "Action"
+                    });
+                }
+            }
+
+            masterWindow._popupCounter++;
+            let currentUid = masterWindow._popupCounter;
+
+            // Always store the live object so the history center can interact with it
+            masterWindow.liveNotifs[currentUid] = n;
+
             let notifData = {
-                "appName": n.appName !== "" ? n.appName : "System",
-                "summary": n.summary !== "" ? n.summary : "No Title",
-                "body": n.body !== "" ? n.body : "",
-                "iconPath": n.appIcon !== "" ? n.appIcon : "", // <-- ADDED: Save the -i parameter path
-                "notif": n
+                "appName":     n.appName  !== "" ? n.appName  : "System",
+                "summary":     n.summary  !== "" ? n.summary  : "No Title",
+                "body":        n.body     !== "" ? n.body     : "",
+                "iconPath":    n.appIcon  !== "" ? n.appIcon  : "",
+                "actionsJson": JSON.stringify(extractedActions),
+                "uid":         currentUid,
+                "notif":       n
             };
 
-            // A. Insert into the permanent center
+            // Always silently add to the history list
             globalNotificationHistory.insert(0, notifData);
 
-            // B. Append to the on-screen popups
-            masterWindow._popupCounter++;
-            let popupData = Object.assign({ "uid": masterWindow._popupCounter }, notifData);
-            activePopupsModel.append(popupData);
+            // --- CHANGED: Only trigger the visual popup if we are past the startup phase ---
+            if (!masterWindow.isStartup) {
+                activePopupsModel.append(notifData);
+                osdPopups.storeNotif(currentUid, n);
+            }
         }
-    }   
+    }
+
     property var notifModel: globalNotificationHistory
-    
-    // --- INSTANTIATE THE POPUP OVERLAY ---
+
     Notifs.NotificationPopups {
         id: osdPopups
         popupModel: activePopupsModel
         uiScale: masterWindow.globalUiScale
+        onRemoveRequested: (uid) => masterWindow.removePopup(uid)
     }
-    // =========================================================
-
-    onGlobalUiScaleChanged: {
-        handleNativeScreenChange();
-    }
+    onGlobalUiScaleChanged: { handleNativeScreenChange(); }
 
     Process {
         id: settingsReader
         command: ["bash", "-c", "cat ~/.config/hypr/settings.json 2>/dev/null || echo '{}'"]
-        running: true 
+        running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -179,72 +276,105 @@ PanelWindow {
             onStreamFinished: {
                 settingsReader.running = false;
                 settingsReader.running = true;
-                
                 settingsWatcher.running = false;
                 settingsWatcher.running = true;
             }
         }
     }
 
-    // FIXED: Use masterWindow dimensions instead of the static Screen singleton
+    // =========================================================
+    // --- LAYOUT CACHE
+    // =========================================================
+    property var    _layoutCache:    ({})
+    property string _layoutCacheKey: ""
+
     function getLayout(name) {
-        return Registry.getLayout(name, 0, 0, masterWindow.width, masterWindow.height, masterWindow.globalUiScale);
+        let key = name + "|" + masterWindow.width + "|" + masterWindow.height + "|" + masterWindow.globalUiScale;
+        if (_layoutCacheKey === key) return _layoutCache[key];
+        let result = Registry.getLayout(name, 0, 0, masterWindow.width, masterWindow.height, masterWindow.globalUiScale);
+        _layoutCache = {};
+        _layoutCache[key] = result;
+        _layoutCacheKey = key;
+        return result;
     }
 
-    // FIXED: Target masterWindow directly so it catches local geometry changes.
     Connections {
         target: masterWindow
-        function onWidthChanged() { handleNativeScreenChange(); }
-        function onHeightChanged() { handleNativeScreenChange(); }
+        function onWidthChanged()  { _layoutCacheKey = ""; handleNativeScreenChange(); }
+        function onHeightChanged() { _layoutCacheKey = ""; handleNativeScreenChange(); }
     }
 
     function handleNativeScreenChange() {
         if (masterWindow.currentActive === "hidden") return;
-        
+
         let t = getLayout(masterWindow.currentActive);
-        if (t) {
-            masterWindow.animX = t.rx;
-            masterWindow.animY = t.ry;
-            masterWindow.animW = t.w;
-            masterWindow.animH = t.h;
-            masterWindow.targetW = t.w;
-            masterWindow.targetH = t.h;
+        if (!t) return;
+
+        let currentItem = widgetStack.currentItem;
+        let finalW = (currentItem && currentItem.targetMasterWidth  !== undefined) ? currentItem.targetMasterWidth  : t.w;
+        let finalH = (currentItem && currentItem.targetMasterHeight !== undefined) ? currentItem.targetMasterHeight : t.h;
+        let finalX = t.rx;
+        if (currentItem && currentItem.targetMasterWidth !== undefined && finalW !== t.w) {
+            finalX = Math.floor((masterWindow.width / 2) - (finalW / 2));
         }
+
+        masterWindow.animX = finalX;
+        masterWindow.animY = t.ry;
+        masterWindow.animW = finalW;
+        masterWindow.animH = finalH;
+        masterWindow.targetW = finalW;
+        masterWindow.targetH = finalH;
     }
 
     onIsVisibleChanged: {
         if (isVisible) widgetStack.forceActiveFocus();
     }
 
+    // =========================================================
+    // --- ANIMATED BOUNDING BOX
+    // =========================================================
     Item {
         x: masterWindow.animX
         y: masterWindow.animY
-        width: masterWindow.animW
+        width:  masterWindow.animW
         height: masterWindow.animH
-        clip: true 
+        clip: true
 
-        Behavior on x { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
-        Behavior on y { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
-        Behavior on width { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
-        Behavior on height { enabled: !masterWindow.disableMorph; NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutQuart } }
-
-        opacity: masterWindow.isVisible ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: masterWindow.morphDuration === 250 ? 150 : 150; easing.type: Easing.InOutSine } }
-
-        MouseArea {
-            anchors.fill: parent
+        Behavior on x {
+            enabled: !masterWindow.disableMorph
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
+        }
+        Behavior on y {
+            enabled: !masterWindow.disableMorph
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
+        }
+        Behavior on width {
+            enabled: !masterWindow.disableMorph
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
+        }
+        Behavior on height {
+            enabled: !masterWindow.disableMorph
+            NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.OutCubic }
         }
 
+        opacity: masterWindow.isVisible ? 1.0 : 0.0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 160
+                easing.type: masterWindow.isVisible ? Easing.OutCubic : Easing.InCubic
+            }
+        }
+
+        MouseArea { anchors.fill: parent }
+
         Item {
-            anchors.centerIn: parent
-            width: masterWindow.targetW
-            height: masterWindow.targetH
+            anchors.fill: parent
 
             StackView {
                 id: widgetStack
                 anchors.fill: parent
                 focus: true
-                
+
                 Keys.onEscapePressed: {
                     switchWidget("hidden", "");
                     event.accepted = true;
@@ -256,72 +386,83 @@ PanelWindow {
 
                 replaceEnter: Transition {
                     ParallelAnimation {
-                        NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 250; easing.type: Easing.OutExpo }
-                        NumberAnimation { property: "scale"; from: 0.98; to: 1.0; duration: 250; easing.type: Easing.OutBack }
+                        NumberAnimation {
+                            property: "opacity"
+                            from: 0.0; to: 1.0
+                            duration: masterWindow.morphDurationSwitch
+                            easing.type: Easing.OutQuint
+                        }
+                        NumberAnimation {
+                            property: "scale"
+                            from: 0.98; to: 1.0
+                            duration: masterWindow.morphDurationSwitch
+                            easing.type: Easing.OutCubic
+                        }
                     }
                 }
+
                 replaceExit: Transition {
                     ParallelAnimation {
-                        NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: masterWindow.exitDuration; easing.type: Easing.InExpo }
-                        NumberAnimation { property: "scale"; from: 1.0; to: 1.02; duration: masterWindow.exitDuration; easing.type: Easing.InExpo }
+                        NumberAnimation {
+                            property: "opacity"
+                            from: 1.0; to: 0.0
+                            duration: masterWindow.morphDurationSwitch
+                            easing.type: Easing.InQuint
+                        }
+                        NumberAnimation {
+                            property: "scale"
+                            from: 1.0; to: 0.98
+                            duration: masterWindow.morphDurationSwitch
+                            easing.type: Easing.OutCubic
+                        }
                     }
                 }
             }
         }
     }
 
+    // =========================================================
+    // --- WIDGET SWITCHING
+    // =========================================================
     function switchWidget(newWidget, arg) {
-        prepTimer.stop();
         delayedClear.stop();
 
         if (newWidget === "hidden") {
             if (currentActive !== "hidden") {
-                masterWindow.morphDuration = 150; 
-                masterWindow.exitDuration = 150;
+                masterWindow.morphDuration = masterWindow.exitDuration;
                 masterWindow.disableMorph = false;
-                
+
                 masterWindow.animW = 1;
                 masterWindow.animH = 1;
-                masterWindow.isVisible = false; 
-                
+                masterWindow.isVisible = false;
+
                 delayedClear.start();
             }
         } else {
-            if (currentActive === "hidden") {
-                masterWindow.morphDuration = 200;
-                masterWindow.exitDuration = 150;
+            if (currentActive === "hidden" || !masterWindow.isVisible) {
+                masterWindow.morphDuration = 230;
                 masterWindow.disableMorph = false;
-                
+
                 let t = getLayout(newWidget);
                 masterWindow.animX = t.rx;
                 masterWindow.animY = t.ry;
-                masterWindow.animW = 1;
-                masterWindow.animH = 1;
+                masterWindow.animW = t.w;
+                masterWindow.animH = t.h;
+                masterWindow.targetW = t.w;
+                masterWindow.targetH = t.h;
             } else {
-                masterWindow.morphDuration = 250;
+                masterWindow.morphDuration = masterWindow.morphDurationSwitch;
                 masterWindow.disableMorph = false;
-                masterWindow.exitDuration = (newWidget === "wallpaper") ? 100 : 150;
             }
 
-            // Route all incoming widgets through the debounce timer to prevent StackView corruption
-            prepTimer.newWidget = newWidget;
-            prepTimer.newArg = arg;
-            prepTimer.start();
+            Qt.callLater(() => executeSwitch(newWidget, arg, false));
         }
-    }
-
-    Timer {
-        id: prepTimer
-        interval: 15 
-        property string newWidget: ""
-        property string newArg: ""
-        onTriggered: executeSwitch(newWidget, newArg, false)
     }
 
     function executeSwitch(newWidget, arg, immediate) {
         masterWindow.currentActive = newWidget;
         masterWindow.activeArg = arg;
-        
+
         let t = getLayout(newWidget);
         masterWindow.animX = t.rx;
         masterWindow.animY = t.ry;
@@ -329,85 +470,57 @@ PanelWindow {
         masterWindow.animH = t.h;
         masterWindow.targetW = t.w;
         masterWindow.targetH = t.h;
-        
-        let props = newWidget === "wallpaper" ? { "widgetArg": arg } : {};
-        props["notifModel"] = masterWindow.notifModel;
 
-        // CRITICAL FIX: Fallback to Immediate if the StackView is already busy with an interrupted transition.
-        if (immediate || widgetStack.busy) {
-            widgetStack.replace(t.comp, props, StackView.Immediate);
+        let props = {};
+        props["notifModel"]   = masterWindow.notifModel;
+        props["liveNotifs"]   = masterWindow.liveNotifs;
+        props["layoutWidth"]  = t.w;
+        props["layoutHeight"] = t.h;
+        if (newWidget === "wallpaper") props["widgetArg"] = arg;
+
+        let cached = widgetCache[newWidget];
+        if (cached) {
+            if (cached.notifModel   !== undefined) cached.notifModel   = masterWindow.notifModel;
+            if (cached.liveNotifs   !== undefined) cached.liveNotifs   = masterWindow.liveNotifs;
+            if (cached.layoutWidth  !== undefined) cached.layoutWidth  = t.w;
+            if (cached.layoutHeight !== undefined) cached.layoutHeight = t.h;
+            if (newWidget === "wallpaper" && cached.widgetArg !== undefined) cached.widgetArg = arg;
+            if (arg !== "" && cached.activeMode !== undefined) cached.activeMode = arg;
+
+            cached.visible = true;
+            if (immediate) {
+                widgetStack.replace(cached, {}, StackView.Immediate);
+            } else {
+                widgetStack.replace(cached, {});
+            }
         } else {
-            widgetStack.replace(t.comp, props);
+            if (immediate) {
+                widgetStack.replace(t.comp, props, StackView.Immediate);
+            } else {
+                widgetStack.replace(t.comp, props);
+            }
         }
-        
+
+        let currentItem = widgetStack.currentItem;
+        if (currentItem) {
+            if (currentItem.targetMasterWidth !== undefined) {
+                let dynW = currentItem.targetMasterWidth;
+                masterWindow.animW = dynW;
+                masterWindow.targetW = dynW;
+                masterWindow.animX = Math.floor((masterWindow.width / 2) - (dynW / 2));
+            }
+            if (currentItem.targetMasterHeight !== undefined) {
+                masterWindow.animH = currentItem.targetMasterHeight;
+                masterWindow.targetH = currentItem.targetMasterHeight;
+            }
+        }
+
         masterWindow.isVisible = true;
     }
 
-    // =========================================================
-    // --- IPC: EVENT-DRIVEN WATCHER
-    // =========================================================
-    Process {
-        id: ipcWatcher
-        command: ["bash", "-c",
-            "touch /tmp/qs_widget_state; " +
-            "inotifywait -qq -e close_write /tmp/qs_widget_state 2>/dev/null; " +
-            "cat /tmp/qs_widget_state"
-        ]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let rawCmd = this.text.trim();
-
-                if (rawCmd !== "") {
-                    let parts = rawCmd.split(":");
-                    let cmd = parts[0];
-
-                    if (cmd === "close") {
-                        switchWidget("hidden", "");
-                    } else if (cmd === "toggle" || cmd === "open") {
-                        let targetWidget = parts.length > 1 ? parts[1] : "";
-                        let arg = parts.length > 2 ? parts.slice(2).join(":") : "";
-
-                        delayedClear.stop();
-                        
-                        if (targetWidget === masterWindow.currentActive) {
-                            let currentItem = widgetStack.currentItem;
-                            
-                            if (arg !== "" && currentItem && currentItem.activeMode !== undefined && currentItem.activeMode !== arg) {
-                                currentItem.activeMode = arg;
-                            } 
-                            else if (cmd === "toggle") {
-                                switchWidget("hidden", "");
-                            }
-                            
-                        } else if (getLayout(targetWidget)) {
-                            switchWidget(targetWidget, arg);
-                        }
-                    } else if (getLayout(cmd)) { 
-                        let arg = parts.length > 1 ? parts.slice(1).join(":") : "";
-                        delayedClear.stop();
-                        
-                        if (cmd === masterWindow.currentActive) {
-                            let currentItem = widgetStack.currentItem;
-                            if (arg !== "" && currentItem && currentItem.activeMode !== undefined && currentItem.activeMode !== arg) {
-                                currentItem.activeMode = arg;
-                            } else {
-                                switchWidget("hidden", "");
-                            }
-                        } else {
-                            switchWidget(cmd, arg);
-                        }
-                    }
-                }
-
-                ipcWatcher.running = false;
-                ipcWatcher.running = true;
-            }
-        }
-    }   
     Timer {
         id: delayedClear
-        interval: masterWindow.morphDuration 
+        interval: 200
         onTriggered: {
             masterWindow.currentActive = "hidden";
             widgetStack.clear();

@@ -473,7 +473,7 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     let type = window.activeTab === "inputs" ? "source" : "sink";
-                                    Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "toggle-mute", type, window.activeId]);
+                                    Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "toggle-mute", type, "@DEFAULT@"]);
                                     audioPoller.running = true;
                                 }
                             }
@@ -520,9 +520,9 @@ Item {
                                             if (targetPct >= 0) {
                                                 let type = window.activeTab === "inputs" ? "source" : "sink";
                                                 if (targetPct > 0 && window.activeMute) {
-                                                    Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "toggle-mute", type, window.activeId]);
+                                                    Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "toggle-mute", type, "@DEFAULT@"]);
                                                 }
-                                                Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "set-volume", type, window.activeId, targetPct]);
+                                                Quickshell.execDetached(["bash", window.scriptsDir + "/audio_control.sh", "set-volume", type, "@DEFAULT@", targetPct]);
                                                 targetPct = -1;
                                             }
                                         }
