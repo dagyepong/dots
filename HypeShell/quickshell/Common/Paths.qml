@@ -1,0 +1,133 @@
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import Quickshell
+import QtCore
+import qs.Services
+
+Singleton {
+    id: root
+
+    readonly property url home: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
+    readonly property url pictures: StandardPaths.standardLocations(StandardPaths.PicturesLocation)[0]
+    readonly property url xdgCache: StandardPaths.standardLocations(StandardPaths.GenericCacheLocation)[0]
+
+    readonly property url data: `${StandardPaths.standardLocations(StandardPaths.GenericDataLocation)[0]}/HypeShell`
+    readonly property url state: `${StandardPaths.standardLocations(StandardPaths.GenericStateLocation)[0]}/HypeShell`
+    readonly property url cache: `${StandardPaths.standardLocations(StandardPaths.GenericCacheLocation)[0]}/HypeShell`
+    readonly property url config: `${StandardPaths.standardLocations(StandardPaths.GenericConfigLocation)[0]}/HypeShell`
+
+    readonly property url imagecache: `${cache}/imagecache`
+
+    function stringify(path: url): string {
+        return path.toString().replace(/%20/g, " ");
+    }
+
+    function expandTilde(path: string): string {
+        if (!path.startsWith("~"))
+            return path;
+        return strip(root.home) + path.substring(1);
+    }
+
+    function shortenHome(path: string): string {
+        return path.replace(strip(root.home), "~");
+    }
+
+    function strip(path: url): string {
+        return stringify(path).replace("file://", "");
+    }
+
+    function toFileUrl(path: string): string {
+        return path.startsWith("file://") ? path : "file://" + path;
+    }
+
+    function mkdir(path: url): void {
+        Quickshell.execDetached(["mkdir", "-p", strip(path)]);
+    }
+
+    function copy(from: url, to: url): void {
+        Quickshell.execDetached(["cp", strip(from), strip(to)]);
+    }
+
+    function isSteamApp(appId: string): bool {
+        return appId && /^steam_app_\d+$/.test(appId);
+    }
+
+    function moddedAppId(appId: string): string {
+        const subs = SettingsData.appIdSubstitutions || [];
+        for (let i = 0; i < subs.length; i++) {
+            const sub = subs[i];
+            if (sub.type === "exact" && appId === sub.pattern) {
+                return sub.replacement;
+            } else if (sub.type === "contains" && appId.includes(sub.pattern)) {
+                return sub.replacement;
+            } else if (sub.type === "regex") {
+                const match = appId.match(new RegExp(sub.pattern));
+                if (match) {
+                    return sub.replacement.replace(/\$(\d+)/g, (_, n) => match[n] || "");
+                }
+            }
+        }
+        const steamMatch = appId.match(/^steam_app_(\d+)$/);
+        if (steamMatch)
+            return `steam_icon_${steamMatch[1]}`;
+        return appId;
+    }
+
+    function resolveIconPath(iconName: string): string {
+        if (!iconName)
+            return "";
+        const moddedId = moddedAppId(iconName);
+        if (moddedId !== iconName) {
+            if (moddedId.startsWith("~") || moddedId.startsWith("/"))
+                return toFileUrl(expandTilde(moddedId));
+            if (moddedId.startsWith("file://"))
+                return moddedId;
+            return Quickshell.iconPath(moddedId, true);
+        }
+        return Quickshell.iconPath(iconName, true) || DesktopService.resolveIconPath(iconName);
+    }
+
+    function resolveIconUrl(iconName: string): string {
+        if (!iconName)
+            return "";
+        const moddedId = moddedAppId(iconName);
+        if (moddedId !== iconName) {
+            if (moddedId.startsWith("~") || moddedId.startsWith("/"))
+                return toFileUrl(expandTilde(moddedId));
+            if (moddedId.startsWith("file://"))
+                return moddedId;
+            return "image://icon/" + moddedId;
+        }
+        return "image://icon/" + iconName;
+    }
+
+    function getAppIcon(appId: string, desktopEntry: var): string {
+        // ! TODO - after QS 0.3, we can install our icon properly
+        if (appId === "org.quickshell" || appId === "com.hypeshell.shell") {
+            return Qt.resolvedUrl("../assets/hypeshell-logo.svg");
+        }
+
+        const moddedId = moddedAppId(appId);
+        if (moddedId !== appId)
+            return resolveIconPath(appId);
+
+        if (desktopEntry && desktopEntry.icon) {
+            return Quickshell.iconPath(desktopEntry.icon, true);
+        }
+
+        const icon = Quickshell.iconPath(appId, true);
+        if (icon && icon !== "")
+            return icon;
+
+        return DesktopService.resolveIconPath(appId);
+    }
+
+    function getAppName(appId: string, desktopEntry: var): string {
+        if (appId === "org.quickshell" || appId === "com.hypeshell.shell") {
+            return "hype";
+        }
+
+        return desktopEntry && desktopEntry.name ? desktopEntry.name : appId;
+    }
+}

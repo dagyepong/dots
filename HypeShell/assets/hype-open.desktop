@@ -1,0 +1,10 @@
+﻿[Desktop Entry]
+Type=Application
+Name=HypeShell
+Comment=Select an application to open links and files
+Exec=hype open %u
+Icon=hypeshell-logo
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/hype;x-scheme-handler/hype;text/html;application/xhtml+xml;
+Categories=Utility;

@@ -1,0 +1,1947 @@
+﻿package clipboard
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"syscall"
+	"time"
+
+	"hash/fnv"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/godbus/dbus/v5"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
+
+	bolt "go.etcd.io/bbolt"
+
+	clipboardstore "github.com/acarlton5/HypeShell/core/internal/clipboard"
+	"github.com/acarlton5/HypeShell/core/internal/log"
+	"github.com/acarlton5/HypeShell/core/internal/proto/ext_data_control"
+	"github.com/acarlton5/HypeShell/core/internal/server/wlcontext"
+	wlclient "github.com/acarlton5/HypeShell/core/pkg/go-wayland/wayland/client"
+)
+
+// These mime types won't be stored in history
+var sensitiveMimeTypes = []string{
+	"x-kde-passwordManagerHint",
+}
+
+func NewManager(wlCtx wlcontext.WaylandContext, config Config) (*Manager, error) {
+	display := wlCtx.Display()
+	dbPath, err := clipboardstore.GetDBPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db path: %w", err)
+	}
+
+	configPath, _ := getConfigPath()
+
+	m := &Manager{
+		config:         config,
+		configPath:     configPath,
+		display:        display,
+		wlCtx:          wlCtx,
+		stopChan:       make(chan struct{}),
+		subscribers:    make(map[string]chan State),
+		dirty:          make(chan struct{}, 1),
+		offerMimeTypes: make(map[any][]string),
+		offerRegistry:  make(map[uint32]any),
+		dbPath:         dbPath,
+	}
+
+	if !config.Disabled {
+		if err := m.setupRegistry(); err != nil {
+			return nil, err
+		}
+	}
+
+	m.notifierWg.Add(1)
+	go m.notifier()
+
+	go m.watchConfig()
+
+	db, err := openDB(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open db: %w", err)
+	}
+	m.db = db
+
+	if err := m.migrateHashes(); err != nil {
+		log.Errorf("Failed to migrate hashes: %v", err)
+	}
+
+	if !config.Disabled {
+		if config.ClearAtStartup {
+			if err := m.clearHistoryInternal(); err != nil {
+				log.Errorf("Failed to clear history at startup: %v", err)
+			}
+		}
+
+		if config.AutoClearDays > 0 {
+			if err := m.clearOldEntries(config.AutoClearDays); err != nil {
+				log.Errorf("Failed to clear old entries: %v", err)
+			}
+		}
+	}
+
+	m.alive = true
+	m.updateState()
+
+	if !config.Disabled && m.dataControlMgr != nil && m.seat != nil {
+		m.setupDataDeviceSync()
+	}
+
+	return m, nil
+}
+
+func openDB(path string) (*bolt.DB, error) {
+	db, err := bolt.Open(path, 0o644, &bolt.Options{
+		Timeout: 1 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("clipboard"))
+		return err
+	})
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func (m *Manager) post(fn func()) {
+	m.wlCtx.Post(fn)
+}
+
+func (m *Manager) setupRegistry() error {
+	ctx := m.display.Context()
+
+	registry, err := m.display.GetRegistry()
+	if err != nil {
+		return fmt.Errorf("failed to get registry: %w", err)
+	}
+	m.registry = registry
+
+	registry.SetGlobalHandler(func(e wlclient.RegistryGlobalEvent) {
+		switch e.Interface {
+		case "ext_data_control_manager_v1":
+			if e.Version < 1 {
+				return
+			}
+			dataControlMgr := ext_data_control.NewExtDataControlManagerV1(ctx)
+			if err := registry.Bind(e.Name, e.Interface, e.Version, dataControlMgr); err != nil {
+				log.Errorf("Failed to bind ext_data_control_manager_v1: %v", err)
+				return
+			}
+			m.dataControlMgr = dataControlMgr
+			log.Info("Bound ext_data_control_manager_v1")
+		case "wl_seat":
+			seat := wlclient.NewSeat(ctx)
+			if err := registry.Bind(e.Name, e.Interface, e.Version, seat); err != nil {
+				log.Errorf("Failed to bind wl_seat: %v", err)
+				return
+			}
+			m.seat = seat
+			m.seatName = e.Name
+			log.Info("Bound wl_seat")
+		}
+	})
+
+	m.display.Roundtrip()
+	m.display.Roundtrip()
+
+	if m.dataControlMgr == nil {
+		return fmt.Errorf("compositor does not support ext_data_control_manager_v1")
+	}
+
+	if m.seat == nil {
+		return fmt.Errorf("no seat available")
+	}
+
+	return nil
+}
+
+func (m *Manager) setupDataDeviceSync() {
+	if m.dataControlMgr == nil || m.seat == nil {
+		return
+	}
+
+	ctx := m.display.Context()
+	dataMgr := m.dataControlMgr.(*ext_data_control.ExtDataControlManagerV1)
+
+	dataDevice := ext_data_control.NewExtDataControlDeviceV1(ctx)
+
+	dataDevice.SetDataOfferHandler(func(e ext_data_control.ExtDataControlDeviceV1DataOfferEvent) {
+		if e.Id == nil {
+			return
+		}
+
+		m.offerMutex.Lock()
+		m.offerRegistry[e.Id.ID()] = e.Id
+		m.offerMimeTypes[e.Id] = make([]string, 0)
+		m.offerMutex.Unlock()
+
+		e.Id.SetOfferHandler(func(me ext_data_control.ExtDataControlOfferV1OfferEvent) {
+			m.offerMutex.Lock()
+			m.offerMimeTypes[e.Id] = append(m.offerMimeTypes[e.Id], me.MimeType)
+			m.offerMutex.Unlock()
+		})
+	})
+
+	dataDevice.SetSelectionHandler(func(e ext_data_control.ExtDataControlDeviceV1SelectionEvent) {
+		if !m.initialized {
+			m.initialized = true
+			return
+		}
+
+		var offer any
+		switch {
+		case e.Id != nil:
+			offer = e.Id
+		case e.OfferId != 0:
+			m.offerMutex.RLock()
+			offer = m.offerRegistry[e.OfferId]
+			m.offerMutex.RUnlock()
+		}
+
+		m.ownerLock.Lock()
+		wasOwner := m.isOwner
+		m.ownerLock.Unlock()
+
+		if wasOwner {
+			return
+		}
+
+		prevOffer := m.currentOffer
+		m.currentOffer = offer
+
+		if prevOffer != nil && prevOffer != offer {
+			m.releaseOffer(prevOffer)
+		}
+
+		if offer == nil {
+			return
+		}
+
+		m.offerMutex.RLock()
+		mimes := m.offerMimeTypes[offer]
+		m.offerMutex.RUnlock()
+
+		m.mimeTypes = mimes
+
+		if len(mimes) == 0 {
+			return
+		}
+
+		if m.hasSensitiveMimeType(mimes) {
+			return
+		}
+
+		preferredMime := m.selectMimeType(mimes)
+		if preferredMime == "" {
+			return
+		}
+
+		typedOffer := offer.(*ext_data_control.ExtDataControlOfferV1)
+
+		r, w, err := os.Pipe()
+		if err != nil {
+			return
+		}
+
+		if err := typedOffer.Receive(preferredMime, int(w.Fd())); err != nil {
+			r.Close()
+			w.Close()
+			return
+		}
+		w.Close()
+
+		go m.readAndStore(r, preferredMime)
+	})
+
+	if err := dataMgr.GetDataDeviceWithProxy(dataDevice, m.seat); err != nil {
+		log.Errorf("Failed to send get_data_device request: %v", err)
+		return
+	}
+
+	m.dataDevice = dataDevice
+
+	if err := ctx.Dispatch(); err != nil {
+		log.Errorf("Failed to dispatch initial events: %v", err)
+		return
+	}
+
+	log.Info("Data device setup complete")
+}
+
+func (m *Manager) releaseOffer(offer any) {
+	if offer == nil {
+		return
+	}
+	typedOffer, ok := offer.(*ext_data_control.ExtDataControlOfferV1)
+	if !ok {
+		return
+	}
+	m.offerMutex.Lock()
+	delete(m.offerMimeTypes, offer)
+	delete(m.offerRegistry, typedOffer.ID())
+	m.offerMutex.Unlock()
+	typedOffer.Destroy()
+}
+
+func (m *Manager) releaseCurrentSource() {
+	if m.currentSource == nil {
+		return
+	}
+	source, ok := m.currentSource.(*ext_data_control.ExtDataControlSourceV1)
+	m.currentSource = nil
+	if !ok {
+		return
+	}
+	source.Destroy()
+}
+
+func (m *Manager) readAndStore(r *os.File, mimeType string) {
+	defer r.Close()
+
+	cfg := m.getConfig()
+
+	done := make(chan []byte, 1)
+	go func() {
+		data, _ := io.ReadAll(r)
+		done <- data
+	}()
+
+	var data []byte
+	select {
+	case data = <-done:
+	case <-time.After(500 * time.Millisecond):
+		return
+	}
+
+	if len(data) == 0 || int64(len(data)) > cfg.MaxEntrySize {
+		return
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return
+	}
+
+	if !cfg.Disabled && m.db != nil {
+		m.storeClipboardEntry(data, mimeType)
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+}
+
+func (m *Manager) storeClipboardEntry(data []byte, mimeType string) {
+	if mimeType == "text/uri-list" {
+		if imgData, imgMime, ok := m.tryReadImageFromURI(data); ok {
+			data = imgData
+			mimeType = imgMime
+		}
+	}
+
+	entry := Entry{
+		Data:      data,
+		MimeType:  mimeType,
+		Size:      len(data),
+		Timestamp: time.Now(),
+		IsImage:   m.isImageMimeType(mimeType),
+	}
+
+	switch {
+	case entry.IsImage:
+		entry.Preview = m.imagePreview(data, mimeType)
+	case mimeType == "text/uri-list":
+		entry.Preview, entry.IsImage = m.uriListPreview(data)
+	default:
+		entry.Preview = m.textPreview(data)
+	}
+
+	if err := m.storeEntry(entry); err != nil {
+		log.Errorf("Failed to store clipboard entry: %v", err)
+	}
+}
+
+func (m *Manager) storeEntry(entry Entry) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	entry.Hash = computeHash(entry.Data)
+
+	return m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+
+		if err := m.deduplicateInTx(b, entry.Hash); err != nil {
+			return err
+		}
+
+		id, err := b.NextSequence()
+		if err != nil {
+			return err
+		}
+
+		entry.ID = id
+
+		encoded, err := encodeEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		if err := b.Put(itob(id), encoded); err != nil {
+			return err
+		}
+
+		return m.trimLengthInTx(b)
+	})
+}
+
+func (m *Manager) deduplicateInTx(b *bolt.Bucket, hash uint64) error {
+	c := b.Cursor()
+	for k, v := c.Last(); k != nil; k, v = c.Prev() {
+		if extractHash(v) != hash {
+			continue
+		}
+		entry, err := decodeEntryMeta(v)
+		if err == nil && entry.Pinned {
+			continue
+		}
+		if err := b.Delete(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) trimLengthInTx(b *bolt.Bucket) error {
+	if m.config.MaxHistory < 0 {
+		return nil
+	}
+	c := b.Cursor()
+	var count int
+	for k, v := c.Last(); k != nil; k, v = c.Prev() {
+		entry, err := decodeEntryMeta(v)
+		if err == nil && entry.Pinned {
+			continue
+		}
+		if count < m.config.MaxHistory {
+			count++
+			continue
+		}
+		if err := b.Delete(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func encodeEntry(e Entry) ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	binary.Write(buf, binary.BigEndian, e.ID)
+	binary.Write(buf, binary.BigEndian, uint32(len(e.Data)))
+	buf.Write(e.Data)
+	binary.Write(buf, binary.BigEndian, uint32(len(e.MimeType)))
+	buf.WriteString(e.MimeType)
+	binary.Write(buf, binary.BigEndian, uint32(len(e.Preview)))
+	buf.WriteString(e.Preview)
+	binary.Write(buf, binary.BigEndian, int32(e.Size))
+	binary.Write(buf, binary.BigEndian, e.Timestamp.Unix())
+	if e.IsImage {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+	binary.Write(buf, binary.BigEndian, e.Hash)
+	if e.Pinned {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func decodeEntry(data []byte) (Entry, error) {
+	return decodeEntryFields(data, true)
+}
+
+func decodeEntryMeta(data []byte) (Entry, error) {
+	return decodeEntryFields(data, false)
+}
+
+func decodeEntryFields(data []byte, withData bool) (Entry, error) {
+	buf := bytes.NewReader(data)
+	var e Entry
+
+	binary.Read(buf, binary.BigEndian, &e.ID)
+
+	var dataLen uint32
+	binary.Read(buf, binary.BigEndian, &dataLen)
+	switch {
+	case withData:
+		e.Data = make([]byte, dataLen)
+		buf.Read(e.Data)
+	default:
+		if _, err := buf.Seek(int64(dataLen), io.SeekCurrent); err != nil {
+			return e, err
+		}
+	}
+
+	var mimeLen uint32
+	binary.Read(buf, binary.BigEndian, &mimeLen)
+	mimeBytes := make([]byte, mimeLen)
+	buf.Read(mimeBytes)
+	e.MimeType = string(mimeBytes)
+
+	var prevLen uint32
+	binary.Read(buf, binary.BigEndian, &prevLen)
+	prevBytes := make([]byte, prevLen)
+	buf.Read(prevBytes)
+	e.Preview = string(prevBytes)
+
+	var size int32
+	binary.Read(buf, binary.BigEndian, &size)
+	e.Size = int(size)
+
+	var timestamp int64
+	binary.Read(buf, binary.BigEndian, &timestamp)
+	e.Timestamp = time.Unix(timestamp, 0)
+
+	var isImage byte
+	binary.Read(buf, binary.BigEndian, &isImage)
+	e.IsImage = isImage == 1
+
+	if buf.Len() >= 8 {
+		binary.Read(buf, binary.BigEndian, &e.Hash)
+	}
+
+	if buf.Len() >= 1 {
+		var pinnedByte byte
+		binary.Read(buf, binary.BigEndian, &pinnedByte)
+		e.Pinned = pinnedByte == 1
+	}
+
+	return e, nil
+}
+
+func itob(v uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, v)
+	return b
+}
+
+func computeHash(data []byte) uint64 {
+	h := fnv.New64a()
+	h.Write(data)
+	return h.Sum64()
+}
+
+func extractHash(data []byte) uint64 {
+	if len(data) < 9 {
+		return 0
+	}
+	return binary.BigEndian.Uint64(data[len(data)-9 : len(data)-1])
+}
+
+func (m *Manager) hasSensitiveMimeType(mimes []string) bool {
+	return slices.ContainsFunc(mimes, func(mime string) bool {
+		return slices.Contains(sensitiveMimeTypes, mime)
+	})
+}
+
+func (m *Manager) selectMimeType(mimes []string) string {
+	preferredTypes := []string{
+		"text/uri-list",
+		"text/plain;charset=utf-8",
+		"text/plain",
+		"UTF8_STRING",
+		"STRING",
+		"TEXT",
+		"image/png",
+		"image/jpeg",
+		"image/gif",
+		"image/bmp",
+		"image/tiff",
+	}
+
+	for _, pref := range preferredTypes {
+		for _, mime := range mimes {
+			if mime == pref {
+				return mime
+			}
+		}
+	}
+
+	// Skip useless MIME types when falling back
+	for _, mime := range mimes {
+		switch mime {
+		case "application/vnd.portal.filetransfer":
+			continue
+		default:
+			return mime
+		}
+	}
+
+	return ""
+}
+
+func (m *Manager) isImageMimeType(mime string) bool {
+	return strings.HasPrefix(mime, "image/")
+}
+
+func (m *Manager) textPreview(data []byte) string {
+	text := string(data)
+	text = strings.TrimSpace(text)
+	text = strings.Join(strings.Fields(text), " ")
+
+	if len(text) > 100 {
+		return text[:100] + "…"
+	}
+	return text
+}
+
+func (m *Manager) imagePreview(data []byte, format string) string {
+	config, imgFmt, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Sprintf("[[ image %s %s ]]", sizeStr(len(data)), format)
+	}
+	return fmt.Sprintf("[[ image %s %s %dx%d ]]", sizeStr(len(data)), imgFmt, config.Width, config.Height)
+}
+
+func (m *Manager) uriListPreview(data []byte) (string, bool) {
+	text := strings.TrimSpace(string(data))
+	uris := strings.Split(text, "\r\n")
+	if len(uris) == 0 {
+		uris = strings.Split(text, "\n")
+	}
+
+	if len(uris) > 1 {
+		return fmt.Sprintf("[[ %d files ]]", len(uris)), false
+	}
+
+	if len(uris) == 1 && strings.HasPrefix(uris[0], "file://") {
+		filePath := strings.TrimPrefix(uris[0], "file://")
+		info, err := os.Stat(filePath)
+		if err != nil || info.IsDir() {
+			return m.textPreview(data), false
+		}
+
+		cfg := m.getConfig()
+		if info.Size() <= cfg.MaxEntrySize {
+			if imgData, err := os.ReadFile(filePath); err == nil {
+				if config, imgFmt, err := image.DecodeConfig(bytes.NewReader(imgData)); err == nil {
+					return fmt.Sprintf("[[ file %s %s %dx%d ]]", filepath.Base(filePath), imgFmt, config.Width, config.Height), true
+				}
+			}
+		}
+		return fmt.Sprintf("[[ file %s ]]", filepath.Base(filePath)), false
+	}
+
+	return m.textPreview(data), false
+}
+
+func (m *Manager) tryReadImageFromURI(data []byte) ([]byte, string, bool) {
+	text := strings.TrimSpace(string(data))
+	uris := strings.Split(text, "\r\n")
+	if len(uris) == 0 {
+		uris = strings.Split(text, "\n")
+	}
+
+	if len(uris) != 1 || !strings.HasPrefix(uris[0], "file://") {
+		return nil, "", false
+	}
+
+	filePath := strings.TrimPrefix(uris[0], "file://")
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		return nil, "", false
+	}
+
+	cfg := m.getConfig()
+	if info.Size() > cfg.MaxEntrySize {
+		return nil, "", false
+	}
+
+	imgData, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, "", false
+	}
+
+	_, imgFmt, err := image.DecodeConfig(bytes.NewReader(imgData))
+	if err != nil {
+		return nil, "", false
+	}
+
+	return imgData, "image/" + imgFmt, true
+}
+
+func sizeStr(size int) string {
+	units := []string{"B", "KiB", "MiB"}
+	var i int
+	fsize := float64(size)
+	for fsize >= 1024 && i < len(units)-1 {
+		fsize /= 1024
+		i++
+	}
+	return fmt.Sprintf("%.0f %s", fsize, units[i])
+}
+
+func (m *Manager) updateState() {
+	history := m.GetHistory()
+
+	var current *Entry
+	if len(history) > 0 {
+		c := history[0]
+		current = &c
+	}
+
+	newState := &State{
+		Enabled: m.alive,
+		History: history,
+		Current: current,
+	}
+
+	m.stateMutex.Lock()
+	m.state = newState
+	m.stateMutex.Unlock()
+}
+
+func (m *Manager) notifier() {
+	defer m.notifierWg.Done()
+
+	for range m.dirty {
+		state := m.GetState()
+
+		if m.lastState != nil && stateEqual(m.lastState, &state) {
+			continue
+		}
+
+		m.lastState = &state
+
+		m.subMutex.RLock()
+		subs := make([]chan State, 0, len(m.subscribers))
+		for _, ch := range m.subscribers {
+			subs = append(subs, ch)
+		}
+		m.subMutex.RUnlock()
+
+		for _, ch := range subs {
+			select {
+			case ch <- state:
+			default:
+			}
+		}
+	}
+}
+
+func stateEqual(a, b *State) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Enabled != b.Enabled {
+		return false
+	}
+	if len(a.History) != len(b.History) {
+		return false
+	}
+	return true
+}
+
+func (m *Manager) GetHistory() []Entry {
+	if m.db == nil {
+		return nil
+	}
+
+	cfg := m.getConfig()
+	var cutoff time.Time
+	if cfg.AutoClearDays > 0 {
+		cutoff = time.Now().AddDate(0, 0, -cfg.AutoClearDays)
+	}
+
+	var history []Entry
+	var stale []uint64
+
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		c := b.Cursor()
+
+		for k, v := c.Last(); k != nil; k, v = c.Prev() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil {
+				continue
+			}
+			if !cutoff.IsZero() && entry.Timestamp.Before(cutoff) {
+				stale = append(stale, entry.ID)
+				continue
+			}
+			history = append(history, entry)
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to read clipboard history: %v", err)
+	}
+
+	if len(stale) > 0 {
+		go m.deleteStaleEntries(stale)
+	}
+
+	return history
+}
+
+func (m *Manager) deleteStaleEntries(ids []uint64) {
+	if m.db == nil {
+		return
+	}
+
+	if err := m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		for _, id := range ids {
+			if err := b.Delete(itob(id)); err != nil {
+				log.Errorf("Failed to delete stale entry %d: %v", id, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to delete stale entries: %v", err)
+	}
+}
+
+func (m *Manager) GetEntry(id uint64) (*Entry, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	var entry Entry
+	var found bool
+
+	err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		v := b.Get(itob(id))
+		if v == nil {
+			return nil
+		}
+
+		var err error
+		entry, err = decodeEntry(v)
+		if err != nil {
+			return err
+		}
+		found = true
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("entry not found")
+	}
+
+	return &entry, nil
+}
+
+func (m *Manager) DeleteEntry(id uint64) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	err := m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		return b.Delete(itob(id))
+	})
+
+	if err == nil {
+		m.updateState()
+		m.notifySubscribers()
+	}
+
+	return err
+}
+
+func (m *Manager) TouchEntry(id uint64) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	entry, err := m.GetEntry(id)
+	if err != nil {
+		return err
+	}
+
+	entry.Timestamp = time.Now()
+
+	if err := m.storeEntry(*entry); err != nil {
+		return err
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+
+	return nil
+}
+
+func (m *Manager) CreateHistoryEntryFromPinned(pinnedEntry *Entry) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	// Create a new unpinned entry with the same data
+	newEntry := Entry{
+		Data:      pinnedEntry.Data,
+		MimeType:  pinnedEntry.MimeType,
+		Size:      pinnedEntry.Size,
+		Timestamp: time.Now(),
+		IsImage:   pinnedEntry.IsImage,
+		Preview:   pinnedEntry.Preview,
+		Pinned:    false,
+	}
+
+	if err := m.storeEntryWithoutDedup(newEntry); err != nil {
+		return err
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+
+	return nil
+}
+
+func (m *Manager) storeEntryWithoutDedup(entry Entry) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	entry.Hash = computeHash(entry.Data)
+
+	return m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+
+		id, err := b.NextSequence()
+		if err != nil {
+			return err
+		}
+
+		entry.ID = id
+
+		encoded, err := encodeEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		if err := b.Put(itob(id), encoded); err != nil {
+			return err
+		}
+
+		return m.trimLengthInTx(b)
+	})
+}
+
+func (m *Manager) ClearHistory() {
+	if m.db == nil {
+		return
+	}
+
+	// Delete only non-pinned entries
+	if err := m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		var toDelete [][]byte
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil || !entry.Pinned {
+				toDelete = append(toDelete, k)
+			}
+		}
+
+		for _, k := range toDelete {
+			if err := b.Delete(k); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to clear clipboard history: %v", err)
+		return
+	}
+
+	pinnedCount := 0
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b != nil {
+			c := b.Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				entry, _ := decodeEntryMeta(v)
+				if entry.Pinned {
+					pinnedCount++
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to count pinned entries: %v", err)
+	}
+
+	if pinnedCount == 0 {
+		if err := m.compactDB(); err != nil {
+			log.Errorf("Failed to compact database: %v", err)
+		}
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+}
+
+func (m *Manager) compactDB() error {
+	m.db.Close()
+
+	tmpPath := m.dbPath + ".compact"
+	defer os.Remove(tmpPath)
+
+	srcDB, err := bolt.Open(m.dbPath, 0o644, &bolt.Options{ReadOnly: true, Timeout: time.Second})
+	if err != nil {
+		m.db, _ = bolt.Open(m.dbPath, 0o644, &bolt.Options{Timeout: time.Second})
+		return fmt.Errorf("open source: %w", err)
+	}
+
+	dstDB, err := bolt.Open(tmpPath, 0o644, &bolt.Options{Timeout: time.Second})
+	if err != nil {
+		srcDB.Close()
+		m.db, _ = bolt.Open(m.dbPath, 0o644, &bolt.Options{Timeout: time.Second})
+		return fmt.Errorf("open destination: %w", err)
+	}
+
+	if err := bolt.Compact(dstDB, srcDB, 0); err != nil {
+		srcDB.Close()
+		dstDB.Close()
+		m.db, _ = bolt.Open(m.dbPath, 0o644, &bolt.Options{Timeout: time.Second})
+		return fmt.Errorf("compact: %w", err)
+	}
+
+	srcDB.Close()
+	dstDB.Close()
+
+	if err := os.Rename(tmpPath, m.dbPath); err != nil {
+		m.db, _ = bolt.Open(m.dbPath, 0o644, &bolt.Options{Timeout: time.Second})
+		return fmt.Errorf("rename: %w", err)
+	}
+
+	m.db, err = bolt.Open(m.dbPath, 0o644, &bolt.Options{Timeout: time.Second})
+	if err != nil {
+		return fmt.Errorf("reopen: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) SetClipboard(data []byte, mimeType string) error {
+	if int64(len(data)) > m.config.MaxEntrySize {
+		return fmt.Errorf("data too large")
+	}
+
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
+
+	m.post(func() {
+		if m.dataControlMgr == nil || m.dataDevice == nil {
+			log.Error("Data control manager or device not initialized")
+			return
+		}
+
+		dataMgr := m.dataControlMgr.(*ext_data_control.ExtDataControlManagerV1)
+
+		source, err := dataMgr.CreateDataSource()
+		if err != nil {
+			log.Errorf("Failed to create data source: %v", err)
+			return
+		}
+
+		if err := source.Offer(mimeType); err != nil {
+			log.Errorf("Failed to offer mime type: %v", err)
+			return
+		}
+
+		source.SetSendHandler(func(e ext_data_control.ExtDataControlSourceV1SendEvent) {
+			fd := e.Fd
+			defer syscall.Close(fd)
+
+			file := os.NewFile(uintptr(fd), "clipboard-pipe")
+			defer file.Close()
+
+			if _, err := file.Write(dataCopy); err != nil {
+				log.Errorf("Failed to write clipboard data: %v", err)
+			}
+		})
+
+		source.SetCancelledHandler(func(e ext_data_control.ExtDataControlSourceV1CancelledEvent) {
+			m.ownerLock.Lock()
+			m.isOwner = false
+			m.ownerLock.Unlock()
+		})
+
+		m.releaseCurrentSource()
+		m.currentSource = source
+		m.sourceMutex.Lock()
+		m.sourceMimeTypes = []string{mimeType}
+		m.sourceMutex.Unlock()
+
+		m.ownerLock.Lock()
+		m.isOwner = true
+		m.ownerLock.Unlock()
+
+		device := m.dataDevice.(*ext_data_control.ExtDataControlDeviceV1)
+		if err := device.SetSelection(source); err != nil {
+			log.Errorf("Failed to set selection: %v", err)
+		}
+	})
+
+	return nil
+}
+
+func (m *Manager) CopyText(text string) error {
+	if err := m.SetClipboard([]byte(text), "text/plain;charset=utf-8"); err != nil {
+		return err
+	}
+
+	entry := Entry{
+		Data:      []byte(text),
+		MimeType:  "text/plain;charset=utf-8",
+		Size:      len(text),
+		Timestamp: time.Now(),
+		IsImage:   false,
+		Preview:   m.textPreview([]byte(text)),
+	}
+
+	if err := m.storeEntry(entry); err != nil {
+		log.Errorf("Failed to store clipboard entry: %v", err)
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+
+	return nil
+}
+
+func (m *Manager) PasteText() (string, error) {
+	history := m.GetHistory()
+	if len(history) == 0 {
+		return "", fmt.Errorf("no clipboard data available")
+	}
+
+	entry := history[0]
+	if entry.IsImage {
+		return "", fmt.Errorf("clipboard contains image, not text")
+	}
+
+	fullEntry, err := m.GetEntry(entry.ID)
+	if err != nil {
+		return "", err
+	}
+
+	return string(fullEntry.Data), nil
+}
+
+func (m *Manager) Close() {
+	if !m.alive {
+		return
+	}
+
+	m.alive = false
+	close(m.stopChan)
+
+	close(m.dirty)
+	m.notifierWg.Wait()
+
+	m.subMutex.Lock()
+	for _, ch := range m.subscribers {
+		close(ch)
+	}
+	m.subscribers = make(map[string]chan State)
+	m.subMutex.Unlock()
+
+	m.releaseCurrentSource()
+
+	if m.currentOffer != nil {
+		m.releaseOffer(m.currentOffer)
+		m.currentOffer = nil
+	}
+
+	if m.dataDevice != nil {
+		device := m.dataDevice.(*ext_data_control.ExtDataControlDeviceV1)
+		device.Destroy()
+	}
+
+	if m.dataControlMgr != nil {
+		mgr := m.dataControlMgr.(*ext_data_control.ExtDataControlManagerV1)
+		mgr.Destroy()
+	}
+
+	if m.registry != nil {
+		m.registry.Destroy()
+	}
+
+	if m.db != nil {
+		m.db.Close()
+	}
+}
+
+func (m *Manager) clearHistoryInternal() error {
+	return m.db.Update(func(tx *bolt.Tx) error {
+		if err := tx.DeleteBucket([]byte("clipboard")); err != nil {
+			return err
+		}
+		_, err := tx.CreateBucket([]byte("clipboard"))
+		return err
+	})
+}
+
+func (m *Manager) clearOldEntries(days int) error {
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	return m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		var toDelete [][]byte
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil {
+				continue
+			}
+			if entry.Pinned {
+				continue
+			}
+			if entry.Timestamp.Before(cutoff) {
+				toDelete = append(toDelete, k)
+			}
+		}
+
+		for _, k := range toDelete {
+			if err := b.Delete(k); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (m *Manager) migrateHashes() error {
+	if m.db == nil {
+		return nil
+	}
+
+	var needsMigration bool
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if extractHash(v) == 0 {
+				needsMigration = true
+				return nil
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if !needsMigration {
+		return nil
+	}
+
+	log.Info("Migrating clipboard entries to add hashes...")
+
+	return m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		var updates []struct {
+			key   []byte
+			entry Entry
+		}
+
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntry(v)
+			if err != nil {
+				continue
+			}
+			if entry.Hash != 0 {
+				continue
+			}
+			entry.Hash = computeHash(entry.Data)
+			keyCopy := make([]byte, len(k))
+			copy(keyCopy, k)
+			updates = append(updates, struct {
+				key   []byte
+				entry Entry
+			}{keyCopy, entry})
+		}
+
+		for _, u := range updates {
+			encoded, err := encodeEntry(u.entry)
+			if err != nil {
+				continue
+			}
+			if err := b.Put(u.key, encoded); err != nil {
+				return err
+			}
+		}
+
+		log.Infof("Migrated %d clipboard entries", len(updates))
+		return nil
+	})
+}
+
+func (m *Manager) Search(params SearchParams) SearchResult {
+	if m.db == nil {
+		return SearchResult{}
+	}
+
+	if params.Limit <= 0 {
+		params.Limit = 50
+	}
+	if params.Limit > 500 {
+		params.Limit = 500
+	}
+
+	query := strings.ToLower(params.Query)
+	mimeFilter := strings.ToLower(params.MimeType)
+
+	var all []Entry
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		c := b.Cursor()
+		for k, v := c.Last(); k != nil; k, v = c.Prev() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil {
+				continue
+			}
+
+			if params.IsImage != nil && entry.IsImage != *params.IsImage {
+				continue
+			}
+
+			if mimeFilter != "" && !strings.Contains(strings.ToLower(entry.MimeType), mimeFilter) {
+				continue
+			}
+
+			if params.Before != nil && entry.Timestamp.Unix() >= *params.Before {
+				continue
+			}
+
+			if params.After != nil && entry.Timestamp.Unix() <= *params.After {
+				continue
+			}
+
+			if query != "" && !strings.Contains(strings.ToLower(entry.Preview), query) {
+				continue
+			}
+
+			all = append(all, entry)
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Search failed: %v", err)
+	}
+
+	total := len(all)
+
+	start := params.Offset
+	if start > total {
+		start = total
+	}
+	end := start + params.Limit
+	if end > total {
+		end = total
+	}
+
+	return SearchResult{
+		Entries: all[start:end],
+		Total:   total,
+		HasMore: end < total,
+	}
+}
+
+func (m *Manager) GetConfig() Config {
+	return m.config
+}
+
+func (m *Manager) SetConfig(cfg Config) error {
+	m.configMutex.Lock()
+	m.config = cfg
+	m.configMutex.Unlock()
+
+	m.updateState()
+	m.notifySubscribers()
+
+	return SaveConfig(cfg)
+}
+
+func (m *Manager) getConfig() Config {
+	m.configMutex.RLock()
+	defer m.configMutex.RUnlock()
+	return m.config
+}
+
+func (m *Manager) watchConfig() {
+	if m.configPath == "" {
+		return
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Warnf("Failed to create config watcher: %v", err)
+		return
+	}
+	defer watcher.Close()
+
+	configDir := filepath.Dir(m.configPath)
+	if err := watcher.Add(configDir); err != nil {
+		log.Warnf("Failed to watch config directory: %v", err)
+		return
+	}
+
+	for {
+		select {
+		case <-m.stopChan:
+			return
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Name != m.configPath {
+				continue
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+				continue
+			}
+			newCfg := LoadConfig()
+			m.applyConfigChange(newCfg)
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Warnf("Config watcher error: %v", err)
+		}
+	}
+}
+
+func (m *Manager) applyConfigChange(newCfg Config) {
+	m.configMutex.Lock()
+	oldCfg := m.config
+	m.config = newCfg
+	m.configMutex.Unlock()
+
+	switch {
+	case newCfg.Disabled && !oldCfg.Disabled:
+		log.Info("Clipboard tracking disabled")
+	case !newCfg.Disabled && oldCfg.Disabled:
+		log.Info("Clipboard tracking enabled")
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+}
+
+func (m *Manager) StoreData(data []byte, mimeType string) error {
+	cfg := m.getConfig()
+
+	if cfg.Disabled {
+		return fmt.Errorf("clipboard tracking disabled")
+	}
+
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	if int64(len(data)) > cfg.MaxEntrySize {
+		return fmt.Errorf("data too large")
+	}
+
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil
+	}
+
+	entry := Entry{
+		Data:      data,
+		MimeType:  mimeType,
+		Size:      len(data),
+		Timestamp: time.Now(),
+		IsImage:   m.isImageMimeType(mimeType),
+	}
+
+	switch {
+	case entry.IsImage:
+		entry.Preview = m.imagePreview(data, mimeType)
+	case mimeType == "text/uri-list":
+		entry.Preview, entry.IsImage = m.uriListPreview(data)
+	default:
+		entry.Preview = m.textPreview(data)
+	}
+
+	if err := m.storeEntry(entry); err != nil {
+		return err
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+
+	return nil
+}
+
+func (m *Manager) PinEntry(id uint64) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	entryToPin, err := m.GetEntry(id)
+	if err != nil {
+		return err
+	}
+
+	var hashExists bool
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil || !entry.Pinned {
+				continue
+			}
+			if entry.Hash == entryToPin.Hash {
+				hashExists = true
+				return nil
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if hashExists {
+		return nil
+	}
+
+	cfg := m.getConfig()
+	pinnedCount := 0
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntryMeta(v)
+			if err == nil && entry.Pinned {
+				pinnedCount++
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to count pinned entries: %v", err)
+	}
+
+	if pinnedCount >= cfg.MaxPinned {
+		return fmt.Errorf("maximum pinned entries reached (%d)", cfg.MaxPinned)
+	}
+
+	err = m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		v := b.Get(itob(id))
+		if v == nil {
+			return fmt.Errorf("entry not found")
+		}
+
+		entry, err := decodeEntry(v)
+		if err != nil {
+			return err
+		}
+
+		entry.Pinned = true
+		encoded, err := encodeEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		return b.Put(itob(id), encoded)
+	})
+
+	if err == nil {
+		m.updateState()
+		m.notifySubscribers()
+	}
+
+	return err
+}
+
+func (m *Manager) UnpinEntry(id uint64) error {
+	if m.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	err := m.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		v := b.Get(itob(id))
+		if v == nil {
+			return fmt.Errorf("entry not found")
+		}
+
+		entry, err := decodeEntry(v)
+		if err != nil {
+			return err
+		}
+
+		entry.Pinned = false
+		encoded, err := encodeEntry(entry)
+		if err != nil {
+			return err
+		}
+
+		return b.Put(itob(id), encoded)
+	})
+
+	if err == nil {
+		m.updateState()
+		m.notifySubscribers()
+	}
+
+	return err
+}
+
+func (m *Manager) GetPinnedEntries() []Entry {
+	if m.db == nil {
+		return nil
+	}
+
+	var pinned []Entry
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		c := b.Cursor()
+		for k, v := c.Last(); k != nil; k, v = c.Prev() {
+			entry, err := decodeEntryMeta(v)
+			if err != nil {
+				continue
+			}
+			if entry.Pinned {
+				pinned = append(pinned, entry)
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to get pinned entries: %v", err)
+	}
+
+	return pinned
+}
+
+func (m *Manager) GetPinnedCount() int {
+	if m.db == nil {
+		return 0
+	}
+
+	count := 0
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("clipboard"))
+		if b == nil {
+			return nil
+		}
+
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			entry, err := decodeEntryMeta(v)
+			if err == nil && entry.Pinned {
+				count++
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Errorf("Failed to count pinned entries: %v", err)
+	}
+
+	return count
+}
+
+func (m *Manager) CopyFile(filePath string) error {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("file not found: %w", err)
+	}
+
+	cfg := m.getConfig()
+	if fileInfo.Size() > cfg.MaxEntrySize {
+		return fmt.Errorf("file too large: %d > %d", fileInfo.Size(), cfg.MaxEntrySize)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	exportedPath, err := m.ExportFileForFlatpak(filePath)
+	if err != nil {
+		exportedPath = filePath
+	}
+	fileURI := "file://" + exportedPath
+
+	if imgData, imgMime, ok := m.tryReadImageFromURI([]byte("file://" + filePath)); ok {
+		entry := Entry{
+			Data:      imgData,
+			MimeType:  imgMime,
+			Size:      len(imgData),
+			Timestamp: time.Now(),
+			IsImage:   true,
+			Preview:   m.imagePreview(imgData, imgMime),
+		}
+		if err := m.storeEntry(entry); err != nil {
+			log.Errorf("Failed to store file entry: %v", err)
+		}
+	} else {
+		entry := Entry{
+			Data:      fileData,
+			MimeType:  "text/uri-list",
+			Size:      len(fileData),
+			Timestamp: time.Now(),
+			IsImage:   false,
+			Preview:   fmt.Sprintf("[[ file %s ]]", filepath.Base(filePath)),
+		}
+		if err := m.storeEntry(entry); err != nil {
+			log.Errorf("Failed to store file entry: %v", err)
+		}
+	}
+
+	m.updateState()
+	m.notifySubscribers()
+
+	_, imgMime, imgErr := image.DecodeConfig(bytes.NewReader(fileData))
+
+	m.post(func() {
+		if m.dataControlMgr == nil || m.dataDevice == nil {
+			log.Error("Data control manager or device not initialized")
+			return
+		}
+
+		dataMgr := m.dataControlMgr.(*ext_data_control.ExtDataControlManagerV1)
+		source, err := dataMgr.CreateDataSource()
+		if err != nil {
+			log.Errorf("Failed to create data source: %v", err)
+			return
+		}
+
+		type offer struct {
+			mime string
+			data []byte
+		}
+		offers := []offer{
+			{"x-special/gnome-copied-files", []byte("copy\n" + fileURI)},
+			{"text/uri-list", []byte(fileURI + "\r\n")},
+			{"text/plain", []byte(filePath)},
+		}
+
+		if imgErr == nil {
+			imgMimeType := "image/" + imgMime
+			offers = append(offers, offer{imgMimeType, fileData})
+		}
+
+		offerData := make(map[string][]byte)
+		for _, o := range offers {
+			if err := source.Offer(o.mime); err != nil {
+				log.Errorf("Failed to offer %s: %v", o.mime, err)
+				return
+			}
+			offerData[o.mime] = o.data
+		}
+
+		source.SetSendHandler(func(e ext_data_control.ExtDataControlSourceV1SendEvent) {
+			fd := e.Fd
+			defer syscall.Close(fd)
+			file := os.NewFile(uintptr(fd), "clipboard-pipe")
+			defer file.Close()
+			if data, ok := offerData[e.MimeType]; ok {
+				file.Write(data)
+			}
+		})
+
+		source.SetCancelledHandler(func(e ext_data_control.ExtDataControlSourceV1CancelledEvent) {
+			m.ownerLock.Lock()
+			m.isOwner = false
+			m.ownerLock.Unlock()
+		})
+
+		m.releaseCurrentSource()
+		m.currentSource = source
+
+		m.ownerLock.Lock()
+		m.isOwner = true
+		m.ownerLock.Unlock()
+
+		device := m.dataDevice.(*ext_data_control.ExtDataControlDeviceV1)
+		if err := device.SetSelection(source); err != nil {
+			log.Errorf("Failed to set selection: %v", err)
+		}
+	})
+
+	return nil
+}
+
+func (m *Manager) EntryToFile(entry *Entry) string {
+	switch {
+	case entry.MimeType == "text/uri-list":
+		data := strings.TrimSpace(string(entry.Data))
+		lines := strings.Split(data, "\n")
+		if len(lines) == 0 {
+			return ""
+		}
+		uri := strings.TrimSuffix(strings.TrimSpace(lines[0]), "\r")
+		if path, ok := strings.CutPrefix(uri, "file://"); ok {
+			return path
+		}
+	case entry.IsImage:
+		ext := ".png"
+		if suffix, ok := strings.CutPrefix(entry.MimeType, "image/"); ok {
+			ext = "." + suffix
+		}
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			return ""
+		}
+		clipDir := filepath.Join(cacheDir, "hype", "clipboard")
+		if err := os.MkdirAll(clipDir, 0o755); err != nil {
+			return ""
+		}
+		filePath := filepath.Join(clipDir, fmt.Sprintf("%d%s", time.Now().UnixNano(), ext))
+		if os.WriteFile(filePath, entry.Data, 0o644) != nil {
+			return ""
+		}
+		return filePath
+	}
+	return ""
+}
+
+func (m *Manager) ExportFileForFlatpak(filePath string) (string, error) {
+	if _, err := os.Stat(filePath); err != nil {
+		return "", fmt.Errorf("file not found: %w", err)
+	}
+
+	if m.dbusConn == nil {
+		conn, err := dbus.ConnectSessionBus()
+		if err != nil {
+			return "", fmt.Errorf("connect session bus: %w", err)
+		}
+		if !conn.SupportsUnixFDs() {
+			conn.Close()
+			return "", fmt.Errorf("D-Bus connection does not support Unix FD passing")
+		}
+		m.dbusConn = conn
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("open file: %w", err)
+	}
+	fd := int(file.Fd())
+
+	portal := m.dbusConn.Object("org.freedesktop.portal.Documents", "/org/freedesktop/portal/documents")
+
+	var docIds []string
+	var extra map[string]dbus.Variant
+	flags := uint32(0)
+
+	err = portal.Call(
+		"org.freedesktop.portal.Documents.AddFull",
+		0,
+		[]dbus.UnixFD{dbus.UnixFD(fd)},
+		flags,
+		"",
+		[]string{},
+	).Store(&docIds, &extra)
+
+	file.Close()
+
+	if err != nil {
+		return "", fmt.Errorf("AddFull: %w", err)
+	}
+
+	if len(docIds) == 0 {
+		return "", fmt.Errorf("no doc IDs returned")
+	}
+
+	docId := docIds[0]
+
+	for _, app := range getInstalledFlatpaks() {
+		_ = portal.Call(
+			"org.freedesktop.portal.Documents.GrantPermissions",
+			0,
+			docId,
+			app,
+			[]string{"read"},
+		).Err
+	}
+
+	uid := os.Getuid()
+	basename := filepath.Base(filePath)
+	exportedPath := fmt.Sprintf("/run/user/%d/doc/%s/%s", uid, docId, basename)
+
+	return exportedPath, nil
+}
+
+func getInstalledFlatpaks() []string {
+	out, err := exec.Command("flatpak", "list", "--app", "--columns=application").Output()
+	if err != nil {
+		return nil
+	}
+
+	var apps []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if app := strings.TrimSpace(line); app != "" {
+			apps = append(apps, app)
+		}
+	}
+	return apps
+}

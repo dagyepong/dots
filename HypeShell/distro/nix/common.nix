@@ -1,0 +1,27 @@
+﻿{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.programs.hype-material-shell;
+in
+{
+  packages = [
+    cfg.package
+  ]
+  ++ lib.optional cfg.enableSystemMonitoring cfg.dgop.package
+  ++ lib.optionals cfg.enableVPN [
+    pkgs.glib
+    pkgs.networkmanager
+  ]
+  ++ lib.optional cfg.enableDynamicTheming pkgs.matugen
+  ++ lib.optional cfg.enableAudioWavelength pkgs.cava
+  ++ lib.optional cfg.enableCalendarEvents pkgs.khal
+  ++ lib.optional cfg.enableClipboardPaste pkgs.wtype;
+
+  plugins = lib.mapAttrs (name: plugin: {
+    source = plugin.src;
+  }) (lib.filterAttrs (n: v: v.enable) cfg.plugins);
+}

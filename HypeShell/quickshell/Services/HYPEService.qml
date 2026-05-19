@@ -1,0 +1,734 @@
+﻿pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import qs.Common
+import qs.Services
+
+Singleton {
+    id: root
+    readonly property var log: Log.scoped("HypeService")
+
+    property bool hypeAvailable: false
+    property var capabilities: []
+    property int apiVersion: 0
+    property string cliVersion: ""
+    readonly property int expectedApiVersion: 1
+    property var availablePlugins: []
+    property var installedPlugins: []
+    property var availableThemes: []
+    property var installedThemes: []
+    property bool isConnected: false
+    property bool isConnecting: false
+    property bool subscribeConnected: false
+    readonly property bool forceExtWorkspace: false
+
+    readonly property string socketPath: Quickshell.env("HYPE_SOCKET") || Quickshell.env("HYPE_SOCKET")
+
+    property var pendingRequests: ({})
+    property var clipboardRequestIds: ({})
+    property int requestIdCounter: 0
+    property bool shownOutdatedError: false
+    property string updateCommand: ShellVersionService.installerUpdateCommand()
+    property bool checkingUpdateCommand: false
+
+    signal pluginsListReceived(var plugins)
+    signal installedPluginsReceived(var plugins)
+    signal searchResultsReceived(var plugins)
+    signal themesListReceived(var themes)
+    signal installedThemesReceived(var themes)
+    signal themeSearchResultsReceived(var themes)
+    signal operationSuccess(string message)
+    signal operationError(string error)
+    signal connectionStateChanged
+
+    signal networkStateUpdate(var data)
+    signal cupsStateUpdate(var data)
+    signal loginctlStateUpdate(var data)
+    signal capabilitiesReceived
+    signal credentialsRequest(var data)
+    signal bluetoothPairingRequest(var data)
+    signal dwlStateUpdate(var data)
+    signal brightnessStateUpdate(var data)
+    signal brightnessDeviceUpdate(var device)
+    signal extWorkspaceStateUpdate(var data)
+    signal wlrOutputStateUpdate(var data)
+    signal evdevStateUpdate(var data)
+    signal gammaStateUpdate(var data)
+    signal themeAutoStateUpdate(var data)
+    signal openUrlRequested(string url)
+    signal appPickerRequested(var data)
+    signal screensaverStateUpdate(var data)
+    signal clipboardStateUpdate(var data)
+    signal locationStateUpdate(var data)
+    signal sysupdateStateUpdate(var data)
+    signal tailscaleStateUpdate(var data)
+
+    property bool capsLockState: false
+    property bool screensaverInhibited: false
+    property var screensaverInhibitors: []
+
+    property var activeSubscriptions: ["network", "network.credentials", "loginctl", "freedesktop", "freedesktop.screensaver", "gamma", "theme.auto", "bluetooth", "bluetooth.pairing", "dwl", "brightness", "wlroutput", "evdev", "browser", "dbus", "clipboard", "location", "sysupdate"]
+
+    Component.onCompleted: {
+        if (socketPath && socketPath.length > 0) {
+            detectUpdateCommand();
+        }
+    }
+
+    function detectUpdateCommand() {
+        updateCommand = ShellVersionService.installerUpdateCommand();
+        checkingUpdateCommand = false;
+        startSocketConnection();
+    }
+
+    function startSocketConnection() {
+        if (socketPath && socketPath.length > 0) {
+            testProcess.running = true;
+        }
+    }
+
+    Process {
+        id: testProcess
+        command: ["test", "-S", root.socketPath]
+
+        onExited: exitCode => {
+            if (exitCode === 0) {
+                root.hypeAvailable = true;
+                connectSocket();
+            } else {
+                root.hypeAvailable = false;
+            }
+        }
+    }
+
+    function connectSocket() {
+        if (!hypeAvailable || isConnected || isConnecting) {
+            return;
+        }
+
+        isConnecting = true;
+        requestSocket.connected = true;
+    }
+
+    HypeSocket {
+        id: requestSocket
+        path: root.socketPath
+        connected: false
+
+        onConnectionStateChanged: {
+            if (connected) {
+                root.isConnected = true;
+                root.isConnecting = false;
+                root.connectionStateChanged();
+                subscribeSocket.connected = true;
+            } else {
+                root.isConnected = false;
+                root.isConnecting = false;
+                root.apiVersion = 0;
+                root.capabilities = [];
+                root.connectionStateChanged();
+            }
+        }
+
+        parser: SplitParser {
+            onRead: line => {
+                if (!line || line.length === 0)
+                    return;
+
+                let response;
+                try {
+                    response = JSON.parse(line);
+                } catch (e) {
+                    log.warn("Failed to parse request response:", line.substring(0, 100));
+                    return;
+                }
+                const isClipboard = clipboardRequestIds[response.id];
+                if (isClipboard)
+                    delete clipboardRequestIds[response.id];
+                else
+                    log.debug("Request socket <<", line);
+                handleResponse(response);
+            }
+        }
+    }
+
+    HypeSocket {
+        id: subscribeSocket
+        path: root.socketPath
+        connected: false
+
+        onConnectionStateChanged: {
+            root.subscribeConnected = connected;
+            if (connected) {
+                sendSubscribeRequest();
+            }
+        }
+
+        parser: SplitParser {
+            onRead: line => {
+                if (!line || line.length === 0)
+                    return;
+
+                let response;
+                try {
+                    response = JSON.parse(line);
+                } catch (e) {
+                    log.warn("Failed to parse subscription event:", line.substring(0, 100));
+                    return;
+                }
+                if (!line.includes("clipboard"))
+                    log.debug("Subscribe socket <<", line);
+                handleSubscriptionEvent(response);
+            }
+        }
+    }
+
+    function sendSubscribeRequest() {
+        const request = {
+            "method": "subscribe"
+        };
+
+        if (activeSubscriptions.length > 0) {
+            request.params = {
+                "services": activeSubscriptions
+            };
+            log.debug("Subscribing to services:", JSON.stringify(activeSubscriptions));
+        } else {
+            log.debug("Subscribing to all services");
+        }
+
+        subscribeSocket.send(request);
+    }
+
+    function subscribe(services) {
+        if (!Array.isArray(services)) {
+            services = [services];
+        }
+
+        activeSubscriptions = services;
+
+        if (subscribeConnected) {
+            subscribeSocket.connected = false;
+            Qt.callLater(() => {
+                subscribeSocket.connected = true;
+            });
+        }
+    }
+
+    function addSubscription(service) {
+        if (activeSubscriptions.includes("all"))
+            return;
+        if (!activeSubscriptions.includes(service)) {
+            const newSubs = [...activeSubscriptions, service];
+            subscribe(newSubs);
+        }
+    }
+
+    function removeSubscription(service) {
+        if (activeSubscriptions.includes("all")) {
+            const allServices = ["network", "loginctl", "freedesktop", "gamma", "bluetooth", "dwl", "brightness", "extworkspace", "browser", "location"];
+            const filtered = allServices.filter(s => s !== service);
+            subscribe(filtered);
+        } else {
+            const filtered = activeSubscriptions.filter(s => s !== service);
+            if (filtered.length === 0) {
+                log.warn("Cannot remove last subscription");
+                return;
+            }
+            subscribe(filtered);
+        }
+    }
+
+    function subscribeAll() {
+        subscribe(["all"]);
+    }
+
+    function subscribeAllExcept(excludeServices) {
+        if (!Array.isArray(excludeServices)) {
+            excludeServices = [excludeServices];
+        }
+
+        const allServices = ["network", "loginctl", "freedesktop", "gamma", "theme.auto", "bluetooth", "cups", "dwl", "brightness", "extworkspace", "browser", "dbus", "location"];
+        const filtered = allServices.filter(s => !excludeServices.includes(s));
+        subscribe(filtered);
+    }
+
+    function handleSubscriptionEvent(response) {
+        if (response.error) {
+            if (response.error.includes("unknown method") && response.error.includes("subscribe")) {
+                if (!shownOutdatedError) {
+                    log.error("Server does not support subscribe method");
+                    ToastService.showError(I18n.tr("HypeShell out of date"), I18n.tr("To update, run the following command:"), updateCommand);
+                    shownOutdatedError = true;
+                }
+            }
+            return;
+        }
+
+        if (!response.result) {
+            return;
+        }
+
+        const service = response.result.service;
+        const data = response.result.data;
+
+        if (service === "server") {
+            apiVersion = data.apiVersion || 0;
+            cliVersion = data.cliVersion || "";
+            capabilities = data.capabilities || [];
+
+            log.info("Connected (API v" + apiVersion + ", CLI " + cliVersion + ") -", JSON.stringify(capabilities));
+
+            if (apiVersion < expectedApiVersion) {
+                ToastService.showError(I18n.tr("Hype API is outdated (API v%1, expected v%2)").arg(apiVersion).arg(expectedApiVersion));
+            }
+
+            capabilitiesReceived();
+        } else if (service === "network") {
+            networkStateUpdate(data);
+        } else if (service === "network.credentials") {
+            credentialsRequest(data);
+        } else if (service === "loginctl") {
+            loginctlStateUpdate(data);
+        } else if (service === "bluetooth.pairing") {
+            bluetoothPairingRequest(data);
+        } else if (service === "cups") {
+            cupsStateUpdate(data);
+        } else if (service === "dwl") {
+            dwlStateUpdate(data);
+        } else if (service === "brightness") {
+            brightnessStateUpdate(data);
+        } else if (service === "brightness.update") {
+            if (data.device) {
+                brightnessDeviceUpdate(data.device);
+            }
+        } else if (service === "extworkspace") {
+            extWorkspaceStateUpdate(data);
+        } else if (service === "wlroutput") {
+            wlrOutputStateUpdate(data);
+        } else if (service === "evdev") {
+            if (data.capsLock !== undefined) {
+                capsLockState = data.capsLock;
+            }
+            evdevStateUpdate(data);
+        } else if (service === "gamma") {
+            gammaStateUpdate(data);
+        } else if (service === "theme.auto") {
+            themeAutoStateUpdate(data);
+        } else if (service === "browser.open_requested") {
+            if (data.target) {
+                if (data.requestType === "url" || !data.requestType) {
+                    openUrlRequested(data.target);
+                } else {
+                    appPickerRequested(data);
+                }
+            } else if (data.url) {
+                openUrlRequested(data.url);
+            }
+        } else if (service === "freedesktop.screensaver") {
+            screensaverInhibited = data.inhibited || false;
+            screensaverInhibitors = data.inhibitors || [];
+            screensaverStateUpdate(data);
+        } else if (service === "dbus") {
+            dbusSignalReceived(data.subscriptionId || "", data);
+        } else if (service === "clipboard") {
+            clipboardStateUpdate(data);
+        } else if (service === "location") {
+            locationStateUpdate(data);
+        } else if (service === "sysupdate") {
+            sysupdateStateUpdate(data);
+        } else if (service === "tailscale") {
+            tailscaleStateUpdate(data);
+        }
+    }
+
+    function sendRequest(method, params, callback) {
+        if (!isConnected) {
+            log.warn("HypeService.sendRequest: Not connected, method:", method);
+            if (callback) {
+                callback({
+                    "error": "not connected to HypeShell socket"
+                });
+            }
+            return;
+        }
+
+        requestIdCounter++;
+        const id = Date.now() + requestIdCounter;
+        const request = {
+            "id": id,
+            "method": method
+        };
+
+        if (params) {
+            request.params = params;
+        }
+
+        if (callback)
+            pendingRequests[id] = callback;
+
+        if (method.startsWith("clipboard")) {
+            clipboardRequestIds[id] = true;
+        } else {
+            log.debug("HypeService.sendRequest: Sending request id=" + id + " method=" + method);
+        }
+        requestSocket.send(request);
+    }
+
+    function handleResponse(response) {
+        const callback = pendingRequests[response.id];
+
+        if (callback) {
+            delete pendingRequests[response.id];
+            callback(response);
+        }
+    }
+
+    function ping(callback) {
+        sendRequest("ping", null, callback);
+    }
+
+    function listPlugins(callback) {
+        sendRequest("plugins.list", null, response => {
+            if (response.result) {
+                availablePlugins = response.result;
+                pluginsListReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function listInstalled(callback) {
+        sendRequest("plugins.listInstalled", null, response => {
+            if (response.result) {
+                installedPlugins = response.result;
+                installedPluginsReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function search(query, category, compositor, capability, callback) {
+        const params = {
+            "query": query
+        };
+        if (category) {
+            params.category = category;
+        }
+        if (compositor) {
+            params.compositor = compositor;
+        }
+        if (capability) {
+            params.capability = capability;
+        }
+
+        sendRequest("plugins.search", params, response => {
+            if (response.result) {
+                searchResultsReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function install(pluginName, callback) {
+        sendRequest("plugins.install", {
+            "name": pluginName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalled();
+            }
+        });
+    }
+
+    function uninstall(pluginName, callback) {
+        sendRequest("plugins.uninstall", {
+            "name": pluginName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalled();
+            }
+        });
+    }
+
+    function update(pluginName, callback) {
+        sendRequest("plugins.update", {
+            "name": pluginName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalled();
+            }
+        });
+    }
+
+    function listThemes(callback) {
+        sendRequest("themes.list", null, response => {
+            if (response.result) {
+                availableThemes = response.result;
+                themesListReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function listInstalledThemes(callback) {
+        sendRequest("themes.listInstalled", null, response => {
+            if (response.result) {
+                installedThemes = response.result;
+                installedThemesReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function searchThemes(query, callback) {
+        sendRequest("themes.search", {
+            "query": query
+        }, response => {
+            if (response.result) {
+                themeSearchResultsReceived(response.result);
+            }
+            if (callback) {
+                callback(response);
+            }
+        });
+    }
+
+    function installTheme(themeName, callback) {
+        sendRequest("themes.install", {
+            "name": themeName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalledThemes();
+            }
+        });
+    }
+
+    function uninstallTheme(themeName, callback) {
+        sendRequest("themes.uninstall", {
+            "name": themeName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalledThemes();
+            }
+        });
+    }
+
+    function updateTheme(themeName, callback) {
+        sendRequest("themes.update", {
+            "name": themeName
+        }, response => {
+            if (callback) {
+                callback(response);
+            }
+            if (!response.error) {
+                listInstalledThemes();
+            }
+        });
+    }
+
+    function lockSession(callback) {
+        sendRequest("loginctl.lock", null, callback);
+    }
+
+    function unlockSession(callback) {
+        sendRequest("loginctl.unlock", null, callback);
+    }
+
+    function bluetoothPair(devicePath, callback) {
+        sendRequest("bluetooth.pair", {
+            "device": devicePath
+        }, callback);
+    }
+
+    function bluetoothConnect(devicePath, callback) {
+        sendRequest("bluetooth.connect", {
+            "device": devicePath
+        }, callback);
+    }
+
+    function bluetoothDisconnect(devicePath, callback) {
+        sendRequest("bluetooth.disconnect", {
+            "device": devicePath
+        }, callback);
+    }
+
+    function bluetoothRemove(devicePath, callback) {
+        sendRequest("bluetooth.remove", {
+            "device": devicePath
+        }, callback);
+    }
+
+    function bluetoothTrust(devicePath, callback) {
+        sendRequest("bluetooth.trust", {
+            "device": devicePath
+        }, callback);
+    }
+
+    function bluetoothSubmitPairing(token, secrets, accept, callback) {
+        sendRequest("bluetooth.pairing.submit", {
+            "token": token,
+            "secrets": secrets,
+            "accept": accept
+        }, callback);
+    }
+
+    function bluetoothCancelPairing(token, callback) {
+        sendRequest("bluetooth.pairing.cancel", {
+            "token": token
+        }, callback);
+    }
+
+    signal dbusSignalReceived(string subscriptionId, var data)
+
+    property var dbusSubscriptions: ({})
+
+    function dbusCall(bus, dest, path, iface, method, args, callback) {
+        sendRequest("dbus.call", {
+            "bus": bus,
+            "dest": dest,
+            "path": path,
+            "interface": iface,
+            "method": method,
+            "args": args || []
+        }, callback);
+    }
+
+    function dbusGetProperty(bus, dest, path, iface, property, callback) {
+        sendRequest("dbus.getProperty", {
+            "bus": bus,
+            "dest": dest,
+            "path": path,
+            "interface": iface,
+            "property": property
+        }, callback);
+    }
+
+    function dbusSetProperty(bus, dest, path, iface, property, value, callback) {
+        sendRequest("dbus.setProperty", {
+            "bus": bus,
+            "dest": dest,
+            "path": path,
+            "interface": iface,
+            "property": property,
+            "value": value
+        }, callback);
+    }
+
+    function dbusGetAllProperties(bus, dest, path, iface, callback) {
+        sendRequest("dbus.getAllProperties", {
+            "bus": bus,
+            "dest": dest,
+            "path": path,
+            "interface": iface
+        }, callback);
+    }
+
+    function dbusIntrospect(bus, dest, path, callback) {
+        sendRequest("dbus.introspect", {
+            "bus": bus,
+            "dest": dest,
+            "path": path || "/"
+        }, callback);
+    }
+
+    function dbusListNames(bus, callback) {
+        sendRequest("dbus.listNames", {
+            "bus": bus
+        }, callback);
+    }
+
+    function dbusSubscribe(bus, sender, path, iface, member, callback) {
+        sendRequest("dbus.subscribe", {
+            "bus": bus,
+            "sender": sender || "",
+            "path": path || "",
+            "interface": iface || "",
+            "member": member || ""
+        }, response => {
+            if (!response.error && response.result?.subscriptionId) {
+                dbusSubscriptions[response.result.subscriptionId] = true;
+            }
+            if (callback)
+                callback(response);
+        });
+    }
+
+    function dbusUnsubscribe(subscriptionId, callback) {
+        sendRequest("dbus.unsubscribe", {
+            "subscriptionId": subscriptionId
+        }, response => {
+            if (!response.error) {
+                delete dbusSubscriptions[subscriptionId];
+            }
+            if (callback)
+                callback(response);
+        });
+    }
+
+    function renameWorkspace(name, callback) {
+        sendRequest("extworkspace.renameWorkspace", {
+            "name": name
+        }, callback);
+    }
+
+    function sysupdateGetState(callback) {
+        sendRequest("sysupdate.getState", null, callback);
+    }
+
+    function sysupdateRefresh(force, callback) {
+        sendRequest("sysupdate.refresh", {
+            "force": force === true
+        }, callback);
+    }
+
+    function sysupdateUpgrade(opts, callback) {
+        const params = opts || {};
+        sendRequest("sysupdate.upgrade", params, callback);
+    }
+
+    function sysupdateCancel(callback) {
+        sendRequest("sysupdate.cancel", null, callback);
+    }
+
+    function sysupdateSetInterval(seconds, callback) {
+        sendRequest("sysupdate.setInterval", {
+            "seconds": seconds
+        }, callback);
+    }
+
+    function sysupdateAcquire(callback) {
+        sendRequest("sysupdate.acquire", null, callback);
+    }
+
+    function sysupdateRelease(callback) {
+        sendRequest("sysupdate.release", null, callback);
+    }
+}

@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck -e SC2164 -e SC2001 -e SC2012 -e SC2317
+        language: system
+        types: [shell]
+  - repo: local
+    hooks:
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: bash -c 'cd core && go mod tidy'
+        language: system
+        files: ^core/.*\.(go|mod|sum)$
+        pass_filenames: false
+  - repo: local
+    hooks:
+      - id: no-console-in-qml
+        name: no console.* in QML (use Log service)
+        entry: bash -c 'if grep -nE "console\.(log|error|info|warn|debug)" "$@"; then echo "Use the Log service (log.info/warn/error/debug/fatal) instead of console.*" >&2; exit 1; fi' --
+        language: system
+        files: ^quickshell/.*\.qml$
+        exclude: ^quickshell/(Services/Log\.qml$|dms-plugins/|PLUGINS/)

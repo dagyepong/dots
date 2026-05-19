@@ -1,0 +1,54 @@
+﻿{
+  config,
+  pkgs,
+  lib,
+  ...
+}@args:
+let
+  cfg = config.programs.hype-material-shell;
+  common = import ./common.nix {
+    inherit
+      config
+      pkgs
+      lib
+      ;
+  };
+in
+{
+  imports = [
+    (import ./options.nix args)
+  ];
+  options.programs.hype-material-shell.systemd.target = lib.mkOption {
+    type = lib.types.str;
+    description = "Systemd target to bind to.";
+    default = "graphical-session.target";
+  };
+  config = lib.mkIf cfg.enable {
+    systemd.user.services.hype = lib.mkIf cfg.systemd.enable {
+      description = "HypeMaterialShell";
+      path = lib.mkForce [ ];
+
+      partOf = [ cfg.systemd.target ];
+      after = [ cfg.systemd.target ];
+      wantedBy = [ cfg.systemd.target ];
+      restartIfChanged = cfg.systemd.restartIfChanged;
+
+      serviceConfig = {
+        ExecStart = lib.getExe cfg.package + " run --session";
+        Restart = "on-failure";
+      };
+    };
+
+    environment.systemPackages = [ cfg.quickshell.package ] ++ common.packages;
+
+    environment.etc = lib.mapAttrs' (name: value: {
+      name = "xdg/quickshell/hype-plugins/${name}";
+      inherit value;
+    }) common.plugins;
+
+    services.power-profiles-daemon.enable = lib.mkDefault true;
+    services.accounts-daemon.enable = lib.mkDefault true;
+    services.geoclue2.enable = lib.mkDefault true;
+    security.polkit.enable = lib.mkDefault true;
+  };
+}

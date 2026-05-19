@@ -1,0 +1,525 @@
+﻿name: Update OBS Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to update"
+        required: true
+        type: choice
+        options:
+          - hype
+          - hype-greeter
+          - hype-git
+          - all
+        default: "hype"
+      rebuild_release:
+        description: "Release number for rebuilds (e.g., 2, 3, 4 to increment spec Release)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 2,5,14,17,20,23 * * *" # 9am, 12pm, 3pm, 6pm, 9pm, 12am EST (UTC times shown)
+
+jobs:
+  check-updates:
+    name: Check for updates
+    runs-on: ubuntu-latest
+
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      packages: ${{ steps.check.outputs.packages }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for updates
+        id: check
+        env:
+          OBS_USERNAME: ${{ secrets.OBS_USERNAME }}
+          OBS_PASSWORD: ${{ secrets.OBS_PASSWORD }}
+        run: |
+          # Helper function to check hype-git commit
+          check_hype_git() {
+            local CURRENT_COMMIT=$(git rev-parse --short=8 HEAD)
+            local OBS_SPEC=$(curl -s -u "$OBS_USERNAME:$OBS_PASSWORD" "https://api.opensuse.org/source/home:AvengeMedia:hype-git/hype-git/hype-git.spec" 2>/dev/null || echo "")
+            local OBS_COMMIT=$(echo "$OBS_SPEC" | grep "^Version:" | grep -oP '\.[a-f0-9]{8}' | tr -d '.' || echo "")
+
+            if [[ -n "$OBS_COMMIT" && "$CURRENT_COMMIT" == "$OBS_COMMIT" ]]; then
+              echo "📋 hype-git: Commit $CURRENT_COMMIT already exists, skipping"
+              return 1  # No update needed
+            else
+              echo "📋 hype-git: New commit $CURRENT_COMMIT (OBS has ${OBS_COMMIT:-none})"
+              return 0  # Update needed
+            fi
+          }
+
+          # Helper function to check hype stable tag
+          # Sets LATEST_TAG variable in parent scope if update needed
+          check_hype_stable() {
+            LATEST_TAG=$(curl -s https://api.github.com/repos/AvengeMedia/HypeMaterialShell/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/' || echo "")
+            local OBS_SPEC=$(curl -s -u "$OBS_USERNAME:$OBS_PASSWORD" "https://api.opensuse.org/source/home:AvengeMedia:hype/hype/hype.spec" 2>/dev/null || echo "")
+            local OBS_VERSION=$(echo "$OBS_SPEC" | grep "^Version:" | awk '{print $2}' | xargs || echo "")
+
+            if [[ -n "$LATEST_TAG" && "$LATEST_TAG" == "$OBS_VERSION" ]]; then
+              echo "📋 hype: Tag $LATEST_TAG already exists, skipping"
+              return 1  # No update needed
+            else
+              echo "📋 hype: New tag ${LATEST_TAG:-unknown} (OBS has ${OBS_VERSION:-none})"
+              return 0  # Update needed
+            fi
+          }
+
+          # Helper function to check hype-greeter stable tag
+          check_hype_greeter_stable() {
+            LATEST_TAG=$(curl -s https://api.github.com/repos/AvengeMedia/HypeMaterialShell/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/' || echo "")
+            local OBS_SPEC=$(curl -s -u "$OBS_USERNAME:$OBS_PASSWORD" "https://api.opensuse.org/source/home:AvengeMedia:hypelinux/hype-greeter/hype-greeter.spec" 2>/dev/null || echo "")
+            local OBS_VERSION=$(echo "$OBS_SPEC" | grep "^Version:" | awk '{print $2}' | xargs | sed 's/^v//')
+
+            if [[ -n "$LATEST_TAG" && "$LATEST_TAG" == "v$OBS_VERSION" ]]; then
+              echo "📋 hype-greeter: Tag $LATEST_TAG already exists, skipping"
+              return 1  # No update needed
+            else
+              echo "📋 hype-greeter: New tag ${LATEST_TAG:-unknown} (OBS has ${OBS_VERSION:-none})"
+              return 0  # Update needed
+            fi
+          }
+
+          # Main logic
+          REBUILD="${{ github.event.inputs.rebuild_release }}"
+
+          if [[ "${{ github.ref }}" =~ ^refs/tags/ ]] && [[ -z "${{ github.event.inputs.package }}" ]]; then
+            # Run from tag with no package specified - update both stable packages
+            echo "packages=hype hype-greeter" >> $GITHUB_OUTPUT
+            VERSION="${GITHUB_REF#refs/tags/}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Triggered by tag: $VERSION (always update)"
+
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Scheduled run - check hype-git only
+            echo "packages=hype-git" >> $GITHUB_OUTPUT
+            if check_hype_git; then
+              echo "has_updates=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_updates=false" >> $GITHUB_OUTPUT
+            fi
+
+          elif [[ -n "${{ github.event.inputs.package }}" ]]; then
+            # Manual workflow trigger
+            PKG="${{ github.event.inputs.package }}"
+
+            if [[ -n "$REBUILD" ]]; then
+              # Rebuild requested - always proceed
+              echo "packages=$PKG" >> $GITHUB_OUTPUT
+              echo "has_updates=true" >> $GITHUB_OUTPUT
+              echo "🔄 Manual rebuild requested: $PKG (db$REBUILD)"
+
+            elif [[ "$PKG" == "all" ]]; then
+              # Check each stable package and build list of those needing updates
+              PACKAGES_TO_UPDATE=()
+              if check_hype_stable; then
+                PACKAGES_TO_UPDATE+=("hype")
+                if [[ -n "$LATEST_TAG" ]]; then
+                  echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+                fi
+              fi
+              if check_hype_greeter_stable; then
+                PACKAGES_TO_UPDATE+=("hype-greeter")
+                [[ -n "$LATEST_TAG" ]] && echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+              fi
+
+              if [[ ${#PACKAGES_TO_UPDATE[@]} -gt 0 ]]; then
+                echo "packages=${PACKAGES_TO_UPDATE[*]}" >> $GITHUB_OUTPUT
+                echo "has_updates=true" >> $GITHUB_OUTPUT
+                echo "✓ Packages to update: ${PACKAGES_TO_UPDATE[*]}"
+              else
+                echo "packages=" >> $GITHUB_OUTPUT
+                echo "has_updates=false" >> $GITHUB_OUTPUT
+                echo "✓ Both packages up to date"
+              fi
+
+            elif [[ "$PKG" == "hype-git" ]]; then
+              if check_hype_git; then
+                echo "packages=$PKG" >> $GITHUB_OUTPUT
+                echo "has_updates=true" >> $GITHUB_OUTPUT
+              else
+                echo "packages=" >> $GITHUB_OUTPUT
+                echo "has_updates=false" >> $GITHUB_OUTPUT
+              fi
+
+            elif [[ "$PKG" == "hype" ]]; then
+              if check_hype_stable; then
+                echo "packages=$PKG" >> $GITHUB_OUTPUT
+                echo "has_updates=true" >> $GITHUB_OUTPUT
+                if [[ -n "$LATEST_TAG" ]]; then
+                  echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+                fi
+              else
+                echo "packages=" >> $GITHUB_OUTPUT
+                echo "has_updates=false" >> $GITHUB_OUTPUT
+              fi
+
+            elif [[ "$PKG" == "hype-greeter" ]]; then
+              if check_hype_greeter_stable; then
+                echo "packages=$PKG" >> $GITHUB_OUTPUT
+                echo "has_updates=true" >> $GITHUB_OUTPUT
+                if [[ -n "$LATEST_TAG" ]]; then
+                  echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+                fi
+              else
+                echo "packages=" >> $GITHUB_OUTPUT
+                echo "has_updates=false" >> $GITHUB_OUTPUT
+              fi
+
+            else
+              # Unknown package - proceed anyway
+              echo "packages=$PKG" >> $GITHUB_OUTPUT
+              echo "has_updates=true" >> $GITHUB_OUTPUT
+              echo "Manual trigger: $PKG"
+            fi
+          else
+            # Fallback - proceed
+            echo "packages=all" >> $GITHUB_OUTPUT
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          fi
+
+  update-obs:
+    name: Upload to OBS
+    needs: check-updates
+    runs-on: ubuntu-latest
+    if: needs.check-updates.outputs.has_updates == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Wait before OBS upload
+        run: sleep 3
+
+      - name: Determine packages to update
+        id: packages
+        run: |
+          # Use check-updates outputs when available
+          if [[ -n "${{ needs.check-updates.outputs.version }}" ]]; then
+            # Use version from check-updates job
+            echo "packages=${{ needs.check-updates.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "version=${{ needs.check-updates.outputs.version }}" >> $GITHUB_OUTPUT
+            echo "Using version from check-updates: ${{ needs.check-updates.outputs.version }}"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Scheduled run - hype-git only
+            echo "packages=${{ needs.check-updates.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "Triggered by schedule: updating git package"
+          elif [[ -n "${{ github.event.inputs.package }}" ]]; then
+            # Manual workflow dispatch
+
+            # Determine version for hype stable and hype-greeter using the API
+            # GITHUB_REF is unreliable when "Use workflow from" a tag; API works from any ref
+            if [[ "${{ github.event.inputs.package }}" == "hype" ]] || [[ "${{ github.event.inputs.package }}" == "hype-greeter" ]] || [[ "${{ github.event.inputs.package }}" == "all" ]]; then
+              LATEST_TAG=$(curl -s https://api.github.com/repos/AvengeMedia/HypeMaterialShell/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/' || echo "")
+              if [[ -n "$LATEST_TAG" ]]; then
+                echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+                echo "Using latest release from API: $LATEST_TAG"
+              else
+                echo "ERROR: Could not fetch latest release from API"
+                exit 1
+              fi
+            fi
+
+            # Use filtered packages from check-updates when package="all" and no rebuild/tag specified
+            if [[ "${{ github.event.inputs.package }}" == "all" ]] && [[ -z "${{ github.event.inputs.rebuild_release }}" ]] && [[ ! "${{ github.ref }}" =~ ^refs/tags/ ]]; then
+              echo "packages=${{ needs.check-updates.outputs.packages }}" >> $GITHUB_OUTPUT
+              echo "Manual trigger: all (filtered to: ${{ needs.check-updates.outputs.packages }})"
+            else
+              echo "packages=${{ github.event.inputs.package }}" >> $GITHUB_OUTPUT
+              echo "Manual trigger: ${{ github.event.inputs.package }}"
+            fi
+          else
+            echo "packages=${{ needs.check-updates.outputs.packages }}" >> $GITHUB_OUTPUT
+            if [[ -n "${{ needs.check-updates.outputs.version }}" ]]; then
+              echo "version=${{ needs.check-updates.outputs.version }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Update hype-git spec version
+        if: contains(steps.packages.outputs.packages, 'hype-git')
+        run: |
+          COMMIT_HASH=$(git rev-parse --short=8 HEAD)
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep -oP '^Version:\s+\K[0-9.]+' distro/opensuse/hype.spec | head -1 || echo "1.0.2")
+          NEW_VERSION="${BASE_VERSION}+git${COMMIT_COUNT}.${COMMIT_HASH}"
+          echo "📦 Updating hype-git.spec to version: $NEW_VERSION"
+
+          sed -i "s/^Version:.*/Version:        $NEW_VERSION/" distro/opensuse/hype-git.spec
+
+          # Single changelog entry (git snapshots don't need history)
+          DATE_STR=$(date "+%a %b %d %Y")
+          LOCAL_SPEC_HEAD=$(sed -n '1,/%changelog/{ /%changelog/d; p }' distro/opensuse/hype-git.spec)
+          {
+            echo "$LOCAL_SPEC_HEAD"
+            echo "%changelog"
+            echo "* $DATE_STR Avenge Media <AvengeMedia.US@gmail.com> - ${NEW_VERSION}-1"
+            echo "- Git snapshot (commit $COMMIT_COUNT: $COMMIT_HASH)"
+          } > distro/opensuse/hype-git.spec
+
+      - name: Update Debian hype-git changelog version
+        if: contains(steps.packages.outputs.packages, 'hype-git')
+        run: |
+          COMMIT_HASH=$(git rev-parse --short=8 HEAD)
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          BASE_VERSION=$(grep -oP '^Version:\s+\K[0-9.]+' distro/opensuse/hype.spec | head -1 || echo "1.0.2")
+          NEW_VERSION="${BASE_VERSION}+git${COMMIT_COUNT}.${COMMIT_HASH}"
+          echo "📦 Updating Debian hype-git changelog to version: $NEW_VERSION"
+
+          # Single changelog entry (git snapshots don't need history)
+          CHANGELOG_DATE=$(date -R)
+          {
+            echo "hype-git (${NEW_VERSION}db1) nightly; urgency=medium"
+            echo ""
+            echo "  * Git snapshot (commit $COMMIT_COUNT: $COMMIT_HASH)"
+            echo ""
+            echo " -- Avenge Media <AvengeMedia.US@gmail.com>  $CHANGELOG_DATE"
+          } > "distro/debian/hype-git/debian/changelog"
+
+      - name: Update stable version (hype + hype-greeter)
+        if: steps.packages.outputs.version != ''
+        run: |
+          VERSION="${{ steps.packages.outputs.version }}"
+          VERSION_NO_V="${VERSION#v}"
+          PACKAGES="${{ steps.packages.outputs.packages }}"
+          echo "==> Updating packaging files to version: $VERSION_NO_V"
+
+          # Update hype spec and changelog when hype is in the upload list
+          if [[ "$PACKAGES" == *"hype"* ]]; then
+            sed -i "s/^Version:.*/Version:        $VERSION_NO_V/" distro/opensuse/hype.spec
+            UPDATED_VERSION=$(grep -oP '^Version:\s+\K[0-9.]+' distro/opensuse/hype.spec | head -1)
+            echo "✓ hype spec now shows Version: $UPDATED_VERSION"
+
+            DATE_STR=$(date "+%a %b %d %Y")
+            LOCAL_SPEC_HEAD=$(sed -n '1,/%changelog/{ /%changelog/d; p }' distro/opensuse/hype.spec)
+            {
+              echo "$LOCAL_SPEC_HEAD"
+              echo "%changelog"
+              echo "* $DATE_STR AvengeMedia <maintainer@avengemedia.com> - ${VERSION_NO_V}-1"
+              echo "- Update to stable $VERSION release"
+            } > distro/opensuse/hype.spec
+
+            if [[ -f "distro/debian/hype/debian/changelog" ]]; then
+              CHANGELOG_DATE=$(date -R)
+              {
+                echo "hype (${VERSION_NO_V}db1) stable; urgency=medium"
+                echo ""
+                echo "  * Update to $VERSION stable release"
+                echo ""
+                echo " -- Avenge Media <AvengeMedia.US@gmail.com>  $CHANGELOG_DATE"
+              } > "distro/debian/hype/debian/changelog"
+              echo "✓ Updated hype changelog to ${VERSION_NO_V}db1"
+            fi
+          fi
+
+          # Update hype-greeter changelog when hype-greeter is in the upload list
+          if [[ "$PACKAGES" == *"hype-greeter"* ]] && [[ -f "distro/debian/hype-greeter/debian/changelog" ]]; then
+            CHANGELOG_DATE=$(date -R)
+            {
+              echo "hype-greeter (${VERSION_NO_V}db1) unstable; urgency=medium"
+              echo ""
+              echo "  * Update to $VERSION stable release"
+              echo ""
+              echo " -- Avenge Media <AvengeMedia.US@gmail.com>  $CHANGELOG_DATE"
+            } > "distro/debian/hype-greeter/debian/changelog"
+            echo "✓ Updated hype-greeter changelog to ${VERSION_NO_V}db1"
+          fi
+
+          # Update Debian _service files for packages in upload list (download_url paths)
+          for service in distro/debian/*/_service; do
+            if [[ -f "$service" ]]; then
+              # Update tar_scm revision parameter (for hype-git)
+              sed -i "s|<param name=\"revision\">v[0-9.]*</param>|<param name=\"revision\">$VERSION</param>|" "$service"
+              # Update download_url paths (for hype, hype-greeter stable)
+              sed -i "s|/v[0-9.]\+/|/$VERSION/|g" "$service"
+              sed -i "s|/tags/v[0-9.]\+\.tar\.gz|/tags/$VERSION.tar.gz|g" "$service"
+            fi
+          done
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ./core/go.mod
+
+      - name: Install OSC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osc
+
+          mkdir -p ~/.config/osc
+          cat > ~/.config/osc/oscrc << EOF
+          [general]
+          apiurl = https://api.opensuse.org
+
+          [https://api.opensuse.org]
+          user = ${{ secrets.OBS_USERNAME }}
+          pass = ${{ secrets.OBS_PASSWORD }}
+          EOF
+          chmod 600 ~/.config/osc/oscrc
+
+      # Cache OBS bundled Go toolchains
+      - name: Cache OBS bundled Go toolchains (hype-git)
+        if: contains(steps.packages.outputs.packages, 'hype-git')
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/hype-obs-go-toolchain
+          key: hype-obs-go-toolchain-${{ runner.os }}-${{ hashFiles('core/go.mod') }}
+          restore-keys: |
+            hype-obs-go-toolchain-${{ runner.os }}-
+
+      - name: Upload to OBS
+        id: upload
+        env:
+          REBUILD_RELEASE: ${{ github.event.inputs.rebuild_release }}
+          TAG_VERSION: ${{ steps.packages.outputs.version }}
+        run: |
+          PACKAGES="${{ steps.packages.outputs.packages }}"
+
+          if [[ -z "$PACKAGES" ]]; then
+            echo "✓ No packages need uploading. All up to date!"
+            echo "uploaded_packages=" >> $GITHUB_OUTPUT
+            echo "skipped_packages=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          MESSAGE="Automated update from GitHub Actions"
+          if [[ -n "${{ steps.packages.outputs.version }}" ]]; then
+            MESSAGE="Update to ${{ steps.packages.outputs.version }}"
+            echo "==> Version being uploaded: ${{ steps.packages.outputs.version }}"
+          fi
+
+          UPLOADED_PACKAGES=()
+          SKIPPED_PACKAGES=()
+
+          # PACKAGES can be space-separated list (e.g., "hype hype-greeter" from "all" check)
+          # Loop through each package and upload
+          for PKG in $PACKAGES; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Uploading $PKG to OBS..."
+            if [[ -n "$REBUILD_RELEASE" ]]; then
+              echo "🔄 Using rebuild release number: db$REBUILD_RELEASE"
+            fi
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            LOG_FILE=$(mktemp)
+            set +e
+            if [[ "$PKG" == "hype-git" ]]; then
+              bash distro/scripts/obs-upload.sh hype-git "Automated git update" >"$LOG_FILE" 2>&1
+            else
+              bash distro/scripts/obs-upload.sh "$PKG" "$MESSAGE" >"$LOG_FILE" 2>&1
+            fi
+            STATUS=$?
+            set -e
+
+            cat "$LOG_FILE"
+
+            if [[ $STATUS -ne 0 ]]; then
+              rm -f "$LOG_FILE"
+              echo "❌ Upload failed for $PKG"
+              exit $STATUS
+            fi
+
+            if grep -Eq "Exiting gracefully \(no changes needed\)|No changes needed for this package\. Exiting gracefully\." "$LOG_FILE"; then
+              echo "ℹ️  $PKG is already up to date. Skipped."
+              SKIPPED_PACKAGES+=("$PKG")
+            else
+              UPLOADED_PACKAGES+=("$PKG")
+            fi
+
+            rm -f "$LOG_FILE"
+          done
+
+          echo "uploaded_packages=${UPLOADED_PACKAGES[*]}" >> $GITHUB_OUTPUT
+          echo "skipped_packages=${SKIPPED_PACKAGES[*]}" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### OBS Package Upload Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PACKAGES="${{ steps.packages.outputs.packages }}"
+
+          if [[ -z "$PACKAGES" ]]; then
+            echo "**Status:** ✅ All packages up to date (no uploads needed)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All packages are current. Run completed successfully." >> $GITHUB_STEP_SUMMARY
+          else
+            UPLOADED_PACKAGES="${{ steps.upload.outputs.uploaded_packages }}"
+            SKIPPED_PACKAGES="${{ steps.upload.outputs.skipped_packages }}"
+            TOTAL_COUNT=$(wc -w <<<"$PACKAGES" | tr -d ' ')
+            UPLOADED_COUNT=0
+            SKIPPED_COUNT=0
+            if [[ -n "$UPLOADED_PACKAGES" ]]; then
+              UPLOADED_COUNT=$(wc -w <<<"$UPLOADED_PACKAGES" | tr -d ' ')
+            fi
+            if [[ -n "$SKIPPED_PACKAGES" ]]; then
+              SKIPPED_COUNT=$(wc -w <<<"$SKIPPED_PACKAGES" | tr -d ' ')
+            fi
+            in_list() {
+              local item="$1"
+              local list="$2"
+              [[ " $list " == *" $item "* ]]
+            }
+
+            if [[ "${{ job.status }}" == "success" ]]; then
+              echo "**Status:** ✅ Completed successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Status:** ❌ Completed with errors" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Processed:** $TOTAL_COUNT package(s)" >> $GITHUB_STEP_SUMMARY
+            echo "**Uploaded:** $UPLOADED_COUNT package(s)" >> $GITHUB_STEP_SUMMARY
+            echo "**Skipped (up to date):** $SKIPPED_COUNT package(s)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Packages:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            for PKG in $PACKAGES; do
+              STATUS_ICON="✅"
+              STATUS_TEXT="uploaded"
+              if in_list "$PKG" "$SKIPPED_PACKAGES"; then
+                STATUS_ICON="ℹ️"
+                STATUS_TEXT="up to date (skipped)"
+              elif ! in_list "$PKG" "$UPLOADED_PACKAGES"; then
+                STATUS_ICON="❌"
+                STATUS_TEXT="failed"
+              fi
+
+              case "$PKG" in
+                hype)
+                  echo "- $STATUS_ICON **hype** ($STATUS_TEXT) → [View builds](https://build.opensuse.org/package/show/home:AvengeMedia:hype/hype)" >> $GITHUB_STEP_SUMMARY
+                  ;;
+                hype-git)
+                  echo "- $STATUS_ICON **hype-git** ($STATUS_TEXT) → [View builds](https://build.opensuse.org/package/show/home:AvengeMedia:hype-git/hype-git)" >> $GITHUB_STEP_SUMMARY
+                  ;;
+                hype-greeter)
+                  echo "- $STATUS_ICON **hype-greeter** ($STATUS_TEXT) → [View builds](https://build.opensuse.org/package/show/home:AvengeMedia:hypelinux/hype-greeter)" >> $GITHUB_STEP_SUMMARY
+                  ;;
+              esac
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [[ -n "${{ github.event.inputs.rebuild_release }}" ]]; then
+              echo "**Rebuild Number:** db${{ github.event.inputs.rebuild_release }}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [[ -n "${{ steps.packages.outputs.version }}" ]]; then
+              echo "**Version:** ${{ steps.packages.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "Monitor build progress on [OBS project page](https://build.opensuse.org/project/show/home:AvengeMedia)." >> $GITHUB_STEP_SUMMARY
+          fi

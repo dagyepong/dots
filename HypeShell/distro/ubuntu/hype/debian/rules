@@ -1,0 +1,84 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+
+# Extract version from debian/changelog
+DEB_VERSION := $(shell dpkg-parsechangelog -S Version)
+# Get upstream version (strip -1ppa1 suffix)
+UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | sed 's/-[^-]*$$//')
+# Strip ppa suffix and handle git versions
+# Examples: 0.5.2ppa9 -> 0.5.2, 0.5.2+git20251116 -> 0.5.2
+BASE_VERSION := $(shell echo $(UPSTREAM_VERSION) | sed 's/ppa[0-9]*$$//' | sed 's/+git.*//')
+
+%:
+	dh $@
+
+override_dh_installsystemd:
+	dh_installsystemd --name=dms
+
+override_dh_auto_build:
+	# All files are included in source package (downloaded by build-source.sh)
+	# Launchpad build environment has no internet access
+	$(eval DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH))
+	@echo "Building for architecture: $(DEB_HOST_ARCH)"
+
+	test -f dms-distropkg-$(DEB_HOST_ARCH).gz || (echo "ERROR: dms-distropkg-$(DEB_HOST_ARCH).gz not found!" && exit 1)
+	test -f dms-source.tar.gz || (echo "ERROR: dms-source.tar.gz not found!" && exit 1)
+
+	# Extract pre-built binary
+	gunzip -c dms-distropkg-$(DEB_HOST_ARCH).gz > dms
+	chmod +x dms
+
+	# Extract source tarball for QML files
+	tar -xzf dms-source.tar.gz
+	# Find the extracted directory (it might have various names)
+	# and rename it to the expected BASE_VERSION name for consistent install
+	SOURCE_DIR=$$(find . -maxdepth 1 -type d -name "DankMaterialShell-*" ! -name "DankMaterialShell-$(BASE_VERSION)" | head -n1); \
+	if [ -n "$$SOURCE_DIR" ] && [ "$$SOURCE_DIR" != "./DankMaterialShell-$(BASE_VERSION)" ]; then \
+		echo "Renaming $$SOURCE_DIR to DankMaterialShell-$(BASE_VERSION)"; \
+		mv "$$SOURCE_DIR" DankMaterialShell-$(BASE_VERSION); \
+	elif [ ! -d "DankMaterialShell-$(BASE_VERSION)" ]; then \
+		echo "ERROR: No DankMaterialShell directory found after extraction!"; \
+		ls -la; \
+		exit 1; \
+	fi
+
+override_dh_auto_install:
+	# Install binary
+	install -Dm755 dms debian/dms/usr/bin/dms
+
+	# Install systemd user service (before copying everything else)
+	install -Dm644 DankMaterialShell-$(BASE_VERSION)/assets/systemd/dms.service \
+		debian/dms/usr/lib/systemd/user/dms.service
+
+	# Install desktop file and icon
+	install -Dm644 DankMaterialShell-$(BASE_VERSION)/assets/dms-open.desktop \
+		debian/dms/usr/share/applications/dms-open.desktop
+	install -Dm644 DankMaterialShell-$(BASE_VERSION)/assets/danklogo.svg \
+		debian/dms/usr/share/icons/hicolor/scalable/apps/danklogo.svg
+
+	# Install QML files from source tarball
+	mkdir -p debian/dms/usr/share/quickshell/dms
+	cp -r DankMaterialShell-$(BASE_VERSION)/* debian/dms/usr/share/quickshell/dms/
+
+	# Remove unnecessary directories
+	rm -rf debian/dms/usr/share/quickshell/dms/core
+	rm -rf debian/dms/usr/share/quickshell/dms/distro
+	rm -rf debian/dms/usr/share/quickshell/dms/assets
+
+	# Create VERSION file for Quickshell (stable release format)
+	echo "$(BASE_VERSION)" > debian/dms/usr/share/quickshell/dms/VERSION
+
+	# Generate and install shell completions (if applicable)
+	# Uncomment if dms supports completion generation
+	# ./dms completion bash > dms.bash
+	# ./dms completion zsh > dms.zsh
+	# install -Dm644 dms.bash debian/dms/usr/share/bash-completion/completions/dms
+	# install -Dm644 dms.zsh debian/dms/usr/share/zsh/vendor-completions/_dms
+
+override_dh_auto_clean:
+	rm -f dms
+	rm -rf DankMaterialShell-*
+	# Don't remove dms-distropkg-amd64.gz and dms-source.tar.gz
+	# They need to be included in the source package for Launchpad builds
+	dh_auto_clean

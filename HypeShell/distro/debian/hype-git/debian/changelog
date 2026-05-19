@@ -1,0 +1,26 @@
+dms-git (1.0.2+git2528.d336866fdb1) nightly; urgency=medium
+
+  * Git snapshot (commit 2528: d336866f)
+
+ -- Avenge Media <AvengeMedia.US@gmail.com>  Sun, 14 Dec 2025 03:56:25 +0000
+
+dms-git (1.0.2+git2521.3b511e2f) nightly; urgency=medium
+
+  * Git snapshot (commit 2521: 3b511e2f)
+
+ -- Avenge Media <AvengeMedia.US@gmail.com>  Sat, 13 Dec 2025 21:10:22 +0000
+
+dms-git (1.0.2+git2518.a783d650) nightly; urgency=medium
+
+  * Git snapshot (commit 2518: a783d650)
+
+ -- Avenge Media <AvengeMedia.US@gmail.com>  Sat, 13 Dec 2025 15:11:40 +0000
+
+
+dms-git (1.0.0+git2419.993f14a3) nightly; urgency=medium
+
+  * Major stable release v1.0.0
+  * widgets: make dank icon picker a popup
+  * Previous updates included in build
+
+ -- Avenge Media <AvengeMedia.US@gmail.com>  Mon, 09 Dec 2025 14:00:00 +0000

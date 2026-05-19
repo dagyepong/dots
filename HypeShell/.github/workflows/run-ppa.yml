@@ -1,0 +1,150 @@
+﻿name: Update PPA Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to upload"
+        required: true
+        type: choice
+        options:
+          - hype
+          - hype-greeter
+          - hype-git
+          - all
+        default: "hype"
+      rebuild_release:
+        description: "Release number for rebuilds (e.g., 2, 3, 4 for ppa2, ppa3, ppa4)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 2,5,14,17,20,23 * * *" # 9am, 12pm, 3pm, 6pm, 9pm, 12am EST (UTC times shown)
+
+jobs:
+  check-updates:
+    name: Check package/series updates
+    runs-on: ubuntu-latest
+
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      targets: ${{ steps.check.outputs.targets }}
+      targets_json: ${{ steps.check.outputs.targets_json }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl git
+
+      - name: Check for updates
+        id: check
+        run: |
+          chmod +x distro/scripts/ppa-sync-plan.sh
+
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            PACKAGE="hype-git"
+          else
+            PACKAGE="${{ github.event.inputs.package }}"
+          fi
+
+          REBUILD_RELEASE="${{ github.event.inputs.rebuild_release }}"
+          ARGS=(--package "$PACKAGE" --json)
+          if [[ -n "$REBUILD_RELEASE" ]]; then
+            ARGS+=(--rebuild "$REBUILD_RELEASE")
+          fi
+
+          TARGETS_JSON=$(distro/scripts/ppa-sync-plan.sh "${ARGS[@]}" 2> ppa-audit.log)
+          cat ppa-audit.log
+
+          TARGETS=$(echo "$TARGETS_JSON" | jq -r 'join(" ")')
+          if [[ "$TARGETS_JSON" != "[]" ]]; then
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+            echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+            echo "targets_json=$TARGETS_JSON" >> "$GITHUB_OUTPUT"
+            echo "Package/series targets: $TARGETS"
+          else
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+            echo "targets=" >> "$GITHUB_OUTPUT"
+            echo "targets_json=[]" >> "$GITHUB_OUTPUT"
+            echo "No package/series uploads needed"
+          fi
+
+  upload-ppa:
+    name: Upload ${{ matrix.target }}
+    needs: check-updates
+    runs-on: ubuntu-latest
+    if: needs.check-updates.outputs.has_updates == 'true'
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.check-updates.outputs.targets_json) }}
+    concurrency:
+      group: ppa-hype-${{ matrix.target }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ./core/go.mod
+          cache: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper \
+            devscripts \
+            dput \
+            lftp \
+            build-essential \
+            fakeroot \
+            dpkg-dev \
+            openssh-client
+
+      - name: Configure GPG
+        env:
+          GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_KEY" | gpg --import
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+          echo "DEBSIGN_KEYID=$GPG_KEY_ID" >> "$GITHUB_ENV"
+
+      - name: Upload target
+        env:
+          TARGET: ${{ matrix.target }}
+          LAUNCHPAD_SSH_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_SSH_PRIVATE_KEY }}
+          LAUNCHPAD_SSH_LOGIN: ${{ secrets.LAUNCHPAD_SSH_LOGIN }}
+        run: |
+          IFS=':' read -r PACKAGE UBUNTU_SERIES PPA_NUM <<< "$TARGET"
+
+          case "$PACKAGE" in
+            hype) PPA_NAME="hype" ;;
+            hype-git) PPA_NAME="hype-git" ;;
+            hype-greeter) PPA_NAME="hypelinux" ;;
+            *) echo "::error::Unknown package $PACKAGE"; exit 1 ;;
+          esac
+
+          echo "Uploading $PACKAGE to $PPA_NAME/$UBUNTU_SERIES with ppa$PPA_NUM"
+          bash distro/scripts/ppa-upload.sh "$PACKAGE" "$PPA_NAME" "$UBUNTU_SERIES" "$PPA_NUM"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### PPA Package Upload" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target:** ${{ matrix.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **HYPE PPA:** https://launchpad.net/~avengemedia/+archive/ubuntu/hype/+packages" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **HYPE-Git PPA:** https://launchpad.net/~avengemedia/+archive/ubuntu/hype-git/+packages" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **HypeLinux PPA:** https://launchpad.net/~avengemedia/+archive/ubuntu/hypelinux/+packages" >> "$GITHUB_STEP_SUMMARY"

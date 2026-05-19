@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=HypeShell (Hyprland)
+Comment=Start Hyprland with the HypeShell session
+Exec=hypeshell-hyprland-session
+Type=Application
+DesktopNames=Hyprland;HypeShell

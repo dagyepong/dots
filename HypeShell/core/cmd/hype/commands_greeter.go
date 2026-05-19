@@ -1,0 +1,1822 @@
+﻿package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/acarlton5/HypeShell/core/internal/distros"
+	"github.com/acarlton5/HypeShell/core/internal/greeter"
+	"github.com/acarlton5/HypeShell/core/internal/log"
+	sharedpam "github.com/acarlton5/HypeShell/core/internal/pam"
+	"github.com/acarlton5/HypeShell/core/internal/privesc"
+	"github.com/acarlton5/HypeShell/core/internal/utils"
+	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+)
+
+var greeterCmd = &cobra.Command{
+	Use:   "greeter",
+	Short: "Manage HypeShell greeter",
+	Long:  "Manage HypeShell greeter (greetd)",
+}
+
+var (
+	greeterConfigSyncFn = greeter.SyncHYPEConfigs
+	sharedAuthSyncFn    = sharedpam.SyncAuthConfig
+)
+
+var greeterInstallCmd = &cobra.Command{
+	Use:     "install",
+	Short:   "Install and configure HypeShell greeter",
+	Long:    "Install greetd and configure it to use HypeShell as the greeter interface",
+	PreRunE: preRunPrivileged,
+	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+		term, _ := cmd.Flags().GetBool("terminal")
+		if term {
+			installCmd := "hype greeter install"
+			if yes {
+				installCmd += " --yes"
+			}
+			installCmd += "; echo; echo \"Install finished. Closing in 3 seconds...\"; sleep 3"
+			if err := runCommandInTerminal(installCmd); err != nil {
+				log.Fatalf("Error launching install in terminal: %v", err)
+			}
+			return
+		}
+		if err := installGreeter(yes); err != nil {
+			log.Fatalf("Error installing greeter: %v", err)
+		}
+	},
+}
+
+var greeterSyncCmd = &cobra.Command{
+	Use:     "sync",
+	Short:   "Sync HypeShell theme and settings with greeter",
+	Long:    "Synchronize your current user's HypeShell theme, settings, and wallpaper configuration with the login greeter screen",
+	PreRunE: preRunPrivileged,
+	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+		auth, _ := cmd.Flags().GetBool("auth")
+		local, _ := cmd.Flags().GetBool("local")
+		term, _ := cmd.Flags().GetBool("terminal")
+		if term {
+			if err := syncInTerminal(yes, auth, local); err != nil {
+				log.Fatalf("Error launching sync in terminal: %v", err)
+			}
+			return
+		}
+		if err := syncGreeter(yes, auth, local); err != nil {
+			log.Fatalf("Error syncing greeter: %v", err)
+		}
+	},
+}
+
+func init() {
+	greeterSyncCmd.Flags().BoolP("yes", "y", false, "Non-interactive mode: skip prompts, use defaults (for UI)")
+	greeterSyncCmd.Flags().BoolP("terminal", "t", false, "Run sync in a new terminal (for entering sudo password); terminal auto-closes when done")
+	greeterSyncCmd.Flags().BoolP("auth", "a", false, "Configure PAM for fingerprint and U2F (adds both if modules exist); overrides UI toggles")
+	greeterSyncCmd.Flags().BoolP("local", "l", false, "Developer mode: force greetd config to use a local HypeShell checkout path")
+}
+
+var greeterEnableCmd = &cobra.Command{
+	Use:     "enable",
+	Short:   "Enable HypeShell greeter in greetd config",
+	Long:    "Configure greetd to use HypeShell as the greeter",
+	PreRunE: preRunPrivileged,
+	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+		term, _ := cmd.Flags().GetBool("terminal")
+		if term {
+			enableCmd := "hype greeter enable"
+			if yes {
+				enableCmd += " --yes"
+			}
+			enableCmd += "; echo; echo \"Enable finished. Closing in 3 seconds...\"; sleep 3"
+			if err := runCommandInTerminal(enableCmd); err != nil {
+				log.Fatalf("Error launching enable in terminal: %v", err)
+			}
+			return
+		}
+		if err := enableGreeter(yes); err != nil {
+			log.Fatalf("Error enabling greeter: %v", err)
+		}
+	},
+}
+
+var greeterStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Check greeter sync status",
+	Long:  "Check the status of greeter installation and configuration sync",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := checkGreeterStatus(); err != nil {
+			log.Fatalf("Error checking greeter status: %v", err)
+		}
+	},
+}
+
+var greeterUninstallCmd = &cobra.Command{
+	Use:     "uninstall",
+	Short:   "Remove HypeShell greeter configuration and restore previous display manager",
+	Long:    "Disable greetd, remove HypeShell managed configs, and restore the system to its pre-HypeShell-greeter state",
+	PreRunE: preRunPrivileged,
+	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+		term, _ := cmd.Flags().GetBool("terminal")
+		if term {
+			uninstallCmd := "hype greeter uninstall"
+			if yes {
+				uninstallCmd += " --yes"
+			}
+			uninstallCmd += "; echo; echo \"Uninstall finished. Closing in 3 seconds...\"; sleep 3"
+			if err := runCommandInTerminal(uninstallCmd); err != nil {
+				log.Fatalf("Error launching uninstall in terminal: %v", err)
+			}
+			return
+		}
+		if err := uninstallGreeter(yes); err != nil {
+			log.Fatalf("Error uninstalling greeter: %v", err)
+		}
+	},
+}
+
+func init() {
+	greeterInstallCmd.Flags().BoolP("yes", "y", false, "Non-interactive: skip confirmation prompt")
+	greeterInstallCmd.Flags().BoolP("terminal", "t", false, "Run in a new terminal (for entering sudo password)")
+	greeterEnableCmd.Flags().BoolP("yes", "y", false, "Non-interactive: skip confirmation prompt")
+	greeterEnableCmd.Flags().BoolP("terminal", "t", false, "Run in a new terminal (for entering sudo password)")
+	greeterUninstallCmd.Flags().BoolP("yes", "y", false, "Non-interactive: skip confirmation prompt")
+	greeterUninstallCmd.Flags().BoolP("terminal", "t", false, "Run in a new terminal (for entering sudo password)")
+}
+
+func syncGreeterConfigsAndAuth(hypePath, compositor string, logFunc func(string), options sharedpam.SyncAuthOptions, beforeAuth func()) error {
+	if err := greeterConfigSyncFn(hypePath, compositor, logFunc, ""); err != nil {
+		return err
+	}
+	if beforeAuth != nil {
+		beforeAuth()
+	}
+	return sharedAuthSyncFn(logFunc, "", options)
+}
+
+func installGreeter(nonInteractive bool) error {
+	fmt.Println("=== HypeShell Greeter Installation ===")
+
+	logFunc := func(msg string) {
+		fmt.Println(msg)
+	}
+
+	if !nonInteractive {
+		fmt.Print("\nThis will install greetd (if needed), configure the HypeShell greeter, and enable it. Continue? [Y/n]: ")
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(strings.TrimSpace(response)) == "n" || strings.ToLower(strings.TrimSpace(response)) == "no" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+		fmt.Println()
+	}
+
+	if err := greeter.EnsureGreetdInstalled(logFunc, ""); err != nil {
+		return err
+	}
+
+	greeter.TryInstallGreeterPackage(logFunc, "")
+	if isPackageOnlyGreeterDistro() && !greeter.IsGreeterPackaged() {
+		return fmt.Errorf("hype-greeter must be installed from the HypeShell source wrapper. %s", packageInstallHint())
+	}
+	if greeter.IsGreeterPackaged() && greeter.HasLegacyLocalGreeterWrapper() {
+		return fmt.Errorf("legacy greeter wrapper detected; rerun install.sh --update to replace it with hype-greeter")
+	}
+
+	if isGreeterEnabled() {
+		fmt.Print("\nGreeter is already installed and configured. Re-run to re-sync settings and permissions? [Y/n]: ")
+		var response string
+		fmt.Scanln(&response)
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response == "n" || response == "no" {
+			fmt.Println("Run 'hype greeter sync' to re-sync theme and settings at any time.")
+			return nil
+		}
+		fmt.Println()
+	}
+
+	fmt.Println("\nDetecting HypeShell installation...")
+	hypePath, err := greeter.DetectHYPEPath()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✓ Found HypeShell at: %s\n", hypePath)
+
+	fmt.Println("\nDetecting installed compositors...")
+	compositors := greeter.DetectCompositors()
+	if len(compositors) == 0 {
+		return fmt.Errorf("no supported compositors found (niri or Hyprland required)")
+	}
+
+	var selectedCompositor string
+	if len(compositors) == 1 {
+		selectedCompositor = compositors[0]
+		fmt.Printf("✓ Found compositor: %s\n", selectedCompositor)
+	} else {
+		var err error
+		selectedCompositor, err = greeter.PromptCompositorChoice(compositors)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("✓ Selected compositor: %s\n", selectedCompositor)
+	}
+
+	fmt.Println("\nSetting up HypeShell greeter group and permissions...")
+	if err := greeter.SetupHYPEGroup(logFunc, ""); err != nil {
+		return err
+	}
+
+	fmt.Println("\nCopying greeter files...")
+	if err := greeter.CopyGreeterFiles(hypePath, selectedCompositor, logFunc, ""); err != nil {
+		return err
+	}
+
+	if greeter.IsAppArmorEnabled() {
+		fmt.Println("\nConfiguring AppArmor profile...")
+		if err := greeter.InstallAppArmorProfile(logFunc, ""); err != nil {
+			logFunc(fmt.Sprintf("⚠ AppArmor profile setup failed: %v", err))
+		}
+	}
+
+	fmt.Println("\nConfiguring greetd...")
+	greeterPathForConfig := ""
+	if !greeter.IsGreeterPackaged() {
+		greeterPathForConfig = hypePath
+	}
+	if err := greeter.ConfigureGreetd(greeterPathForConfig, selectedCompositor, logFunc, ""); err != nil {
+		return err
+	}
+
+	fmt.Println("\nSynchronizing HypeShell configurations...")
+	if err := syncGreeterConfigsAndAuth(hypePath, selectedCompositor, logFunc, sharedpam.SyncAuthOptions{}, func() {
+		fmt.Println("\nConfiguring authentication...")
+	}); err != nil {
+		return err
+	}
+
+	if err := ensureGraphicalTarget(); err != nil {
+		return err
+	}
+
+	if err := handleConflictingDisplayManagers(); err != nil {
+		return err
+	}
+
+	if err := ensureGreetdEnabled(); err != nil {
+		return err
+	}
+
+	fmt.Println("\n=== Installation Complete ===")
+	fmt.Println("\nTo start the greeter now, run:")
+	fmt.Println("  sudo systemctl start greetd")
+	fmt.Println("\nOr reboot to see the greeter at next boot.")
+
+	return nil
+}
+
+func uninstallGreeter(nonInteractive bool) error {
+	fmt.Println("=== HypeShell Greeter Uninstall ===")
+
+	logFunc := func(msg string) { fmt.Println(msg) }
+
+	if !isGreeterEnabled() {
+		fmt.Println("ℹ HypeShell greeter is not currently configured in /etc/greetd/config.toml.")
+		fmt.Println("  Nothing to undo for greetd configuration.")
+	}
+
+	if !nonInteractive {
+		fmt.Print("\nThis will:\n  • Stop and disable greetd\n  • Remove the HypeShell-managed greeter auth block\n  • Remove the HypeShell AppArmor profile\n  • Restore the most recent pre-HypeShell greetd config (if available)\n\nContinue? [y/N]: ")
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(strings.TrimSpace(response)) != "y" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+	}
+
+	fmt.Println("\nDisabling greetd...")
+	if err := privesc.Run(context.Background(), "", "systemctl", "disable", "greetd"); err != nil {
+		fmt.Printf("  ⚠ Could not disable greetd: %v\n", err)
+	} else {
+		fmt.Println("  ✓ greetd disabled")
+	}
+
+	fmt.Println("\nRemoving HypeShell authentication configuration...")
+	if err := sharedpam.RemoveManagedGreeterPamBlock(logFunc, ""); err != nil {
+		fmt.Printf("  ⚠ PAM cleanup failed: %v\n", err)
+	}
+
+	fmt.Println("\nRemoving HypeShell AppArmor profile...")
+	if err := greeter.UninstallAppArmorProfile(logFunc, ""); err != nil {
+		fmt.Printf("  ⚠ AppArmor cleanup failed: %v\n", err)
+	}
+
+	fmt.Println("\nRestoring greetd configuration...")
+	if err := restorePreHYPEGreetdConfig(""); err != nil {
+		fmt.Printf("  ⚠ Could not restore previous greetd config: %v\n", err)
+		fmt.Println("  You may need to manually edit /etc/greetd/config.toml.")
+	}
+
+	fmt.Println("\nChecking for other display managers to re-enable...")
+	suggestDisplayManagerRestore(nonInteractive)
+
+	fmt.Println("\n=== Uninstall Complete ===")
+	fmt.Println("\nReboot to complete the uninstallation and switch to your previous display manager.")
+	fmt.Println("To re-enable HypeShell greeter at any time, run: hype greeter enable")
+
+	return nil
+}
+
+func restorePreHYPEGreetdConfig(sudoPassword string) error {
+	const configPath = "/etc/greetd/config.toml"
+	const backupGlob = "/etc/greetd/config.toml.backup-*"
+
+	matches, _ := filepath.Glob(backupGlob)
+
+	for i := 0; i < len(matches)-1; i++ {
+		for j := i + 1; j < len(matches); j++ {
+			if matches[j] > matches[i] {
+				matches[i], matches[j] = matches[j], matches[i]
+			}
+		}
+	}
+
+	for _, candidate := range matches {
+		data, err := os.ReadFile(candidate)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(string(data), "hype-greeter") {
+			continue
+		}
+		tmp, err := os.CreateTemp("", "greetd-restore-*")
+		if err != nil {
+			return fmt.Errorf("could not create temp file: %w", err)
+		}
+		tmpPath := tmp.Name()
+		defer os.Remove(tmpPath)
+		if _, err := tmp.Write(data); err != nil {
+			tmp.Close()
+			return err
+		}
+		tmp.Close()
+
+		if err := privesc.Run(context.Background(), sudoPassword, "cp", tmpPath, configPath); err != nil {
+			return fmt.Errorf("failed to restore %s: %w", candidate, err)
+		}
+		if err := privesc.Run(context.Background(), sudoPassword, "chmod", "644", configPath); err != nil {
+			return err
+		}
+		fmt.Printf("  ✓ Restored greetd config from %s\n", candidate)
+		return nil
+	}
+
+	minimal := `[terminal]
+vt = 1
+
+# HypeShell greeter has been uninstalled.
+# Configure a greeter command here or re-enable a display manager.
+[default_session]
+user = "greeter"
+command = "agreety --cmd /bin/bash"
+`
+	tmp, err := os.CreateTemp("", "greetd-minimal-*")
+	if err != nil {
+		return fmt.Errorf("could not create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.WriteString(minimal); err != nil {
+		tmp.Close()
+		return err
+	}
+	tmp.Close()
+
+	if err := privesc.Run(context.Background(), sudoPassword, "cp", tmpPath, configPath); err != nil {
+		return fmt.Errorf("failed to write fallback greetd config: %w", err)
+	}
+	_ = privesc.Run(context.Background(), sudoPassword, "chmod", "644", configPath)
+	fmt.Println("  ✓ Wrote minimal fallback greetd config (configure a greeter command manually if needed)")
+	return nil
+}
+
+// suggestDisplayManagerRestore scans for installed DMs and re-enables one
+func suggestDisplayManagerRestore(nonInteractive bool) {
+	knownDMs := []string{"gdm", "gdm3", "lightdm", "sddm", "lxdm", "xdm", "cosmic-greeter"}
+	var found []string
+	for _, dm := range knownDMs {
+		if utils.CommandExists(dm) || isSystemdUnitInstalled(dm) {
+			found = append(found, dm)
+		}
+	}
+	if len(found) == 0 {
+		fmt.Println("  ℹ No other display managers detected.")
+		fmt.Println("  You can install one (e.g. gdm, lightdm, sddm) and then run:")
+		fmt.Println("    sudo systemctl enable --now <dm-name>")
+		return
+	}
+
+	enableDM := func(dm string) {
+		fmt.Printf("  Enabling %s...\n", dm)
+		if err := privesc.Run(context.Background(), "", "systemctl", "enable", "--force", dm); err != nil {
+			fmt.Printf("  ⚠ Failed to enable %s: %v\n", dm, err)
+		} else {
+			fmt.Printf("  ✓ %s enabled (will take effect on next boot).\n", dm)
+		}
+	}
+
+	if len(found) == 1 || nonInteractive {
+		chosen := found[0]
+		if len(found) > 1 {
+			fmt.Printf("  ℹ Multiple display managers found (%s); enabling %s automatically.\n",
+				strings.Join(found, ", "), chosen)
+		} else {
+			fmt.Printf("  ℹ Found display manager: %s\n", chosen)
+		}
+		enableDM(chosen)
+		return
+	}
+
+	fmt.Println("  ℹ Found the following display managers:")
+	for i, dm := range found {
+		fmt.Printf("    %d) %s\n", i+1, dm)
+	}
+	fmt.Print("  Choose a number to re-enable (or press Enter to skip): ")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return
+	}
+	input := strings.TrimSpace(scanner.Text())
+	if input == "" {
+		fmt.Println("  Skipped. You can re-enable a display manager later with:")
+		fmt.Println("    sudo systemctl enable --now <dm-name>")
+		return
+	}
+
+	n, err := strconv.Atoi(input)
+	if err != nil || n < 1 || n > len(found) {
+		fmt.Printf("  Invalid selection %q — skipping.\n", input)
+		return
+	}
+
+	enableDM(found[n-1])
+}
+
+func isSystemdUnitInstalled(unit string) bool {
+	cmd := exec.Command("systemctl", "list-unit-files", unit+".service", "--no-legend", "--no-pager")
+	out, err := cmd.Output()
+	return err == nil && strings.Contains(string(out), unit)
+}
+
+func runCommandInTerminal(shellCmd string) error {
+	terminals := []struct {
+		name string
+		args []string
+	}{
+		{"gnome-terminal", []string{"--", "bash", "-c", shellCmd}},
+		{"konsole", []string{"-e", "bash", "-c", shellCmd}},
+		{"xfce4-terminal", []string{"-e", "bash -c \"" + strings.ReplaceAll(shellCmd, `"`, `\"`) + "\""}},
+		{"ghostty", []string{"-e", "bash", "-c", shellCmd}},
+		{"wezterm", []string{"start", "--", "bash", "-c", shellCmd}},
+		{"alacritty", []string{"-e", "bash", "-c", shellCmd}},
+		{"kitty", []string{"bash", "-c", shellCmd}},
+		{"xterm", []string{"-e", "bash -c \"" + strings.ReplaceAll(shellCmd, `"`, `\"`) + "\""}},
+	}
+	for _, t := range terminals {
+		if _, err := exec.LookPath(t.name); err != nil {
+			continue
+		}
+		cmd := exec.Command(t.name, t.args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("no terminal emulator found (tried: gnome-terminal, konsole, xfce4-terminal, ghostty, wezterm, alacritty, kitty, xterm)")
+}
+
+func syncInTerminal(nonInteractive bool, forceAuth bool, local bool) error {
+	syncFlags := make([]string, 0, 3)
+	if nonInteractive {
+		syncFlags = append(syncFlags, "--yes")
+	}
+	if forceAuth {
+		syncFlags = append(syncFlags, "--auth")
+	}
+	if local {
+		syncFlags = append(syncFlags, "--local")
+	}
+	shellSyncCmd := "hype greeter sync"
+	if len(syncFlags) > 0 {
+		shellSyncCmd += " " + strings.Join(syncFlags, " ")
+	}
+	shellCmd := shellSyncCmd + `; echo; echo "Sync finished. Closing in 3 seconds..."; sleep 3`
+	return runCommandInTerminal(shellCmd)
+}
+
+func resolveLocalWrapperShell() (string, error) {
+	for _, shellName := range []string{"bash", "sh"} {
+		shellPath, err := exec.LookPath(shellName)
+		if err == nil {
+			return shellPath, nil
+		}
+	}
+	return "", fmt.Errorf("could not find bash or sh in PATH for local greeter wrapper")
+}
+
+func syncGreeter(nonInteractive bool, forceAuth bool, local bool) error {
+	if !nonInteractive {
+		fmt.Println("=== HypeShell Greeter Sync ===")
+		fmt.Println()
+	}
+
+	logFunc := func(msg string) {
+		fmt.Println(msg)
+	}
+
+	if !nonInteractive {
+		fmt.Println("Detecting HypeShell installation...")
+	}
+	var hypePath string
+	var err error
+	if local {
+		hypePath, err = resolveLocalHYPEPath()
+		if err != nil {
+			return err
+		}
+		if !nonInteractive {
+			fmt.Printf("✓ Using local HypeShell path: %s\n", hypePath)
+		}
+	} else {
+		hypePath, err = greeter.DetectHYPEPath()
+		if err != nil {
+			return err
+		}
+		if !nonInteractive {
+			fmt.Printf("✓ Found HypeShell at: %s\n", hypePath)
+		}
+	}
+
+	if !isGreeterEnabled() {
+		if nonInteractive {
+			return fmt.Errorf("greeter is not enabled; run 'hype greeter install' or 'hype greeter enable' first")
+		}
+		fmt.Println("\n⚠ HypeShell greeter is not enabled in greetd config.")
+		fmt.Print("Would you like to enable it now? (Y/n): ")
+
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response != "n" && response != "no" {
+			if err := enableGreeter(false); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("greeter must be enabled before syncing")
+		}
+	}
+
+	if greeter.IsGreeterPackaged() && greeter.HasLegacyLocalGreeterWrapper() {
+		return fmt.Errorf("legacy greeter wrapper detected; rerun install.sh --update to replace it with hype-greeter")
+	}
+
+	cacheDir := greeter.GreeterCacheDir
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		logFunc("Cache directory not found — attempting to create it...")
+	}
+
+	greeterGroup := greeter.DetectGreeterGroup()
+	greeterGroupExists := utils.HasGroup(greeterGroup)
+	if greeterGroupExists {
+		currentUser, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		groupsCmd := exec.Command("groups", currentUser.Username)
+		groupsOutput, err := groupsCmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to check groups: %w", err)
+		}
+
+		inGreeterGroup := strings.Contains(string(groupsOutput), greeterGroup)
+		if !inGreeterGroup {
+			if nonInteractive {
+				logFunc(fmt.Sprintf("⚠ Not yet in %s group — will be added during sync (logout/login required to take effect).", greeterGroup))
+			} else {
+				fmt.Printf("\n⚠ Warning: You are not in the %s group.\n", greeterGroup)
+				fmt.Printf("Would you like to add your user to the %s group? (Y/n): ", greeterGroup)
+
+				var response string
+				fmt.Scanln(&response)
+				response = strings.ToLower(strings.TrimSpace(response))
+
+				if response != "n" && response != "no" {
+					fmt.Printf("\nAdding user to %s group...\n", greeterGroup)
+					if err := privesc.Run(context.Background(), "", "usermod", "-aG", greeterGroup, currentUser.Username); err != nil {
+						return fmt.Errorf("failed to add user to %s group: %w", greeterGroup, err)
+					}
+					fmt.Printf("✓ User added to %s group\n", greeterGroup)
+					fmt.Println("⚠ You will need to log out and back in for the group change to take effect")
+				} else {
+					return fmt.Errorf("aborted: user must be in the greeter group before syncing")
+				}
+			}
+		}
+	}
+
+	compositor := detectConfiguredCompositor()
+	if compositor == "" {
+		compositors := greeter.DetectCompositors()
+		switch len(compositors) {
+		case 0:
+			return fmt.Errorf("no supported compositors found")
+		case 1:
+			compositor = compositors[0]
+			if !nonInteractive {
+				fmt.Printf("✓ Using compositor: %s\n", compositor)
+			}
+		default:
+			if nonInteractive {
+				compositor = compositors[0]
+				break
+			}
+			var err error
+			compositor, err = promptCompositorChoice(compositors)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("✓ Selected compositor: %s\n", compositor)
+		}
+	} else if !nonInteractive {
+		fmt.Printf("✓ Detected compositor from config: %s\n", compositor)
+	}
+
+	if local {
+		localWrapperScript := filepath.Join(hypePath, "Modules", "Greetd", "assets", "hype-greeter")
+		if info, statErr := os.Stat(localWrapperScript); statErr != nil || info.IsDir() {
+			localWrapperScript = filepath.Join(hypePath, "quickshell", "Modules", "Greetd", "assets", "hype-greeter")
+		}
+		restoreWrapperOverride := func() {}
+		if info, statErr := os.Stat(localWrapperScript); statErr == nil && !info.IsDir() {
+			wrapperShell, shellErr := resolveLocalWrapperShell()
+			if shellErr != nil {
+				return shellErr
+			}
+			previousWrapperOverride, hadWrapperOverride := os.LookupEnv("HYPE_GREETER_WRAPPER_CMD")
+			wrapperCmdOverride := wrapperShell + " " + localWrapperScript
+			_ = os.Setenv("HYPE_GREETER_WRAPPER_CMD", wrapperCmdOverride)
+			restoreWrapperOverride = func() {
+				if hadWrapperOverride {
+					_ = os.Setenv("HYPE_GREETER_WRAPPER_CMD", previousWrapperOverride)
+				} else {
+					_ = os.Unsetenv("HYPE_GREETER_WRAPPER_CMD")
+				}
+			}
+			if !nonInteractive {
+				fmt.Printf("✓ Using local greeter wrapper script: %s\n", localWrapperScript)
+			}
+		} else if !nonInteractive {
+			fmt.Printf("ℹ Local wrapper script not found at %s; using system wrapper.\n", localWrapperScript)
+		}
+
+		fmt.Println("\nUpdating greetd command to use local HypeShell path...")
+		err := greeter.ConfigureGreetd(hypePath, compositor, logFunc, "")
+		restoreWrapperOverride()
+		if err != nil {
+			return fmt.Errorf("failed to apply local greeter path: %w", err)
+		}
+		if !nonInteractive {
+			fmt.Println("ℹ Local mode applies both HypeShell path override (-p) and local wrapper behavior when available.")
+		}
+	} else {
+		greeterPathForConfig := ""
+		if !greeter.IsGreeterPackaged() {
+			greeterPathForConfig = hypePath
+		}
+		fmt.Println("\nUpdating greetd command...")
+		if err := greeter.ConfigureGreetd(greeterPathForConfig, compositor, logFunc, ""); err != nil {
+			return fmt.Errorf("failed to update greetd command: %w", err)
+		}
+	}
+
+	fmt.Println("\nSetting up permissions and ACLs...")
+	greeter.RemediateStaleACLs(logFunc, "")
+	greeter.RemediateStaleAppArmor(logFunc, "")
+	if err := greeter.SetupHYPEGroup(logFunc, ""); err != nil {
+		return err
+	}
+	if err := greeter.EnsureGreeterCacheDir(logFunc, ""); err != nil {
+		return fmt.Errorf("failed to ensure greeter cache directory at %s: %w\nRun: sudo mkdir -p %s && sudo chown root:%s %s && sudo chmod 2770 %s", cacheDir, err, cacheDir, greeterGroup, cacheDir, cacheDir)
+	}
+
+	fmt.Println("\nSynchronizing HypeShell configurations...")
+	if err := syncGreeterConfigsAndAuth(hypePath, compositor, logFunc, sharedpam.SyncAuthOptions{
+		ForceGreeterAuth: forceAuth,
+	}, func() {
+		fmt.Println("\nConfiguring authentication...")
+	}); err != nil {
+		return err
+	}
+
+	if greeter.IsAppArmorEnabled() {
+		fmt.Println("\nConfiguring AppArmor profile...")
+		if err := greeter.InstallAppArmorProfile(logFunc, ""); err != nil {
+			logFunc(fmt.Sprintf("⚠ AppArmor profile setup failed: %v", err))
+		}
+	}
+
+	fmt.Println("\n=== Sync Complete ===")
+	fmt.Println("\nYour theme, settings, and wallpaper configuration have been synced with the greeter.")
+	fmt.Println("Shared authentication settings were also checked and reconciled where needed.")
+	if forceAuth {
+		fmt.Println("Authentication has been configured for fingerprint and U2F (where modules exist).")
+	}
+	fmt.Println("The changes will be visible on the next login screen.")
+
+	return nil
+}
+
+func hasDmsShellQml(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, "shell.qml"))
+	return err == nil && !info.IsDir()
+}
+
+func resolveHYPELocalCandidate(path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
+	if hasDmsShellQml(path) {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return path, true
+		}
+		return abs, true
+	}
+
+	quickshellPath := filepath.Join(path, "quickshell")
+	if hasDmsShellQml(quickshellPath) {
+		abs, err := filepath.Abs(quickshellPath)
+		if err != nil {
+			return quickshellPath, true
+		}
+		return abs, true
+	}
+
+	return "", false
+}
+
+func resolveLocalHYPEPath() (string, error) {
+	if override := strings.TrimSpace(os.Getenv("HYPESHELL_LOCAL_PATH")); override != "" {
+		if resolved, ok := resolveHYPELocalCandidate(override); ok {
+			return resolved, nil
+		}
+		return "", fmt.Errorf("HYPESHELL_LOCAL_PATH is set but does not point to a valid HypeShell quickshell path: %s", override)
+	}
+
+	if override := strings.TrimSpace(os.Getenv("HYPE_LOCAL_PATH")); override != "" {
+		if resolved, ok := resolveHYPELocalCandidate(override); ok {
+			return resolved, nil
+		}
+		return "", fmt.Errorf("HYPE_LOCAL_PATH is set but does not point to a valid HypeShell quickshell path: %s", override)
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	dir := wd
+	for {
+		if resolved, ok := resolveHYPELocalCandidate(dir); ok {
+			return resolved, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err == nil && homeDir != "" {
+		for _, candidate := range []string{
+			filepath.Join(homeDir, "hype"),
+			filepath.Join(homeDir, "HypeShell"),
+			filepath.Join(homeDir, "hypematerialshell"),
+			filepath.Join(homeDir, "projects", "hype"),
+			filepath.Join(homeDir, "src", "hype"),
+		} {
+			if resolved, ok := resolveHYPELocalCandidate(candidate); ok {
+				return resolved, nil
+			}
+		}
+
+		if entries, readErr := os.ReadDir(homeDir); readErr == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				name := strings.ToLower(entry.Name())
+				if !strings.Contains(name, "hype") && !strings.Contains(name, "hype") {
+					continue
+				}
+				if resolved, ok := resolveHYPELocalCandidate(filepath.Join(homeDir, entry.Name())); ok {
+					return resolved, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not locate a local HypeShell checkout from %s; run from repo root or set HYPESHELL_LOCAL_PATH=/absolute/path/to/repo", wd)
+}
+
+func disableDisplayManager(dmName string) (bool, error) {
+	state, err := getSystemdServiceState(dmName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check %s state: %w", dmName, err)
+	}
+
+	if !state.Exists {
+		return false, nil
+	}
+
+	fmt.Printf("\nChecking %s...\n", dmName)
+	fmt.Printf("  Current state: enabled=%s\n", state.EnabledState)
+
+	actionTaken := false
+
+	if state.NeedsDisable {
+		var action, actionVerb string
+		switch state.EnabledState {
+		case "static":
+			fmt.Printf("  Masking %s (static service cannot be disabled)...\n", dmName)
+			action = "mask"
+			actionVerb = "masked"
+		default:
+			fmt.Printf("  Disabling %s...\n", dmName)
+			action = "disable"
+			actionVerb = "disabled"
+		}
+
+		if err := privesc.Run(context.Background(), "", "systemctl", action, dmName); err != nil {
+			return actionTaken, fmt.Errorf("failed to disable/mask %s: %w", dmName, err)
+		}
+
+		enabledState, shouldDisable, verifyErr := checkSystemdServiceEnabled(dmName)
+		if verifyErr != nil {
+			fmt.Printf("  ⚠ Warning: Could not verify %s was %s: %v\n", dmName, actionVerb, verifyErr)
+		} else if shouldDisable {
+			return actionTaken, fmt.Errorf("%s is still in state '%s' after %s operation", dmName, enabledState, actionVerb)
+		} else {
+			fmt.Printf("  ✓ %s %s (now: %s)\n", cases.Title(language.English).String(actionVerb), dmName, enabledState)
+		}
+
+		actionTaken = true
+	} else {
+		if state.EnabledState == "masked" || state.EnabledState == "masked-runtime" {
+			fmt.Printf("  ✓ %s is already masked\n", dmName)
+		} else {
+			fmt.Printf("  ✓ %s is already disabled\n", dmName)
+		}
+	}
+
+	return actionTaken, nil
+}
+
+func ensureGreetdEnabled() error {
+	fmt.Println("\nChecking greetd service status...")
+
+	state, err := getSystemdServiceState("greetd")
+	if err != nil {
+		return fmt.Errorf("failed to check greetd state: %w", err)
+	}
+
+	if !state.Exists {
+		return fmt.Errorf("greetd service not found. Please install greetd first")
+	}
+
+	fmt.Printf("  Current state: %s\n", state.EnabledState)
+
+	if state.EnabledState == "masked" || state.EnabledState == "masked-runtime" {
+		fmt.Println("  Unmasking greetd...")
+		if err := privesc.Run(context.Background(), "", "systemctl", "unmask", "greetd"); err != nil {
+			return fmt.Errorf("failed to unmask greetd: %w", err)
+		}
+		fmt.Println("  ✓ Unmasked greetd")
+	}
+
+	if state.EnabledState == "enabled" || state.EnabledState == "enabled-runtime" {
+		fmt.Println("  Reasserting greetd as active display manager...")
+	} else {
+		fmt.Println("  Enabling greetd service...")
+	}
+
+	if err := privesc.Run(context.Background(), "", "systemctl", "enable", "--force", "greetd"); err != nil {
+		return fmt.Errorf("failed to enable greetd: %w", err)
+	}
+
+	enabledState, _, verifyErr := checkSystemdServiceEnabled("greetd")
+	if verifyErr != nil {
+		fmt.Printf("  ⚠ Warning: Could not verify greetd enabled state: %v\n", verifyErr)
+	} else {
+		switch enabledState {
+		case "enabled", "enabled-runtime", "static", "indirect", "alias":
+			fmt.Printf("  ✓ greetd enabled (state: %s)\n", enabledState)
+		default:
+			return fmt.Errorf("greetd is still in state '%s' after enable operation", enabledState)
+		}
+	}
+
+	return nil
+}
+
+func ensureGraphicalTarget() error {
+	getDefaultCmd := exec.Command("systemctl", "get-default")
+	currentTarget, err := getDefaultCmd.Output()
+	if err != nil {
+		fmt.Println("⚠ Warning: Could not detect current default systemd target")
+		return nil
+	}
+
+	currentTargetStr := strings.TrimSpace(string(currentTarget))
+	if currentTargetStr != "graphical.target" {
+		fmt.Printf("\nSetting graphical.target as default (current: %s)...\n", currentTargetStr)
+		if err := privesc.Run(context.Background(), "", "systemctl", "set-default", "graphical.target"); err != nil {
+			fmt.Println("⚠ Warning: Failed to set graphical.target as default")
+			fmt.Println("  Greeter may not start on boot. Run manually:")
+			fmt.Println("  sudo systemctl set-default graphical.target")
+			return nil
+		}
+		fmt.Println("✓ Set graphical.target as default")
+	} else {
+		fmt.Println("✓ Default target already set to graphical.target")
+	}
+
+	return nil
+}
+
+func handleConflictingDisplayManagers() error {
+	fmt.Println("\n=== Checking for Conflicting Display Managers ===")
+
+	conflictingDMs := []string{"gdm", "gdm3", "lightdm", "sddm", "lxdm", "xdm", "cosmic-greeter"}
+
+	disabledAny := false
+	var errors []string
+
+	for _, dm := range conflictingDMs {
+		actionTaken, err := disableDisplayManager(dm)
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to handle %s: %v", dm, err)
+			errors = append(errors, errMsg)
+			fmt.Printf("  ⚠⚠⚠ ERROR: %s\n", errMsg)
+			continue
+		}
+		if actionTaken {
+			disabledAny = true
+		}
+	}
+
+	if len(errors) > 0 {
+		fmt.Println("\n╔════════════════════════════════════════════════════════════╗")
+		fmt.Println("║           ⚠⚠⚠ ERRORS OCCURRED ⚠⚠⚠                      ║")
+		fmt.Println("╚════════════════════════════════════════════════════════════╝")
+		fmt.Println("\nSome display managers could not be disabled:")
+		for _, err := range errors {
+			fmt.Printf("  ✗ %s\n", err)
+		}
+		fmt.Println("\nThis may prevent greetd from starting properly.")
+		fmt.Println("You may need to manually disable them before greetd will work.")
+		fmt.Println("\nManual commands to try:")
+		for _, dm := range conflictingDMs {
+			fmt.Printf("  sudo systemctl disable %s\n", dm)
+			fmt.Printf("  sudo systemctl mask %s\n", dm)
+		}
+		fmt.Print("\nContinue with greeter enablement anyway? (Y/n): ")
+
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response == "n" || response == "no" {
+			return fmt.Errorf("aborted due to display manager conflicts")
+		}
+		fmt.Println("\nContinuing despite errors...")
+	}
+
+	if !disabledAny && len(errors) == 0 {
+		fmt.Println("\n✓ No conflicting display managers found")
+	} else if disabledAny && len(errors) == 0 {
+		fmt.Println("\n✓ Successfully handled all conflicting display managers")
+	}
+
+	return nil
+}
+
+func enableGreeter(nonInteractive bool) error {
+	fmt.Println("=== HypeShell Greeter Enable ===")
+	fmt.Println()
+
+	configPath := "/etc/greetd/config.toml"
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return fmt.Errorf("greetd config not found at %s\nPlease install greetd first", configPath)
+	} else if err != nil {
+		return fmt.Errorf("failed to access greetd config at %s: %w", configPath, err)
+	}
+
+	if greeter.IsGreeterPackaged() && greeter.HasLegacyLocalGreeterWrapper() {
+		return fmt.Errorf("legacy greeter wrapper detected; rerun install.sh --update to replace it with hype-greeter")
+	}
+
+	configAlreadyCorrect := isGreeterEnabled()
+	configuredCompositor := detectConfiguredCompositor()
+
+	logFunc := func(msg string) {
+		fmt.Println(msg)
+	}
+	greeterGroup := greeter.DetectGreeterGroup()
+
+	if configAlreadyCorrect {
+		fmt.Println("✓ Greeter is already configured with hype-greeter")
+		if configuredCompositor != "" {
+			fmt.Printf("✓ Configured compositor: %s\n", configuredCompositor)
+		}
+
+		fmt.Println("\nSetting up HypeShell greeter group and permissions...")
+		if err := greeter.SetupHYPEGroup(logFunc, ""); err != nil {
+			return err
+		}
+		if !greeter.IsGreeterPackaged() {
+			hypePath, err := greeter.DetectHYPEPath()
+			if err != nil {
+				return fmt.Errorf("failed to detect HypeShell path for manual greeter configuration: %w", err)
+			}
+			if err := greeter.CopyGreeterFiles(hypePath, configuredCompositor, logFunc, ""); err != nil {
+				return fmt.Errorf("failed to install local greeter wrapper: %w", err)
+			}
+			if strings.Contains(readDefaultSessionCommand(configPath), "/usr/bin/hype-greeter") {
+				compositor := configuredCompositor
+				if compositor == "" {
+					compositor = "hyprland"
+				}
+				if err := greeter.ConfigureGreetd(hypePath, compositor, logFunc, ""); err != nil {
+					return fmt.Errorf("failed to repair greetd greeter path: %w", err)
+				}
+			}
+		}
+		if err := greeter.EnsureGreeterCacheDir(logFunc, ""); err != nil {
+			fmt.Printf("⚠ Could not ensure cache directory: %v\n  Run: sudo mkdir -p %s && sudo chown root:%s %s && sudo chmod 2770 %s\n", err, greeter.GreeterCacheDir, greeterGroup, greeter.GreeterCacheDir, greeter.GreeterCacheDir)
+		}
+
+		if err := ensureGraphicalTarget(); err != nil {
+			return err
+		}
+
+		if err := handleConflictingDisplayManagers(); err != nil {
+			return err
+		}
+
+		if err := ensureGreetdEnabled(); err != nil {
+			return err
+		}
+
+		fmt.Println("\n=== Enable Complete ===")
+		fmt.Println("\nGreeter configuration verified and system state corrected.")
+		fmt.Println("To start the greeter now, run:")
+		fmt.Println("  sudo systemctl start greetd")
+		fmt.Println("\nOr reboot to see the greeter at boot time.")
+
+		return nil
+	}
+
+	if !nonInteractive {
+		fmt.Print("\nThis will configure greetd to use the HypeShell greeter and may disable other display managers. Continue? [Y/n]: ")
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(strings.TrimSpace(response)) == "n" || strings.ToLower(strings.TrimSpace(response)) == "no" {
+			fmt.Println("Aborted.")
+			return nil
+		}
+		fmt.Println()
+	}
+
+	fmt.Println("Detecting installed compositors...")
+	compositors := greeter.DetectCompositors()
+
+	if utils.CommandExists("sway") {
+		compositors = append(compositors, "sway")
+	}
+
+	if len(compositors) == 0 {
+		return fmt.Errorf("no supported compositors found (niri, Hyprland, or sway required)")
+	}
+
+	var selectedCompositor string
+	if len(compositors) == 1 {
+		selectedCompositor = compositors[0]
+		fmt.Printf("✓ Found compositor: %s\n", selectedCompositor)
+	} else {
+		var err error
+		selectedCompositor, err = promptCompositorChoice(compositors)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("✓ Selected compositor: %s\n", selectedCompositor)
+	}
+
+	greeterPathForConfig := ""
+	if !greeter.IsGreeterPackaged() {
+		hypePath, err := greeter.DetectHYPEPath()
+		if err != nil {
+			return fmt.Errorf("failed to detect HypeShell path for manual greeter configuration: %w", err)
+		}
+		if err := greeter.CopyGreeterFiles(hypePath, selectedCompositor, logFunc, ""); err != nil {
+			return fmt.Errorf("failed to install local greeter wrapper: %w", err)
+		}
+		greeterPathForConfig = hypePath
+	}
+	if err := greeter.ConfigureGreetd(greeterPathForConfig, selectedCompositor, logFunc, ""); err != nil {
+		return fmt.Errorf("failed to configure greetd: %w", err)
+	}
+
+	fmt.Println("\nSetting up HypeShell greeter group and permissions...")
+	if err := greeter.SetupHYPEGroup(logFunc, ""); err != nil {
+		return err
+	}
+	if err := greeter.EnsureGreeterCacheDir(logFunc, ""); err != nil {
+		fmt.Printf("⚠ Could not ensure cache directory: %v\n  Run: sudo mkdir -p %s && sudo chown root:%s %s && sudo chmod 2770 %s\n", err, greeter.GreeterCacheDir, greeterGroup, greeter.GreeterCacheDir, greeter.GreeterCacheDir)
+	}
+
+	if greeter.IsAppArmorEnabled() {
+		if err := greeter.InstallAppArmorProfile(logFunc, ""); err != nil {
+			logFunc(fmt.Sprintf("⚠ AppArmor profile setup failed: %v", err))
+		}
+	}
+
+	if err := ensureGraphicalTarget(); err != nil {
+		return err
+	}
+
+	if err := handleConflictingDisplayManagers(); err != nil {
+		return err
+	}
+
+	if err := ensureGreetdEnabled(); err != nil {
+		return err
+	}
+
+	fmt.Println("\n=== Enable Complete ===")
+	fmt.Println("\nTo start the greeter now, run:")
+	fmt.Println("  sudo systemctl start greetd")
+	fmt.Println("\nOr reboot to see the greeter at boot time.")
+
+	return nil
+}
+
+func isGreeterEnabled() bool {
+	command := readDefaultSessionCommand("/etc/greetd/config.toml")
+	return command != "" && strings.Contains(command, "hype-greeter")
+}
+
+func detectConfiguredCompositor() string {
+	command := strings.ToLower(readDefaultSessionCommand("/etc/greetd/config.toml"))
+	switch {
+	case strings.Contains(command, "--command niri"):
+		return "niri"
+	case strings.Contains(command, "--command hyprland"):
+		return "hyprland"
+	case strings.Contains(command, "--command sway"):
+		return "sway"
+	}
+	return ""
+}
+
+func stripTomlComment(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if idx := strings.Index(trimmed, "#"); idx >= 0 {
+		return strings.TrimSpace(trimmed[:idx])
+	}
+	return trimmed
+}
+
+func parseTomlSection(line string) (string, bool) {
+	trimmed := stripTomlComment(line)
+	if len(trimmed) < 3 || !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
+		return "", false
+	}
+	return strings.TrimSpace(trimmed[1 : len(trimmed)-1]), true
+}
+
+func readDefaultSessionCommand(configPath string) string {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
+	}
+
+	inDefaultSession := false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if section, ok := parseTomlSection(line); ok {
+			inDefaultSession = section == "default_session"
+			continue
+		}
+
+		if !inDefaultSession {
+			continue
+		}
+
+		trimmed := stripTomlComment(line)
+		if !strings.HasPrefix(trimmed, "command =") && !strings.HasPrefix(trimmed, "command=") {
+			continue
+		}
+
+		parts := strings.SplitN(trimmed, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		command := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+		if command != "" {
+			return command
+		}
+	}
+
+	return ""
+}
+
+func extractGreeterCacheDirFromCommand(command string) string {
+	if command == "" {
+		return greeter.GreeterCacheDir
+	}
+	tokens := strings.Fields(command)
+	for i := 0; i < len(tokens); i++ {
+		token := strings.Trim(tokens[i], "\"")
+		if token == "--cache-dir" && i+1 < len(tokens) {
+			return strings.Trim(tokens[i+1], "\"")
+		}
+		if strings.HasPrefix(token, "--cache-dir=") {
+			value := strings.TrimPrefix(token, "--cache-dir=")
+			value = strings.Trim(value, "\"")
+			if value != "" {
+				return value
+			}
+		}
+	}
+	return greeter.GreeterCacheDir
+}
+
+func extractGreeterWrapperFromCommand(command string) string {
+	if command == "" {
+		return ""
+	}
+	tokens := strings.Fields(command)
+	if len(tokens) == 0 {
+		return ""
+	}
+	wrapper := strings.Trim(tokens[0], "\"")
+	if wrapper == "" {
+		return ""
+	}
+	if len(tokens) > 1 {
+		next := strings.Trim(tokens[1], "\"")
+		if next != "" && (filepath.Base(wrapper) == "bash" || filepath.Base(wrapper) == "sh") && strings.Contains(filepath.Base(next), "hype-greeter") {
+			return fmt.Sprintf("%s (script: %s)", wrapper, next)
+		}
+	}
+	return wrapper
+}
+
+func extractGreeterPathOverrideFromCommand(command string) string {
+	if command == "" {
+		return ""
+	}
+	tokens := strings.Fields(command)
+	for i := 0; i < len(tokens); i++ {
+		token := strings.Trim(tokens[i], "\"")
+		if (token == "-p" || token == "--path") && i+1 < len(tokens) {
+			return strings.Trim(tokens[i+1], "\"")
+		}
+		if strings.HasPrefix(token, "--path=") {
+			value := strings.TrimPrefix(token, "--path=")
+			value = strings.Trim(value, "\"")
+			if value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func parseManagedGreeterPamAuth(pamText string) (managed bool, fingerprint bool, u2f bool, legacy bool) {
+	return sharedpam.ParseManagedGreeterPamAuth(pamText)
+}
+
+func packageInstallHint() string {
+	return "Run the HypeShell installer again with --update to install the source-owned hype-greeter wrapper"
+}
+
+func systemPamManagerRemediationHint() string {
+	osInfo, err := distros.GetOSInfo()
+	if err != nil {
+		return "Disable it in your PAM manager (authselect/pam-auth-update) or in the included PAM stack to force password-only greeter login."
+	}
+	config, exists := distros.Registry[osInfo.Distribution.ID]
+	if !exists {
+		return "Disable it in your PAM manager (authselect/pam-auth-update) or in the included PAM stack to force password-only greeter login."
+	}
+
+	switch config.Family {
+	case distros.FamilyFedora:
+		return "Disable it in authselect to force password-only greeter login."
+	case distros.FamilyDebian, distros.FamilyUbuntu:
+		return "Disable it in pam-auth-update to force password-only greeter login."
+	default:
+		return "Disable it in your distro PAM manager (authselect/pam-auth-update) or in the included PAM stack to force password-only greeter login."
+	}
+}
+
+func isPackageOnlyGreeterDistro() bool {
+	return false
+}
+
+func promptCompositorChoice(compositors []string) (string, error) {
+	fmt.Println("\nMultiple compositors detected:")
+	for i, comp := range compositors {
+		fmt.Printf("%d) %s\n", i+1, comp)
+	}
+
+	var response string
+	fmt.Print("Choose compositor for greeter: ")
+	fmt.Scanln(&response)
+	response = strings.TrimSpace(response)
+
+	choice := 0
+	fmt.Sscanf(response, "%d", &choice)
+
+	if choice < 1 || choice > len(compositors) {
+		return "", fmt.Errorf("invalid choice")
+	}
+
+	return compositors[choice-1], nil
+}
+
+func checkGreeterStatus() error {
+	fmt.Println("=== HypeShell Greeter Status ===")
+	fmt.Println()
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	configPath := "/etc/greetd/config.toml"
+	configuredCommand := ""
+	allGood := true
+	fmt.Println("Greeter Configuration:")
+	if _, err := os.ReadFile(configPath); err == nil {
+		configuredCommand = readDefaultSessionCommand(configPath)
+		if configuredCommand != "" && strings.Contains(configuredCommand, "hype-greeter") {
+			fmt.Println("  ✓ Greeter is enabled")
+			if wrapper := extractGreeterWrapperFromCommand(configuredCommand); wrapper != "" {
+				fmt.Printf("  Wrapper: %s\n", wrapper)
+			}
+			if pathOverride := extractGreeterPathOverrideFromCommand(configuredCommand); pathOverride != "" {
+				fmt.Printf("  HypeShell path override: %s\n", pathOverride)
+			}
+
+			compositor := detectConfiguredCompositor()
+			switch compositor {
+			case "niri":
+				fmt.Println("  Compositor: niri")
+			case "hyprland":
+				fmt.Println("  Compositor: Hyprland")
+			case "sway":
+				fmt.Println("  Compositor: sway")
+			default:
+				fmt.Println("  Compositor: unknown")
+			}
+		} else {
+			fmt.Println("  ✗ Greeter is NOT enabled")
+			fmt.Println("    Run 'hype greeter enable' to enable it, or use the Activate button in Settings → Greeter, then Sync.")
+			allGood = false
+		}
+	} else {
+		fmt.Println("  ✗ Greeter config not found")
+		fmt.Printf("    %s\n", packageInstallHint())
+		allGood = false
+	}
+
+	fmt.Println("\nGroup Membership:")
+	groupsCmd := exec.Command("groups", currentUser.Username)
+	groupsOutput, err := groupsCmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check groups: %w", err)
+	}
+
+	greeterGroup := greeter.DetectGreeterGroup()
+	inGreeterGroup := strings.Contains(string(groupsOutput), greeterGroup)
+	if inGreeterGroup {
+		fmt.Printf("  ✓ User is in %s group\n", greeterGroup)
+	} else {
+		fmt.Printf("  ✗ User is NOT in %s group\n", greeterGroup)
+		fmt.Println("    Run 'hype greeter sync' to set up group membership and permissions")
+	}
+
+	cacheDir := extractGreeterCacheDirFromCommand(configuredCommand)
+	fmt.Println("\nGreeter Cache Directory:")
+	fmt.Printf("  Effective cache dir: %s\n", cacheDir)
+	if cacheDir != greeter.GreeterCacheDir {
+		fmt.Printf("  ⚠ Non-default cache dir detected (default: %s)\n", greeter.GreeterCacheDir)
+	}
+	if stat, err := os.Stat(cacheDir); err == nil && stat.IsDir() {
+		fmt.Printf("  ✓ %s exists\n", cacheDir)
+		requiredSubdirs := []string{".local/state", ".local/share", ".cache"}
+		missingSubdirs := false
+		for _, sub := range requiredSubdirs {
+			subPath := filepath.Join(cacheDir, sub)
+			if _, err := os.Stat(subPath); os.IsNotExist(err) {
+				fmt.Printf("  ⚠ Missing required subdir: %s\n", subPath)
+				missingSubdirs = true
+			}
+		}
+		if missingSubdirs {
+			fmt.Println("    Run 'hype greeter sync' to initialize the cache directory structure.")
+			allGood = false
+		}
+	} else {
+		fmt.Printf("  ✗ %s not found\n", cacheDir)
+		fmt.Printf("    %s\n", packageInstallHint())
+		return nil
+	}
+
+	fmt.Println("\nConfiguration Symlinks:")
+	colorSyncInfo, colorSyncErr := greeter.ResolveGreeterColorSyncInfo(homeDir)
+	if colorSyncErr != nil {
+		fmt.Printf("  ✗ Failed to resolve expected greeter color source: %v\n", colorSyncErr)
+		allGood = false
+		colorSyncInfo = greeter.GreeterColorSyncInfo{
+			SourcePath: filepath.Join(homeDir, ".cache", "HypeShell", "hype-colors.json"),
+		}
+	}
+
+	colorThemeDesc := "Color theme"
+	if colorSyncInfo.UsesDynamicWallpaperOverride {
+		colorThemeDesc = "Color theme (greeter wallpaper override)"
+	}
+
+	symlinks := []struct {
+		source string
+		target string
+		desc   string
+	}{
+		{
+			source: filepath.Join(homeDir, ".config", "HypeShell", "settings.json"),
+			target: filepath.Join(cacheDir, "settings.json"),
+			desc:   "Settings",
+		},
+		{
+			source: filepath.Join(homeDir, ".local", "state", "HypeShell", "session.json"),
+			target: filepath.Join(cacheDir, "session.json"),
+			desc:   "Session state",
+		},
+		{
+			source: colorSyncInfo.SourcePath,
+			target: filepath.Join(cacheDir, "colors.json"),
+			desc:   colorThemeDesc,
+		},
+	}
+
+	for _, link := range symlinks {
+		targetInfo, err := os.Lstat(link.target)
+		if err != nil {
+			fmt.Printf("  ✗ %s: symlink not found at %s\n", link.desc, link.target)
+			allGood = false
+			continue
+		}
+
+		if targetInfo.Mode()&os.ModeSymlink == 0 {
+			fmt.Printf("  ✗ %s: %s is not a symlink\n", link.desc, link.target)
+			allGood = false
+			continue
+		}
+
+		linkDest, err := os.Readlink(link.target)
+		if err != nil {
+			fmt.Printf("  ✗ %s: failed to read symlink\n", link.desc)
+			allGood = false
+			continue
+		}
+
+		if linkDest != link.source {
+			fmt.Printf("  ✗ %s: symlink points to wrong location\n", link.desc)
+			fmt.Printf("    Expected: %s\n", link.source)
+			fmt.Printf("    Got: %s\n", linkDest)
+			allGood = false
+			continue
+		}
+
+		if _, err := os.Stat(link.source); os.IsNotExist(err) {
+			fmt.Printf("  ⚠ %s: symlink OK, but source file doesn't exist yet\n", link.desc)
+			fmt.Printf("    Will be created when you run HypeShell\n")
+			continue
+		}
+
+		fmt.Printf("  ✓ %s: synced correctly\n", link.desc)
+	}
+
+	if colorSyncInfo.UsesDynamicWallpaperOverride {
+		fmt.Printf("  ℹ Dynamic theme uses greeter override colors from %s\n", colorSyncInfo.SourcePath)
+	}
+
+	fmt.Println("\nGreeter Wallpaper Override:")
+	overridePath := filepath.Join(cacheDir, "greeter_wallpaper_override.jpg")
+	if stat, err := os.Stat(overridePath); err == nil && !stat.IsDir() {
+		fmt.Printf("  ✓ Override file present: %s\n", overridePath)
+	} else if os.IsNotExist(err) {
+		fmt.Println("  ℹ Override file not present (desktop/session wallpaper fallback in effect)")
+	} else if err != nil {
+		fmt.Printf("  ✗ Could not inspect override file: %v\n", err)
+		allGood = false
+	} else {
+		fmt.Printf("  ✗ Override path is not a regular file: %s\n", overridePath)
+		allGood = false
+	}
+
+	fmt.Println("\nGreeter PAM Authentication (HypeShell-managed block):")
+	if greeter.IsNixOS() {
+		fmt.Println("  ℹ NixOS detected: PAM is managed by NixOS modules.")
+		fmt.Println("    Configure fingerprint/U2F via your greetd NixOS module (security.pam.services.greetd).")
+		fmt.Println()
+		if allGood && inGreeterGroup {
+			fmt.Println("✓ All checks passed! Greeter is properly configured.")
+		} else if !allGood {
+			fmt.Println("⚠ Some issues detected. Run 'hype greeter sync' to repair configuration.")
+		} else if !inGreeterGroup {
+			fmt.Printf("⚠ User is not in %s group. Run 'hype greeter sync' after adding group membership.\n", greeterGroup)
+		}
+		return nil
+	}
+	greetdPamPath := "/etc/pam.d/greetd"
+	pamData, err := os.ReadFile(greetdPamPath)
+	if err != nil {
+		fmt.Printf("  ✗ Failed to read %s: %v\n", greetdPamPath, err)
+		allGood = false
+	} else {
+		managed, managedFprint, managedU2f, legacyManaged := parseManagedGreeterPamAuth(string(pamData))
+		if managed {
+			fmt.Println("  ✓ Managed auth block present")
+			if managedFprint {
+				fmt.Println("    - fingerprint: enabled")
+			} else {
+				fmt.Println("    - fingerprint: disabled")
+			}
+			if managedU2f {
+				fmt.Println("    - security key (U2F): enabled")
+			} else {
+				fmt.Println("    - security key (U2F): disabled")
+			}
+		} else {
+			fmt.Println("  ℹ No managed auth block present (HypeShell-managed fingerprint/U2F lines are disabled)")
+		}
+		if legacyManaged {
+			fmt.Println("  ⚠ Legacy unmanaged HypeShell PAM lines detected. Run 'hype auth sync' to normalize.")
+			allGood = false
+		}
+		enableFprintToggle, enableU2fToggle := false, false
+		if enableFprint, enableU2f, settingsErr := sharedpam.ReadGreeterAuthToggles(homeDir); settingsErr == nil {
+			enableFprintToggle = enableFprint
+			enableU2fToggle = enableU2f
+		} else {
+			fmt.Printf("  ℹ Could not read greeter auth toggles from settings: %v\n", settingsErr)
+		}
+
+		includedFprintFile := sharedpam.DetectIncludedPamModule(string(pamData), "pam_fprintd.so")
+		includedU2fFile := sharedpam.DetectIncludedPamModule(string(pamData), "pam_u2f.so")
+		fprintAvailableForCurrentUser := sharedpam.FingerprintAuthAvailableForCurrentUser()
+
+		if managedFprint && includedFprintFile != "" {
+			fmt.Printf("  ⚠ pam_fprintd found in both HypeShell managed block and %s.\n", includedFprintFile)
+			fmt.Println("    Double fingerprint auth detected — run 'hype auth sync' to resolve.")
+			allGood = false
+		}
+		if managedU2f && includedU2fFile != "" {
+			fmt.Printf("  ⚠ pam_u2f found in both HypeShell managed block and %s.\n", includedU2fFile)
+			fmt.Println("    Double security-key auth detected — run 'hype auth sync' to resolve.")
+			allGood = false
+		}
+
+		if includedFprintFile != "" && !managedFprint {
+			if enableFprintToggle {
+				fmt.Printf("  ℹ Fingerprint auth is enabled via included %s.\n", includedFprintFile)
+				if fprintAvailableForCurrentUser {
+					fmt.Println("    HypeShell toggle is enabled, and effective auth is coming from the included PAM stack.")
+				} else {
+					fmt.Println("    No enrolled fingerprints detected for the current user; password auth remains the effective path.")
+				}
+			} else {
+				if fprintAvailableForCurrentUser {
+					fmt.Printf("  ℹ Fingerprint auth is active via included %s while HypeShell fingerprint toggle is off.\n", includedFprintFile)
+					fmt.Println("    Password login will work but may be delayed while the fingerprint module runs first.")
+					fmt.Printf("    To eliminate the delay, %s\n", systemPamManagerRemediationHint())
+				} else {
+					fmt.Printf("  ℹ pam_fprintd is present via included %s, but no enrolled fingerprints were detected for user %s.\n", includedFprintFile, currentUser.Username)
+					fmt.Println("    Password auth remains the effective login path.")
+				}
+			}
+		}
+		if includedU2fFile != "" && !managedU2f {
+			if enableU2fToggle {
+				fmt.Printf("  ℹ Security-key auth is enabled via included %s.\n", includedU2fFile)
+				fmt.Println("    HypeShell toggle is enabled, but effective auth is coming from the included PAM stack.")
+			} else {
+				fmt.Printf("  ⚠ Security-key auth is active via included %s while HypeShell security-key toggle is off.\n", includedU2fFile)
+				fmt.Printf("    %s\n", systemPamManagerRemediationHint())
+			}
+		}
+	}
+
+	fmt.Println("\nSecurity (AppArmor):")
+	if !greeter.IsAppArmorEnabled() {
+		fmt.Println("  ℹ AppArmor not enabled")
+	} else {
+		fmt.Println("  ℹ AppArmor is enabled")
+
+		const appArmorProfilePath = "/etc/apparmor.d/usr.bin.hype-greeter"
+		if _, err := os.Stat(appArmorProfilePath); os.IsNotExist(err) {
+			fmt.Println("  ⚠ HypeShell AppArmor profile not installed")
+			fmt.Println("    Run 'hype greeter sync' to install it and prevent potential TTY fallback")
+			allGood = false
+		} else {
+			mode := appArmorProfileMode("hype-greeter")
+			if mode != "" {
+				fmt.Printf("  ✓ HypeShell AppArmor profile installed (%s mode)\n", mode)
+			} else {
+				fmt.Println("  ✓ HypeShell AppArmor profile installed")
+			}
+		}
+
+		denialCount, denialSamples, denialErr := recentAppArmorGreeterDenials(3)
+		if denialErr != nil {
+			fmt.Printf("  ℹ Could not inspect AppArmor denials automatically: %v\n", denialErr)
+			fmt.Println("    If greetd falls back to TTY, run: sudo journalctl -b -k | grep 'apparmor.*DENIED'")
+		} else if denialCount > 0 {
+			fmt.Printf("  ⚠ Found %d recent AppArmor denial(s) related to greeter runtime.\n", denialCount)
+			fmt.Println("    This can cause greetd fallback to TTY (for example: 'Failed to create stream fd: Permission denied').")
+			fmt.Println("    Review denials with: sudo journalctl -b -k | grep 'apparmor.*DENIED'")
+			fmt.Println("    Then refine the profile with: sudo aa-logprof")
+			for i, sample := range denialSamples {
+				fmt.Printf("    %d) %s\n", i+1, sample)
+			}
+			allGood = false
+		} else {
+			fmt.Println("  ✓ No recent AppArmor denials detected for common greeter components")
+		}
+	}
+
+	fmt.Println()
+	if allGood && inGreeterGroup {
+		fmt.Println("✓ All checks passed! Greeter is properly configured.")
+	} else if !allGood {
+		fmt.Println("⚠ Some issues detected. Run 'hype greeter sync' to repair configuration.")
+	} else if !inGreeterGroup {
+		fmt.Printf("⚠ User is not in %s group. Run 'hype greeter sync' after adding group membership.\n", greeterGroup)
+	}
+
+	return nil
+}
+
+func recentAppArmorGreeterDenials(sampleLimit int) (int, []string, error) {
+	if sampleLimit <= 0 {
+		sampleLimit = 3
+	}
+	if !utils.CommandExists("journalctl") {
+		return 0, nil, fmt.Errorf("journalctl not found")
+	}
+
+	queries := [][]string{
+		{"-b", "-k", "--no-pager", "-n", "2000", "-o", "cat"},
+		{"-b", "--no-pager", "-n", "2000", "-o", "cat"},
+	}
+
+	seen := make(map[string]bool)
+	samples := make([]string, 0, sampleLimit)
+	total := 0
+	var lastErr error
+	successfulQuery := false
+
+	for _, query := range queries {
+		cmd := exec.Command("journalctl", query...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		successfulQuery = true
+		total += collectGreeterAppArmorDenials(string(output), seen, &samples, sampleLimit)
+	}
+
+	if !successfulQuery && lastErr != nil {
+		return 0, nil, lastErr
+	}
+
+	return total, samples, nil
+}
+
+func collectGreeterAppArmorDenials(text string, seen map[string]bool, samples *[]string, sampleLimit int) int {
+	count := 0
+	for _, rawLine := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || !isGreeterRelatedAppArmorDenial(line) {
+			continue
+		}
+		if seen[line] {
+			continue
+		}
+		seen[line] = true
+		count++
+		if len(*samples) < sampleLimit {
+			*samples = append(*samples, line)
+		}
+	}
+	return count
+}
+
+func isGreeterRelatedAppArmorDenial(line string) bool {
+	lower := strings.ToLower(line)
+	if !strings.Contains(lower, "apparmor") || !strings.Contains(lower, "denied") {
+		return false
+	}
+
+	greeterTokens := []string{
+		"hype-greeter",
+		"/usr/bin/hype-greeter",
+		"greetd",
+		"quickshell",
+		"/usr/bin/qs",
+		"/usr/bin/quickshell",
+		"niri",
+		"hyprland",
+		"sway",
+		"mango",
+		"miracle",
+		"labwc",
+		"pipewire",
+		"wireplumber",
+		"stream fd",
+	}
+
+	for _, token := range greeterTokens {
+		if strings.Contains(lower, token) {
+			return true
+		}
+	}
+	return false
+}
+
+// appArmorProfileMode returns "complain", "enforce", or "" for a named AppArmor profile.
+func appArmorProfileMode(profileName string) string {
+	data, err := os.ReadFile("/sys/kernel/security/apparmor/profiles")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, profileName) {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "(complain)") {
+			return "complain"
+		}
+		if strings.Contains(lower, "(enforce)") {
+			return "enforce"
+		}
+		if strings.Contains(lower, "(kill)") {
+			return "kill"
+		}
+	}
+	return ""
+}

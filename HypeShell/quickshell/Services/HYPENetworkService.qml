@@ -1,0 +1,985 @@
+﻿pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import qs.Common
+import qs.Services
+
+Singleton {
+    id: root
+    readonly property var log: Log.scoped("HYPENetworkService")
+
+    property bool networkAvailable: false
+    property string backend: ""
+
+    property string networkStatus: "disconnected"
+    property string primaryConnection: ""
+
+    property string ethernetIP: ""
+    property string ethernetInterface: ""
+    property bool ethernetConnected: false
+    property string ethernetConnectionUuid: ""
+    property var ethernetDevices: []
+
+    property var wiredConnections: []
+
+    property string wifiIP: ""
+    property string wifiInterface: ""
+    property bool wifiConnected: false
+    property bool wifiEnabled: true
+    property string wifiConnectionUuid: ""
+    property string wifiDevicePath: ""
+    property string activeAccessPointPath: ""
+    property var wifiDevices: []
+    property string wifiDeviceOverride: SessionData.wifiDeviceOverride || ""
+    property string connectingDevice: ""
+
+    property string currentWifiSSID: ""
+    property int wifiSignalStrength: 0
+    property var wifiNetworks: []
+    property var savedConnections: []
+    property var ssidToConnectionName: ({})
+    property var wifiSignalIcon: {
+        if (!wifiConnected) {
+            return "wifi_off";
+        }
+        if (wifiSignalStrength >= 50) {
+            return "wifi";
+        }
+        if (wifiSignalStrength >= 25) {
+            return "wifi_2_bar";
+        }
+        return "wifi_1_bar";
+    }
+
+    property string userPreference: "auto"
+    property bool isConnecting: false
+    property string connectingSSID: ""
+    property string connectionError: ""
+
+    property bool isScanning: false
+    property bool autoScan: false
+
+    property bool wifiAvailable: true
+    property bool wifiToggling: false
+    property bool changingPreference: false
+    property string targetPreference: ""
+    property var savedWifiNetworks: []
+    property string connectionStatus: ""
+    property string lastConnectionError: ""
+    property bool passwordDialogShouldReopen: false
+    property bool autoRefreshEnabled: false
+    property string wifiPassword: ""
+    property string forgetSSID: ""
+
+    property var vpnProfiles: []
+    property var vpnActive: []
+    property bool vpnAvailable: false
+    property bool vpnIsBusy: false
+    property string lastConnectedVpnUuid: ""
+    property string pendingVpnUuid: ""
+    property var vpnBusyStartTime: 0
+
+    property var profiles: {
+        const mergedProfiles = vpnProfiles ? vpnProfiles.slice() : [];
+        const seen = new Set();
+
+        for (const profile of mergedProfiles) {
+            if (profile?.uuid)
+                seen.add("uuid:" + profile.uuid);
+            if (profile?.name)
+                seen.add("name:" + profile.name);
+        }
+
+        for (const active of vpnActive || []) {
+            const entryUuid = active?.uuid || active?.name || "";
+            const uuidKey = active?.uuid ? "uuid:" + active.uuid : "";
+            const nameKey = active?.name ? "name:" + active.name : "";
+
+            if ((uuidKey && seen.has(uuidKey)) || (!uuidKey && nameKey && seen.has(nameKey)))
+                continue;
+
+            mergedProfiles.unshift({
+                uuid: entryUuid,
+                name: active?.name || I18n.tr("Active VPN"),
+                serviceType: active?.serviceType || "",
+                type: active?.type || "",
+                typeLabel: active?.typeLabel || active?.vpnType || "",
+                state: active?.state || "",
+                device: active?.device || "",
+                transient: true,
+                canDelete: false,
+                canExpand: false
+            });
+
+            if (uuidKey)
+                seen.add(uuidKey);
+            if (nameKey)
+                seen.add(nameKey);
+        }
+
+        return mergedProfiles;
+    }
+    property alias activeConnections: root.vpnActive
+    property var activeUuids: vpnActive.map(v => v.uuid).filter(u => !!u)
+    property var activeNames: vpnActive.map(v => v.name).filter(n => !!n)
+    property string activeUuid: activeUuids.length > 0 ? activeUuids[0] : ""
+    property string activeName: activeNames.length > 0 ? activeNames[0] : ""
+    property string activeDevice: vpnActive.length > 0 ? (vpnActive[0].device || "") : ""
+    property string activeState: vpnActive.length > 0 ? (vpnActive[0].state || "") : ""
+    property bool vpnConnected: activeUuids.length > 0
+    property alias available: root.vpnAvailable
+    property alias isBusy: root.vpnIsBusy
+    property alias connected: root.vpnConnected
+
+    property string networkInfoSSID: ""
+    property string networkInfoDetails: ""
+    property bool networkInfoLoading: false
+
+    property string networkWiredInfoUUID: ""
+    property string networkWiredInfoDetails: ""
+    property bool networkWiredInfoLoading: false
+
+    property int refCount: 0
+    property bool stateInitialized: false
+
+    property string credentialsToken: ""
+    property string credentialsSSID: ""
+    property string credentialsSetting: ""
+    property var credentialsFields: []
+    property var credentialsHints: []
+    property string credentialsReason: ""
+    property bool credentialsRequested: false
+
+    property string pendingConnectionSSID: ""
+    property var pendingConnectionStartTime: 0
+    property bool wasConnecting: false
+
+    signal networksUpdated
+    signal connectionChanged
+    signal credentialsNeeded(string token, string ssid, string setting, var fields, var hints, string reason, string connType, string connName, string vpnService, var fieldsInfo)
+
+    readonly property string socketPath: Quickshell.env("HYPE_SOCKET") || Quickshell.env("HYPE_SOCKET")
+
+    readonly property string effectiveWifiDevice: {
+        if (!wifiDeviceOverride)
+            return "";
+        const deviceExists = wifiDevices.some(d => d.name === wifiDeviceOverride);
+        return deviceExists ? wifiDeviceOverride : "";
+    }
+
+    Component.onCompleted: {
+        root.userPreference = SettingsData.networkPreference;
+        lastConnectedVpnUuid = SessionData.vpnLastConnected || "";
+        if (socketPath && socketPath.length > 0) {
+            checkHYPECapabilities();
+        }
+    }
+
+    Connections {
+        target: HYPEService
+
+        function onNetworkStateUpdate(data) {
+            const networksCount = data.wifiNetworks?.length ?? "null";
+            log.debug("Subscription update received, networks:", networksCount);
+            updateState(data);
+        }
+    }
+
+    Connections {
+        target: HYPEService
+
+        function onConnectionStateChanged() {
+            if (HYPEService.isConnected) {
+                checkHYPECapabilities();
+            }
+        }
+    }
+
+    Connections {
+        target: HYPEService
+        enabled: HYPEService.isConnected
+
+        function onCapabilitiesChanged() {
+            checkHYPECapabilities();
+        }
+
+        function onCredentialsRequest(data) {
+            handleCredentialsRequest(data);
+        }
+    }
+
+    function checkHYPECapabilities() {
+        if (!HYPEService.isConnected) {
+            return;
+        }
+
+        if (HYPEService.capabilities.length === 0) {
+            return;
+        }
+
+        networkAvailable = HYPEService.capabilities.includes("network");
+
+        if (networkAvailable && !stateInitialized) {
+            stateInitialized = true;
+            getState();
+        }
+    }
+
+    function handleCredentialsRequest(data) {
+        credentialsToken = data.token || "";
+        credentialsSSID = data.ssid || "";
+        credentialsSetting = data.setting || "802-11-wireless-security";
+        credentialsFields = data.fields || ["psk"];
+        credentialsHints = data.hints || [];
+        credentialsReason = data.reason || "Credentials required";
+        credentialsRequested = true;
+
+        const connType = data.connType || "";
+        const connName = data.name || data.connectionId || "";
+        const vpnService = data.vpnService || "";
+        const fInfo = data.fieldsInfo || [];
+
+        credentialsNeeded(credentialsToken, credentialsSSID, credentialsSetting, credentialsFields, credentialsHints, credentialsReason, connType, connName, vpnService, fInfo);
+    }
+
+    function addRef() {
+        refCount++;
+        if (refCount === 1 && networkAvailable) {
+            startAutoScan();
+        }
+    }
+
+    function removeRef() {
+        refCount = Math.max(0, refCount - 1);
+        if (refCount === 0) {
+            stopAutoScan();
+        }
+    }
+
+    property bool initialStateFetched: false
+
+    function getState() {
+        if (!networkAvailable)
+            return;
+        HYPEService.sendRequest("network.getState", null, response => {
+            if (response.result) {
+                updateState(response.result);
+                if (!initialStateFetched && response.result.wifiEnabled && (!response.result.wifiNetworks || response.result.wifiNetworks.length === 0)) {
+                    initialStateFetched = true;
+                    Qt.callLater(() => scanWifi());
+                }
+            }
+        });
+    }
+
+    function updateState(state) {
+        const previousConnecting = isConnecting;
+        const previousConnectingSSID = connectingSSID;
+
+        backend = state.backend || "";
+        vpnAvailable = networkAvailable && backend === "networkmanager";
+        networkStatus = state.networkStatus || "disconnected";
+        primaryConnection = state.primaryConnection || "";
+
+        ethernetIP = state.ethernetIP || "";
+        ethernetInterface = state.ethernetDevice || "";
+        ethernetConnected = state.ethernetConnected || false;
+        ethernetConnectionUuid = state.ethernetConnectionUuid || "";
+        ethernetDevices = state.ethernetDevices || [];
+
+        wiredConnections = state.wiredConnections || [];
+
+        wifiIP = state.wifiIP || "";
+        wifiInterface = state.wifiDevice || "";
+        wifiConnected = state.wifiConnected || false;
+        wifiEnabled = state.wifiEnabled !== undefined ? state.wifiEnabled : true;
+        wifiConnectionUuid = state.wifiConnectionUuid || "";
+        wifiDevicePath = state.wifiDevicePath || "";
+        activeAccessPointPath = state.activeAccessPointPath || "";
+        wifiDevices = state.wifiDevices || [];
+        connectingDevice = state.connectingDevice || "";
+
+        currentWifiSSID = state.wifiSSID || "";
+        wifiSignalStrength = state.wifiSignal || 0;
+
+        if (state.wifiNetworks) {
+            wifiNetworks = state.wifiNetworks;
+
+            const saved = [];
+            const mapping = {};
+            for (const network of state.wifiNetworks) {
+                if (network.saved) {
+                    saved.push({
+                        ssid: network.ssid,
+                        saved: true
+                    });
+                    mapping[network.ssid] = network.ssid;
+                }
+            }
+            savedConnections = saved;
+            savedWifiNetworks = saved;
+            ssidToConnectionName = mapping;
+
+            networksUpdated();
+        }
+
+        if (state.vpnProfiles) {
+            vpnProfiles = state.vpnProfiles;
+        }
+
+        const previousVpnActive = vpnActive;
+        vpnActive = state.vpnActive || [];
+
+        if (vpnConnected && activeUuid) {
+            lastConnectedVpnUuid = activeUuid;
+            SessionData.setVpnLastConnected(activeUuid);
+        }
+
+        if (vpnIsBusy) {
+            const busyDuration = Date.now() - vpnBusyStartTime;
+            const timeout = 30000;
+
+            if (busyDuration > timeout) {
+                log.warn("VPN operation timed out after", timeout, "ms");
+                vpnIsBusy = false;
+                pendingVpnUuid = "";
+                vpnBusyStartTime = 0;
+            } else if (pendingVpnUuid) {
+                const isPendingVpnActive = activeUuids.includes(pendingVpnUuid);
+                if (isPendingVpnActive) {
+                    vpnIsBusy = false;
+                    pendingVpnUuid = "";
+                    vpnBusyStartTime = 0;
+                }
+            } else {
+                const previousCount = previousVpnActive ? previousVpnActive.length : 0;
+                const currentCount = vpnActive ? vpnActive.length : 0;
+
+                if (previousCount !== currentCount) {
+                    vpnIsBusy = false;
+                    vpnBusyStartTime = 0;
+                }
+            }
+        }
+
+        isConnecting = state.isConnecting || false;
+        connectingSSID = state.connectingSSID || "";
+        connectionError = state.lastError || "";
+        lastConnectionError = state.lastError || "";
+
+        if (pendingConnectionSSID) {
+            if (wifiConnected && currentWifiSSID === pendingConnectionSSID && wifiIP) {
+                const elapsed = Date.now() - pendingConnectionStartTime;
+                log.info("Successfully connected to", pendingConnectionSSID, "in", elapsed, "ms");
+                ToastService.showInfo(I18n.tr("Connected to %1").arg(pendingConnectionSSID));
+
+                if (userPreference === "wifi" || userPreference === "auto") {
+                    setConnectionPriority("wifi");
+                }
+
+                pendingConnectionSSID = "";
+                connectionStatus = "connected";
+            } else if (previousConnecting && !isConnecting && !wifiConnected) {
+                const isCancellationError = connectionError === "user-canceled";
+                const isBadCredentials = connectionError === "bad-credentials";
+
+                if (isCancellationError) {
+                    connectionStatus = "cancelled";
+                    pendingConnectionSSID = "";
+                } else if (isBadCredentials) {
+                    connectionStatus = "invalid_password";
+                    pendingConnectionSSID = "";
+                } else {
+                    if (connectionError) {
+                        ToastService.showError(I18n.tr("Failed to connect to %1").arg(pendingConnectionSSID));
+                    }
+                    connectionStatus = "failed";
+                    pendingConnectionSSID = "";
+                }
+            }
+        }
+
+        wasConnecting = isConnecting;
+
+        connectionChanged();
+    }
+
+    function connectToSpecificWiredConfig(uuid) {
+        if (!networkAvailable || isConnecting)
+            return;
+        isConnecting = true;
+        connectionError = "";
+        connectionStatus = "connecting";
+
+        const params = {
+            uuid: uuid
+        };
+
+        HYPEService.sendRequest("network.ethernet.connect.config", params, response => {
+            if (response.error) {
+                connectionError = response.error;
+                lastConnectionError = response.error;
+                connectionStatus = "failed";
+                ToastService.showError(I18n.tr("Failed to activate configuration"), response.error);
+            } else {
+                connectionError = "";
+                connectionStatus = "connected";
+                ToastService.showInfo(I18n.tr("Configuration activated"));
+            }
+
+            isConnecting = false;
+        });
+    }
+
+    function scanWifi() {
+        if (!networkAvailable || isScanning || !wifiEnabled)
+            return;
+        isScanning = true;
+        const params = effectiveWifiDevice ? {
+            device: effectiveWifiDevice
+        } : null;
+        HYPEService.sendRequest("network.wifi.scan", params, response => {
+            isScanning = false;
+            if (response.error) {
+                log.warn("WiFi scan failed:", response.error);
+            } else {
+                Qt.callLater(() => getState());
+            }
+        });
+    }
+
+    function scanWifiNetworks() {
+        scanWifi();
+    }
+
+    function connectToWifi(ssid, password = "", username = "", anonymousIdentity = "", domainSuffixMatch = "", hidden = false) {
+        if (!networkAvailable || isConnecting)
+            return;
+        pendingConnectionSSID = ssid;
+        pendingConnectionStartTime = Date.now();
+        connectionError = "";
+        connectionStatus = "connecting";
+        credentialsRequested = false;
+
+        const params = {
+            ssid: ssid
+        };
+        if (effectiveWifiDevice)
+            params.device = effectiveWifiDevice;
+        if (hidden)
+            params.hidden = true;
+
+        if (HYPEService.apiVersion >= 7) {
+            if (password || username) {
+                params.password = password;
+                if (username)
+                    params.username = username;
+                if (anonymousIdentity)
+                    params.anonymousIdentity = anonymousIdentity;
+                if (domainSuffixMatch)
+                    params.domainSuffixMatch = domainSuffixMatch;
+                params.interactive = false;
+            } else {
+                params.interactive = true;
+            }
+        } else {
+            if (password)
+                params.password = password;
+            if (username)
+                params.username = username;
+            if (anonymousIdentity)
+                params.anonymousIdentity = anonymousIdentity;
+            if (domainSuffixMatch)
+                params.domainSuffixMatch = domainSuffixMatch;
+        }
+
+        HYPEService.sendRequest("network.wifi.connect", params, response => {
+            if (response.error) {
+                if (connectionStatus === "cancelled")
+                    return;
+                connectionError = response.error;
+                lastConnectionError = response.error;
+                pendingConnectionSSID = "";
+                connectionStatus = "failed";
+                ToastService.showError(I18n.tr("Failed to start connection to %1").arg(ssid));
+            }
+        });
+    }
+
+    function disconnectWifi() {
+        if (!networkAvailable || !wifiInterface)
+            return;
+        const params = effectiveWifiDevice ? {
+            device: effectiveWifiDevice
+        } : null;
+        HYPEService.sendRequest("network.wifi.disconnect", params, response => {
+            if (response.error) {
+                ToastService.showError(I18n.tr("Failed to disconnect WiFi"), response.error);
+            } else {
+                ToastService.showInfo(I18n.tr("Disconnected from WiFi"));
+                currentWifiSSID = "";
+                connectionStatus = "";
+            }
+        });
+    }
+
+    function submitCredentials(token, secrets, save) {
+        log.debug("submitCredentials: networkAvailable=" + networkAvailable + " apiVersion=" + HYPEService.apiVersion);
+
+        if (!networkAvailable || HYPEService.apiVersion < 7) {
+            log.warn("submitCredentials: Aborting - networkAvailable=" + networkAvailable + " apiVersion=" + HYPEService.apiVersion);
+            return;
+        }
+
+        const params = {
+            token: token,
+            secrets: secrets,
+            save: save || false
+        };
+
+        credentialsRequested = false;
+
+        HYPEService.sendRequest("network.credentials.submit", params, response => {
+            if (response.error) {
+                log.warn("Failed to submit credentials:", response.error);
+            }
+        });
+    }
+
+    function cancelCredentials(token) {
+        if (!networkAvailable || HYPEService.apiVersion < 7)
+            return;
+        const params = {
+            token: token
+        };
+
+        credentialsRequested = false;
+        pendingConnectionSSID = "";
+        connectionStatus = "cancelled";
+
+        HYPEService.sendRequest("network.credentials.cancel", params, response => {
+            if (response.error) {
+                log.warn("Failed to cancel credentials:", response.error);
+            }
+        });
+    }
+
+    function forgetWifiNetwork(ssid) {
+        if (!networkAvailable)
+            return;
+        forgetSSID = ssid;
+        HYPEService.sendRequest("network.wifi.forget", {
+            ssid: ssid
+        }, response => {
+            if (response.error) {
+                log.warn("Failed to forget network:", response.error);
+            } else {
+                ToastService.showInfo(I18n.tr("Forgot network %1").arg(ssid));
+
+                savedConnections = savedConnections.filter(s => s.ssid !== ssid);
+                savedWifiNetworks = savedWifiNetworks.filter(s => s.ssid !== ssid);
+
+                const updated = [...wifiNetworks];
+                for (const network of updated) {
+                    if (network.ssid === ssid) {
+                        network.saved = false;
+                        if (network.connected) {
+                            network.connected = false;
+                            currentWifiSSID = "";
+                        }
+                    }
+                }
+                wifiNetworks = updated;
+                networksUpdated();
+            }
+            forgetSSID = "";
+        });
+    }
+
+    function toggleWifiRadio() {
+        if (!networkAvailable || wifiToggling)
+            return;
+        wifiToggling = true;
+        HYPEService.sendRequest("network.wifi.toggle", null, response => {
+            wifiToggling = false;
+
+            if (response.error) {
+                log.warn("Failed to toggle WiFi:", response.error);
+            } else if (response.result) {
+                wifiEnabled = response.result.enabled;
+                ToastService.showInfo(wifiEnabled ? I18n.tr("WiFi enabled") : I18n.tr("WiFi disabled"));
+            }
+        });
+    }
+
+    function enableWifiDevice() {
+        if (!networkAvailable)
+            return;
+        HYPEService.sendRequest("network.wifi.enable", null, response => {
+            if (response.error) {
+                ToastService.showError(I18n.tr("Failed to enable WiFi"), response.error);
+            } else {
+                ToastService.showInfo(I18n.tr("WiFi enabled"));
+            }
+        });
+    }
+
+    function setNetworkPreference(preference) {
+        if (!networkAvailable)
+            return;
+        userPreference = preference;
+        changingPreference = true;
+        targetPreference = preference;
+        SettingsData.set("networkPreference", preference);
+
+        HYPEService.sendRequest("network.preference.set", {
+            preference: preference
+        }, response => {
+            changingPreference = false;
+            targetPreference = "";
+
+            if (response.error) {
+                log.warn("Failed to set network preference:", response.error);
+            }
+        });
+    }
+
+    function setConnectionPriority(type) {
+        if (type === "wifi") {
+            setNetworkPreference("wifi");
+        } else if (type === "ethernet") {
+            setNetworkPreference("ethernet");
+        }
+    }
+
+    function connectToWifiAndSetPreference(ssid, password, username = "", anonymousIdentity = "", domainSuffixMatch = "", hidden = false) {
+        connectToWifi(ssid, password, username, anonymousIdentity, domainSuffixMatch, hidden);
+        setNetworkPreference("wifi");
+    }
+
+    function toggleNetworkConnection(type) {
+        if (!networkAvailable)
+            return;
+        if (type === "ethernet") {
+            if (ethernetConnected) {
+                HYPEService.sendRequest("network.ethernet.disconnect", null, null);
+            } else {
+                HYPEService.sendRequest("network.ethernet.connect", null, null);
+            }
+        }
+    }
+
+    function disconnectEthernetDevice(deviceName) {
+        if (!networkAvailable)
+            return;
+        HYPEService.sendRequest("network.ethernet.disconnect", {
+            device: deviceName
+        }, null);
+    }
+
+    function startAutoScan() {
+        autoScan = true;
+        autoRefreshEnabled = true;
+        if (networkAvailable && wifiEnabled) {
+            scanWifi();
+        }
+    }
+
+    function stopAutoScan() {
+        autoScan = false;
+        autoRefreshEnabled = false;
+    }
+
+    function fetchWiredNetworkInfo(uuid) {
+        if (!networkAvailable)
+            return;
+        networkWiredInfoUUID = uuid;
+        networkWiredInfoLoading = true;
+        networkWiredInfoDetails = "Loading network information...";
+
+        HYPEService.sendRequest("network.ethernet.info", {
+            uuid: uuid
+        }, response => {
+            networkWiredInfoLoading = false;
+
+            if (response.error) {
+                networkWiredInfoDetails = "Failed to fetch network information";
+            } else if (response.result) {
+                formatWiredNetworkInfo(response.result);
+            }
+        });
+    }
+
+    function formatWiredNetworkInfo(info) {
+        let details = "";
+
+        if (!info) {
+            details = "Network information not found or network not available.";
+        } else {
+            details += "Interface: " + info.iface + "\\n";
+            details += "Driver: " + info.driver + "\\n";
+            details += "MAC Addr: " + info.hwAddr + "\\n";
+            details += "Speed: " + info.speed + " Mb/s\\n\\n";
+
+            details += "IPv4 information:\\n";
+
+            for (const ip4 of info.IPv4s.ips) {
+                details += "    IPv4 address: " + ip4 + "\\n";
+            }
+            details += "    Gateway: " + info.IPv4s.gateway + "\\n";
+            details += "    DNS: " + info.IPv4s.dns + "\\n";
+
+            if (info.IPv6s.ips) {
+                details += "\\nIPv6 information:\\n";
+
+                for (const ip6 of info.IPv6s.ips) {
+                    details += "    IPv6 address: " + ip6 + "\\n";
+                }
+                if (info.IPv6s.gateway.length > 0) {
+                    details += "    Gateway: " + info.IPv6s.gateway + "\\n";
+                }
+                if (info.IPv6s.dns.length > 0) {
+                    details += "    DNS: " + info.IPv6s.dns + "\\n";
+                }
+            }
+        }
+
+        networkWiredInfoDetails = details;
+    }
+
+    function fetchNetworkInfo(ssid) {
+        if (!networkAvailable)
+            return;
+        networkInfoSSID = ssid;
+        networkInfoLoading = true;
+        networkInfoDetails = "Loading network information...";
+
+        HYPEService.sendRequest("network.info", {
+            ssid: ssid
+        }, response => {
+            networkInfoLoading = false;
+
+            if (response.error) {
+                networkInfoDetails = "Failed to fetch network information";
+            } else if (response.result) {
+                formatNetworkInfo(response.result);
+            }
+        });
+    }
+
+    function formatNetworkInfo(info) {
+        let details = "";
+
+        if (!info || !info.bands || info.bands.length === 0) {
+            details = "Network information not found or network not available.";
+        } else {
+            for (const band of info.bands) {
+                const freqGHz = band.frequency / 1000;
+                let bandName = "Unknown";
+                if (band.frequency >= 2400 && band.frequency <= 2500) {
+                    bandName = "2.4 GHz";
+                } else if (band.frequency >= 5000 && band.frequency <= 6000) {
+                    bandName = "5 GHz";
+                } else if (band.frequency >= 6000) {
+                    bandName = "6 GHz";
+                }
+
+                const statusPrefix = band.connected ? "● " : "  ";
+                const statusSuffix = band.connected ? " (Connected)" : "";
+
+                details += statusPrefix + bandName + statusSuffix + " - " + band.signal + "%\\n";
+                details += "  Channel " + band.channel + " (" + freqGHz.toFixed(1) + " GHz) • " + band.rate + " Mbit/s\\n";
+                details += "  BSSID: " + band.bssid + "\\n";
+                details += "  Mode: " + band.mode + "\\n";
+                details += "  Security: " + (band.secured ? "Secured" : "Open") + "\\n";
+                if (band.saved) {
+                    details += "  Status: Saved network\\n";
+                }
+                details += "\\n";
+            }
+        }
+
+        networkInfoDetails = details;
+    }
+
+    function getNetworkInfo(ssid) {
+        const network = wifiNetworks.find(n => n.ssid === ssid);
+        if (!network) {
+            return null;
+        }
+
+        return {
+            "ssid": network.ssid,
+            "signal": network.signal,
+            "secured": network.secured,
+            "saved": network.saved,
+            "connected": network.connected,
+            "bssid": network.bssid
+        };
+    }
+
+    function getWiredNetworkInfo(uuid) {
+        const network = wiredConnections.find(n => n.uuid === uuid);
+        if (!network) {
+            return null;
+        }
+
+        return {
+            "uuid": uuid
+        };
+    }
+
+    function refreshVpnProfiles() {
+        if (!vpnAvailable)
+            return;
+        HYPEService.sendRequest("network.vpn.profiles", null, response => {
+            if (response.result) {
+                vpnProfiles = response.result;
+            }
+        });
+    }
+
+    function refreshVpnActive() {
+        if (!vpnAvailable)
+            return;
+        HYPEService.sendRequest("network.vpn.active", null, response => {
+            if (response.result) {
+                vpnActive = response.result;
+            }
+        });
+    }
+
+    function connectVpn(uuidOrName, singleActive = false) {
+        if (!vpnAvailable || vpnIsBusy)
+            return;
+        vpnIsBusy = true;
+        pendingVpnUuid = uuidOrName;
+        vpnBusyStartTime = Date.now();
+
+        const params = {
+            uuidOrName: uuidOrName,
+            singleActive: singleActive
+        };
+
+        HYPEService.sendRequest("network.vpn.connect", params, response => {
+            if (response.error) {
+                vpnIsBusy = false;
+                pendingVpnUuid = "";
+                vpnBusyStartTime = 0;
+                ToastService.showError(I18n.tr("Failed to connect VPN"), response.error);
+            }
+        });
+    }
+
+    function connect(uuidOrName, singleActive = false) {
+        connectVpn(uuidOrName, singleActive);
+    }
+
+    function disconnectVpn(uuidOrName) {
+        if (!vpnAvailable || vpnIsBusy)
+            return;
+        vpnIsBusy = true;
+        pendingVpnUuid = "";
+        vpnBusyStartTime = Date.now();
+
+        const params = {
+            uuidOrName: uuidOrName
+        };
+
+        HYPEService.sendRequest("network.vpn.disconnect", params, response => {
+            if (response.error) {
+                vpnIsBusy = false;
+                vpnBusyStartTime = 0;
+                ToastService.showError(I18n.tr("Failed to disconnect VPN"), response.error);
+            }
+        });
+    }
+
+    function disconnect(uuidOrName) {
+        disconnectVpn(uuidOrName);
+    }
+
+    function disconnectAllVpns() {
+        if (!vpnAvailable || vpnIsBusy)
+            return;
+        vpnIsBusy = true;
+        pendingVpnUuid = "";
+
+        HYPEService.sendRequest("network.vpn.disconnectAll", null, response => {
+            if (response.error) {
+                vpnIsBusy = false;
+                ToastService.showError(I18n.tr("Failed to disconnect VPNs"), response.error);
+            }
+        });
+    }
+
+    function disconnectAllActive() {
+        disconnectAllVpns();
+    }
+
+    function toggleVpn(uuid) {
+        if (uuid) {
+            if (isActiveVpnUuid(uuid)) {
+                disconnectVpn(uuid);
+            } else {
+                connectVpn(uuid);
+            }
+            return;
+        }
+
+        if (vpnConnected) {
+            disconnectAllVpns();
+            return;
+        }
+
+        const targetUuid = lastConnectedVpnUuid || (vpnProfiles.length > 0 ? vpnProfiles[0].uuid : "");
+        if (targetUuid) {
+            connectVpn(targetUuid);
+        }
+    }
+
+    function toggle(uuid) {
+        toggleVpn(uuid);
+    }
+
+    function isActiveVpnUuid(uuid) {
+        return activeUuids && activeUuids.indexOf(uuid) !== -1;
+    }
+
+    function isActiveUuid(uuid) {
+        return isActiveVpnUuid(uuid);
+    }
+
+    function refreshNetworkState() {
+        if (networkAvailable) {
+            getState();
+        }
+    }
+
+    function setWifiDeviceOverride(deviceName) {
+        SessionData.setWifiDeviceOverride(deviceName || "");
+        if (networkAvailable && wifiEnabled) {
+            scanWifi();
+        }
+    }
+
+    function setWifiAutoconnect(ssid, autoconnect) {
+        if (!networkAvailable || HYPEService.apiVersion <= 13)
+            return;
+        const params = {
+            ssid: ssid,
+            autoconnect: autoconnect
+        };
+
+        HYPEService.sendRequest("network.wifi.setAutoconnect", params, response => {
+            if (response.error) {
+                ToastService.showError(I18n.tr("Failed to update autoconnect"), response.error);
+            } else {
+                ToastService.showInfo(autoconnect ? I18n.tr("Autoconnect enabled") : I18n.tr("Autoconnect disabled"));
+                Qt.callLater(() => getState());
+            }
+        });
+    }
+}

@@ -1,0 +1,82 @@
+﻿with-expecter: true
+dir: "internal/mocks/{{.InterfaceDirRelative}}"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "{{.PackageName}}"
+packages:
+  github.com/Wifx/gonetworkmanager/v2:
+    interfaces:
+      NetworkManager:
+      Device:
+      DeviceWireless:
+      AccessPoint:
+      Connection:
+      Settings:
+      ActiveConnection:
+      IP4Config:
+  net:
+    interfaces:
+      Conn:
+  github.com/AvengeMedia/hypelinux/internal/plugins:
+    interfaces:
+      GitClient:
+  github.com/godbus/dbus/v5:
+    interfaces:
+      BusObject:
+  github.com/AvengeMedia/hypelinux/internal/server/brightness:
+    config:
+      dir: "internal/mocks/brightness"
+      outpkg: mocks_brightness
+    interfaces:
+      DBusConn:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/geolocation:
+    config:
+      dir: "internal/mocks/geolocation"
+      outpkg: mocks_geolocation
+    interfaces:
+      Client:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/server/network:
+    config:
+      dir: "internal/mocks/network"
+      outpkg: mocks_network
+    interfaces:
+      Backend:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/server/cups:
+    config:
+      dir: "internal/mocks/cups"
+      outpkg: mocks_cups
+    interfaces:
+      CUPSClientInterface:
+      PkHelper:
+        config:
+          dir: "internal/mocks/cups_pkhelper"
+          outpkg: mocks_cups_pkhelper
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/server/evdev:
+    config:
+      dir: "internal/mocks/evdev"
+      outpkg: mocks_evdev
+    interfaces:
+      EvdevDevice:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/version:
+    config:
+      dir: "internal/mocks/version"
+      outpkg: mocks_version
+    interfaces:
+      VersionFetcher:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/server/wlcontext:
+    config:
+      dir: "internal/mocks/wlcontext"
+      outpkg: mocks_wlcontext
+    interfaces:
+      WaylandContext:
+  github.com/AvengeMedia/HypeMaterialShell/core/pkg/go-wayland/wayland/client:
+    config:
+      dir: "internal/mocks/wlclient"
+      outpkg: mocks_wlclient
+    interfaces:
+      WaylandDisplay:
+  github.com/AvengeMedia/HypeMaterialShell/core/internal/utils:
+    config:
+      dir: "internal/mocks/utils"
+      outpkg: mocks_utils
+    interfaces:
+      AppChecker:

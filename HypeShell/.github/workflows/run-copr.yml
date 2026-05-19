@@ -1,0 +1,210 @@
+﻿name: HYPE Copr Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to build (hype, hype-greeter, or both)'
+        required: false
+        default: 'hype'
+        type: choice
+        options:
+          - hype
+          - hype-greeter
+          - both
+      version:
+        description: 'Versioning (e.g., 1.0.3, leave empty for latest release)'
+        required: false
+        default: ''
+      release:
+        description: 'Release number (e.g., 1, 2, 3 for hotfixes)'
+        required: false
+        default: '1'
+
+jobs:
+  determine-packages:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.set-packages.outputs.packages }}
+    steps:
+      - name: Set package list
+        id: set-packages
+        run: |
+          PACKAGE_INPUT="${{ github.event.inputs.package || 'hype' }}"
+          if [ "$PACKAGE_INPUT" = "both" ]; then
+            echo 'packages=["hype","hype-greeter"]' >> $GITHUB_OUTPUT
+          else
+            echo "packages=[\"$PACKAGE_INPUT\"]" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-upload:
+    needs: determine-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.determine-packages.outputs.packages) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Determine version
+        id: version
+        run: |
+          # Get version from manual input or latest release
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual version: $VERSION"
+          else
+            VERSION=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+            echo "Using latest release version: $VERSION"
+          fi
+
+          RELEASE="${{ github.event.inputs.release }}"
+          if [ -z "$RELEASE" ]; then
+            RELEASE="1"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release=$RELEASE" >> $GITHUB_OUTPUT
+          echo "✅ Building ${{ matrix.package }} version: $VERSION-$RELEASE"
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm wget curl jq gzip
+          mkdir -p ~/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          echo "✅ RPM build environment ready"
+
+      - name: Download release assets
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd ~/rpmbuild/SOURCES
+
+          echo "📦 Downloading HYPE QML source for v${VERSION}..."
+
+          # Download HYPE QML source
+          wget "https://github.com/AvengeMedia/HypeMaterialShell/releases/download/v${VERSION}/hype-qml.tar.gz" || {
+            echo "❌ Failed to download hype-qml.tar.gz for v${VERSION}"
+            exit 1
+          }
+
+          echo "✅ Source downloaded"
+          echo "Note: hype-cli binary will be downloaded during build based on target architecture"
+          ls -lh
+
+      - name: Generate stable spec file
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          RELEASE="${{ steps.version.outputs.release }}"
+          CHANGELOG_DATE="$(date '+%a %b %d %Y')"
+          PACKAGE="${{ matrix.package }}"
+
+          # Copy spec file from repository
+          cp distro/fedora/${PACKAGE}.spec ~/rpmbuild/SPECS/${PACKAGE}.spec
+
+          # Replace placeholders with actual values
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ~/rpmbuild/SPECS/${PACKAGE}.spec
+          sed -i "s/RELEASE_PLACEHOLDER/${RELEASE}/g" ~/rpmbuild/SPECS/${PACKAGE}.spec
+          sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ~/rpmbuild/SPECS/${PACKAGE}.spec
+
+          echo "✅ Spec file generated for ${PACKAGE} v${VERSION}-${RELEASE}"
+          echo ""
+          echo "=== Spec file preview ==="
+          head -40 ~/rpmbuild/SPECS/${PACKAGE}.spec
+
+      - name: Build SRPM
+        id: build
+        run: |
+          cd ~/rpmbuild/SPECS
+          PACKAGE="${{ matrix.package }}"
+
+          echo "🔨 Building SRPM for ${PACKAGE}..."
+          rpmbuild -bs ${PACKAGE}.spec
+
+          SRPM=$(ls ~/rpmbuild/SRPMS/${PACKAGE}-*.src.rpm | tail -n 1)
+          SRPM_NAME=$(basename "$SRPM")
+
+          echo "srpm_path=$SRPM" >> $GITHUB_OUTPUT
+          echo "srpm_name=$SRPM_NAME" >> $GITHUB_OUTPUT
+
+          echo "✅ SRPM built: $SRPM_NAME"
+          echo ""
+          echo "=== SRPM Info ==="
+          rpm -qpi "$SRPM"
+
+      - name: Upload SRPM artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.package }}-stable-srpm-${{ steps.version.outputs.version }}
+          path: ${{ steps.build.outputs.srpm_path }}
+          retention-days: 90
+
+      - name: Install Copr CLI
+        run: |
+          sudo apt-get install -y python3-pip
+          pip3 install copr-cli
+
+          mkdir -p ~/.config
+          cat > ~/.config/copr << EOF
+          [copr-cli]
+          login = ${{ secrets.COPR_LOGIN }}
+          username = avengemedia
+          token = ${{ secrets.COPR_TOKEN }}
+          copr_url = https://copr.fedorainfracloud.org
+          EOF
+          chmod 600 ~/.config/copr
+
+          echo "✅ Copr CLI configured"
+
+      - name: Determine Copr project
+        id: copr_project
+        run: |
+          PACKAGE="${{ matrix.package }}"
+          if [ "$PACKAGE" = "hype" ]; then
+            COPR_PROJECT="avengemedia/hype"
+          elif [ "$PACKAGE" = "hype-greeter" ]; then
+            COPR_PROJECT="avengemedia/hypelinux"
+          else
+            echo "❌ Unknown package: $PACKAGE"
+            exit 1
+          fi
+          echo "copr_project=$COPR_PROJECT" >> $GITHUB_OUTPUT
+          echo "✅ Copr project: $COPR_PROJECT"
+
+      - name: Upload to Copr
+        run: |
+          SRPM="${{ steps.build.outputs.srpm_path }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          COPR_PROJECT="${{ steps.copr_project.outputs.copr_project }}"
+          PACKAGE="${{ matrix.package }}"
+
+          echo "🚀 Uploading ${PACKAGE} SRPM to ${COPR_PROJECT}..."
+          echo "   SRPM: $(basename $SRPM)"
+          echo "   Version: $VERSION"
+
+          BUILD_OUTPUT=$(copr-cli build "$COPR_PROJECT" "$SRPM" --nowait 2>&1)
+          echo "$BUILD_OUTPUT"
+
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oP 'Build was added to.*\K[0-9]+' || echo "unknown")
+
+          if [ "$BUILD_ID" != "unknown" ]; then
+            echo "✅ Build submitted successfully!"
+            echo "🔗 https://copr.fedorainfracloud.org/coprs/${COPR_PROJECT}/build/$BUILD_ID/"
+          else
+            echo "⚠️  Could not extract build ID, but upload may have succeeded"
+          fi
+
+      - name: Build summary
+        if: always()
+        run: |
+          PACKAGE="${{ matrix.package }}"
+          COPR_PROJECT="${{ steps.copr_project.outputs.copr_project }}"
+          echo "### 🎉 ${PACKAGE} Stable Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** ${PACKAGE}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.version }}-${{ steps.version.outputs.release }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SRPM:** ${{ steps.build.outputs.srpm_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project:** https://copr.fedorainfracloud.org/coprs/${COPR_PROJECT}/" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Stable release has been built and uploaded to Copr!" >> $GITHUB_STEP_SUMMARY

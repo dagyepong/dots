@@ -1,0 +1,661 @@
+﻿package providers
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestNiriProviderName(t *testing.T) {
+	provider := NewNiriProvider("")
+	if provider.Name() != "niri" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "niri")
+	}
+}
+
+func TestNiriProviderGetCheatSheet(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.kdl")
+
+	content := `binds {
+    Mod+Q { close-window; }
+    Mod+F { fullscreen-window; }
+    Mod+T hotkey-overlay-title="Open Terminal" { spawn "kitty"; }
+    Mod+1 { focus-workspace 1; }
+    Mod+Shift+1 { move-column-to-workspace 1; }
+    Print { screenshot; }
+    Mod+Shift+E { quit; }
+}
+`
+	if err := os.WriteFile(configFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	provider := NewNiriProvider(tmpDir)
+	cheatSheet, err := provider.GetCheatSheet()
+	if err != nil {
+		t.Fatalf("GetCheatSheet failed: %v", err)
+	}
+
+	if cheatSheet.Title != "Niri Keybinds" {
+		t.Errorf("Title = %q, want %q", cheatSheet.Title, "Niri Keybinds")
+	}
+
+	if cheatSheet.Provider != "niri" {
+		t.Errorf("Provider = %q, want %q", cheatSheet.Provider, "niri")
+	}
+
+	windowBinds := cheatSheet.Binds["Window"]
+	if len(windowBinds) < 2 {
+		t.Errorf("Expected at least 2 Window binds, got %d", len(windowBinds))
+	}
+
+	execBinds := cheatSheet.Binds["Execute"]
+	if len(execBinds) < 1 {
+		t.Errorf("Expected at least 1 Execute bind, got %d", len(execBinds))
+	}
+
+	workspaceBinds := cheatSheet.Binds["Workspace"]
+	if len(workspaceBinds) < 2 {
+		t.Errorf("Expected at least 2 Workspace binds, got %d", len(workspaceBinds))
+	}
+
+	screenshotBinds := cheatSheet.Binds["Screenshot"]
+	if len(screenshotBinds) < 1 {
+		t.Errorf("Expected at least 1 Screenshot bind, got %d", len(screenshotBinds))
+	}
+
+	systemBinds := cheatSheet.Binds["System"]
+	if len(systemBinds) < 1 {
+		t.Errorf("Expected at least 1 System bind, got %d", len(systemBinds))
+	}
+}
+
+func TestNiriCategorizeByAction(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	tests := []struct {
+		action   string
+		expected string
+	}{
+		{"focus-workspace", "Workspace"},
+		{"focus-workspace-up", "Workspace"},
+		{"move-column-to-workspace", "Workspace"},
+		{"focus-monitor-left", "Monitor"},
+		{"move-column-to-monitor-right", "Monitor"},
+		{"close-window", "Window"},
+		{"fullscreen-window", "Window"},
+		{"maximize-column", "Window"},
+		{"toggle-window-floating", "Window"},
+		{"focus-column-left", "Window"},
+		{"move-column-right", "Window"},
+		{"spawn", "Execute"},
+		{"quit", "System"},
+		{"power-off-monitors", "System"},
+		{"screenshot", "Screenshot"},
+		{"screenshot-window", "Screenshot"},
+		{"toggle-overview", "Overview"},
+		{"show-hotkey-overlay", "Overview"},
+		{"next-window", "Alt-Tab"},
+		{"previous-window", "Alt-Tab"},
+		{"unknown-action", "Other"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.action, func(t *testing.T) {
+			result := provider.categorizeByAction(tt.action)
+			if result != tt.expected {
+				t.Errorf("categorizeByAction(%q) = %q, want %q", tt.action, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNiriFormatRawAction(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	tests := []struct {
+		action   string
+		args     []string
+		expected string
+	}{
+		{"spawn", []string{"kitty"}, "spawn kitty"},
+		{"spawn", []string{"hype", "ipc", "call"}, "spawn hype ipc call"},
+		{"spawn", []string{"hype", "ipc", "call", "brightness", "increment", "5", ""}, `spawn hype ipc call brightness increment 5 ""`},
+		{"spawn", []string{"hype", "ipc", "call", "dash", "toggle", ""}, `spawn hype ipc call dash toggle ""`},
+		{"close-window", nil, "close-window"},
+		{"fullscreen-window", nil, "fullscreen-window"},
+		{"focus-workspace", []string{"1"}, "focus-workspace 1"},
+		{"move-column-to-workspace", []string{"5"}, "move-column-to-workspace 5"},
+		{"set-column-width", []string{"+10%"}, "set-column-width +10%"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.action, func(t *testing.T) {
+			result := provider.formatRawAction(tt.action, tt.args)
+			if result != tt.expected {
+				t.Errorf("formatRawAction(%q, %v) = %q, want %q", tt.action, tt.args, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNiriFormatKey(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	tests := []struct {
+		mods     []string
+		key      string
+		expected string
+	}{
+		{[]string{"Mod"}, "Q", "Mod+Q"},
+		{[]string{"Mod", "Shift"}, "F", "Mod+Shift+F"},
+		{[]string{"Ctrl", "Alt"}, "Delete", "Ctrl+Alt+Delete"},
+		{nil, "Print", "Print"},
+		{[]string{}, "XF86AudioMute", "XF86AudioMute"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			kb := &NiriKeyBinding{
+				Mods: tt.mods,
+				Key:  tt.key,
+			}
+			result := provider.formatKey(kb)
+			if result != tt.expected {
+				t.Errorf("formatKey(%v) = %q, want %q", kb, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNiriDefaultConfigDir(t *testing.T) {
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
+	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+
+	os.Setenv("XDG_CONFIG_HOME", "/custom/config")
+	dir := defaultNiriConfigDir()
+	if dir != "/custom/config/niri" {
+		t.Errorf("With XDG_CONFIG_HOME set, got %q, want %q", dir, "/custom/config/niri")
+	}
+
+	os.Unsetenv("XDG_CONFIG_HOME")
+	dir = defaultNiriConfigDir()
+	home, _ := os.UserHomeDir()
+	expected := filepath.Join(home, ".config", "niri")
+	if dir != expected {
+		t.Errorf("Without XDG_CONFIG_HOME, got %q, want %q", dir, expected)
+	}
+}
+
+func TestNiriGenerateBindsContent(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	tests := []struct {
+		name     string
+		binds    map[string]*overrideBind
+		expected string
+	}{
+		{
+			name:     "empty binds",
+			binds:    map[string]*overrideBind{},
+			expected: "binds {}\n",
+		},
+		{
+			name: "simple spawn bind",
+			binds: map[string]*overrideBind{
+				"Mod+T": {
+					Key:         "Mod+T",
+					Action:      "spawn kitty",
+					Description: "Open Terminal",
+				},
+			},
+			expected: `binds {
+    Mod+T hotkey-overlay-title="Open Terminal" { spawn "kitty"; }
+}
+`,
+		},
+		{
+			name: "spawn with multiple args",
+			binds: map[string]*overrideBind{
+				"Mod+Space": {
+					Key:         "Mod+Space",
+					Action:      `spawn "hype" "ipc" "call" "spotlight" "toggle"`,
+					Description: "Application Launcher",
+				},
+			},
+			expected: `binds {
+    Mod+Space hotkey-overlay-title="Application Launcher" { spawn "hype" "ipc" "call" "spotlight" "toggle"; }
+}
+`,
+		},
+		{
+			name: "bind with allow-when-locked",
+			binds: map[string]*overrideBind{
+				"XF86AudioMute": {
+					Key:     "XF86AudioMute",
+					Action:  `spawn "hype" "ipc" "call" "audio" "mute"`,
+					Options: map[string]any{"allow-when-locked": true},
+				},
+			},
+			expected: `binds {
+    XF86AudioMute allow-when-locked=true { spawn "hype" "ipc" "call" "audio" "mute"; }
+}
+`,
+		},
+		{
+			name: "simple action without args",
+			binds: map[string]*overrideBind{
+				"Mod+Q": {
+					Key:         "Mod+Q",
+					Action:      "close-window",
+					Description: "Close Window",
+				},
+			},
+			expected: `binds {
+    Mod+Q hotkey-overlay-title="Close Window" { close-window; }
+}
+`,
+		},
+		{
+			name: "recent-windows action",
+			binds: map[string]*overrideBind{
+				"Alt+Tab": {
+					Key:    "Alt+Tab",
+					Action: "next-window",
+				},
+			},
+			expected: `binds {
+}
+
+recent-windows {
+    binds {
+        Alt+Tab { next-window; }
+    }
+}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.generateBindsContent(tt.binds)
+			if result != tt.expected {
+				t.Errorf("generateBindsContent() =\n%q\nwant:\n%q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNiriGenerateBindsContentRoundTrip(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"Mod+Space": {
+			Key:         "Mod+Space",
+			Action:      `spawn "hype" "ipc" "call" "spotlight" "toggle"`,
+			Description: "Application Launcher",
+		},
+		"XF86AudioMute": {
+			Key:     "XF86AudioMute",
+			Action:  `spawn "hype" "ipc" "call" "audio" "mute"`,
+			Options: map[string]any{"allow-when-locked": true},
+		},
+		"Mod+Q": {
+			Key:         "Mod+Q",
+			Action:      "close-window",
+			Description: "Close Window",
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.kdl")
+	if err := os.WriteFile(configFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+
+	result, err := ParseNiriKeys(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to parse generated content: %v\nContent was:\n%s", err, content)
+	}
+
+	if len(result.Section.Keybinds) != 3 {
+		t.Errorf("Expected 3 keybinds after round-trip, got %d", len(result.Section.Keybinds))
+	}
+}
+
+func TestNiriEmptyArgsPreservation(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"XF86MonBrightnessUp": {
+			Key:         "XF86MonBrightnessUp",
+			Action:      `spawn hype ipc call brightness increment 5 ""`,
+			Description: "Brightness Up",
+		},
+		"XF86MonBrightnessDown": {
+			Key:         "XF86MonBrightnessDown",
+			Action:      `spawn hype ipc call brightness decrement 5 ""`,
+			Description: "Brightness Down",
+		},
+		"Super+Alt+Page_Up": {
+			Key:         "Super+Alt+Page_Up",
+			Action:      `spawn hype ipc call dash toggle ""`,
+			Description: "Dashboard Toggle",
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+
+	tmpDir := t.TempDir()
+	hypeDir := filepath.Join(tmpDir, "hype")
+	if err := os.MkdirAll(hypeDir, 0o755); err != nil {
+		t.Fatalf("Failed to create hype directory: %v", err)
+	}
+
+	bindsFile := filepath.Join(hypeDir, "binds.kdl")
+	if err := os.WriteFile(bindsFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("Failed to write binds file: %v", err)
+	}
+
+	testProvider := NewNiriProvider(tmpDir)
+	loadedBinds, err := testProvider.loadOverrideBinds()
+	if err != nil {
+		t.Fatalf("Failed to load binds: %v\nContent was:\n%s", err, content)
+	}
+
+	for key, expected := range binds {
+		loaded, ok := loadedBinds[key]
+		if !ok {
+			t.Errorf("Missing bind for key %s", key)
+			continue
+		}
+		if loaded.Action != expected.Action {
+			t.Errorf("Action mismatch for %s:\n  got:  %q\n  want: %q", key, loaded.Action, expected.Action)
+		}
+	}
+}
+
+func TestNiriProviderWithRealWorldConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.kdl")
+
+	content := `binds {
+    Mod+Shift+Ctrl+D { debug-toggle-damage; }
+    Super+D { spawn "niri" "msg" "action" "toggle-overview"; }
+    Super+Tab repeat=false { toggle-overview; }
+    Mod+Shift+Slash { show-hotkey-overlay; }
+
+    Mod+T hotkey-overlay-title="Open Terminal" { spawn "kitty"; }
+    Mod+Space hotkey-overlay-title="Application Launcher" {
+        spawn "hype" "ipc" "call" "spotlight" "toggle";
+    }
+
+    XF86AudioRaiseVolume allow-when-locked=true {
+        spawn "hype" "ipc" "call" "audio" "increment" "3";
+    }
+    XF86AudioLowerVolume allow-when-locked=true {
+        spawn "hype" "ipc" "call" "audio" "decrement" "3";
+    }
+
+    Mod+Q repeat=false { close-window; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+
+    Mod+Left  { focus-column-left; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Right { focus-column-right; }
+
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+Shift+1 { move-column-to-workspace 1; }
+    Mod+Shift+2 { move-column-to-workspace 2; }
+
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+
+    Mod+Shift+E { quit; }
+}
+
+recent-windows {
+    binds {
+        Alt+Tab { next-window scope="output"; }
+        Alt+Shift+Tab { previous-window scope="output"; }
+    }
+}
+`
+	if err := os.WriteFile(configFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	provider := NewNiriProvider(tmpDir)
+	cheatSheet, err := provider.GetCheatSheet()
+	if err != nil {
+		t.Fatalf("GetCheatSheet failed: %v", err)
+	}
+
+	totalBinds := 0
+	for _, binds := range cheatSheet.Binds {
+		totalBinds += len(binds)
+	}
+
+	if totalBinds < 20 {
+		t.Errorf("Expected at least 20 keybinds, got %d", totalBinds)
+	}
+
+	if len(cheatSheet.Binds["Alt-Tab"]) < 2 {
+		t.Errorf("Expected at least 2 Alt-Tab binds, got %d", len(cheatSheet.Binds["Alt-Tab"]))
+	}
+}
+
+func TestNiriGenerateBindsContentNumericArgs(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	tests := []struct {
+		name     string
+		binds    map[string]*overrideBind
+		expected string
+	}{
+		{
+			name: "workspace with numeric arg",
+			binds: map[string]*overrideBind{
+				"Mod+1": {
+					Key:         "Mod+1",
+					Action:      "focus-workspace 1",
+					Description: "Focus Workspace 1",
+				},
+			},
+			expected: `binds {
+    Mod+1 hotkey-overlay-title="Focus Workspace 1" { focus-workspace 1; }
+}
+`,
+		},
+		{
+			name: "workspace with large numeric arg",
+			binds: map[string]*overrideBind{
+				"Mod+0": {
+					Key:         "Mod+0",
+					Action:      "focus-workspace 10",
+					Description: "Focus Workspace 10",
+				},
+			},
+			expected: `binds {
+    Mod+0 hotkey-overlay-title="Focus Workspace 10" { focus-workspace 10; }
+}
+`,
+		},
+		{
+			name: "percentage string arg (should be quoted)",
+			binds: map[string]*overrideBind{
+				"Super+Minus": {
+					Key:         "Super+Minus",
+					Action:      `set-column-width "-10%"`,
+					Description: "Adjust Column Width -10%",
+				},
+			},
+			expected: `binds {
+    Super+Minus hotkey-overlay-title="Adjust Column Width -10%" { set-column-width "-10%"; }
+}
+`,
+		},
+		{
+			name: "positive percentage string arg",
+			binds: map[string]*overrideBind{
+				"Super+Equal": {
+					Key:         "Super+Equal",
+					Action:      `set-column-width "+10%"`,
+					Description: "Adjust Column Width +10%",
+				},
+			},
+			expected: `binds {
+    Super+Equal hotkey-overlay-title="Adjust Column Width +10%" { set-column-width "+10%"; }
+}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.generateBindsContent(tt.binds)
+			if result != tt.expected {
+				t.Errorf("generateBindsContent() =\n%q\nwant:\n%q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNiriGenerateActionWithUnquotedPercentArg(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"Super+Equal": {
+			Key:         "Super+Equal",
+			Action:      "set-window-height +10%",
+			Description: "Adjust Window Height +10%",
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+	expected := `binds {
+    Super+Equal hotkey-overlay-title="Adjust Window Height +10%" { set-window-height "+10%"; }
+}
+`
+	if content != expected {
+		t.Errorf("Content mismatch.\nGot:\n%s\nWant:\n%s", content, expected)
+	}
+}
+
+func TestNiriGenerateSpawnWithNumericArgs(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"XF86AudioLowerVolume": {
+			Key:     "XF86AudioLowerVolume",
+			Action:  `spawn "hype" "ipc" "call" "audio" "decrement" "3"`,
+			Options: map[string]any{"allow-when-locked": true},
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+	expected := `binds {
+    XF86AudioLowerVolume allow-when-locked=true { spawn "hype" "ipc" "call" "audio" "decrement" "3"; }
+}
+`
+	if content != expected {
+		t.Errorf("Content mismatch.\nGot:\n%s\nWant:\n%s", content, expected)
+	}
+}
+
+func TestNiriGenerateSpawnNumericArgFromCLI(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"XF86AudioLowerVolume": {
+			Key:     "XF86AudioLowerVolume",
+			Action:  "spawn hype ipc call audio decrement 3",
+			Options: map[string]any{"allow-when-locked": true},
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+	expected := `binds {
+    XF86AudioLowerVolume allow-when-locked=true { spawn "hype" "ipc" "call" "audio" "decrement" "3"; }
+}
+`
+	if content != expected {
+		t.Errorf("Content mismatch.\nGot:\n%s\nWant:\n%s", content, expected)
+	}
+}
+
+func TestNiriGenerateWorkspaceBindsRoundTrip(t *testing.T) {
+	provider := NewNiriProvider("")
+
+	binds := map[string]*overrideBind{
+		"Mod+1": {
+			Key:         "Mod+1",
+			Action:      "focus-workspace 1",
+			Description: "Focus Workspace 1",
+		},
+		"Mod+2": {
+			Key:         "Mod+2",
+			Action:      "focus-workspace 2",
+			Description: "Focus Workspace 2",
+		},
+		"Mod+Shift+1": {
+			Key:         "Mod+Shift+1",
+			Action:      "move-column-to-workspace 1",
+			Description: "Move to Workspace 1",
+		},
+		"Super+Minus": {
+			Key:         "Super+Minus",
+			Action:      "set-column-width -10%",
+			Description: "Adjust Column Width -10%",
+		},
+	}
+
+	content := provider.generateBindsContent(binds)
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.kdl")
+	if err := os.WriteFile(configFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+
+	result, err := ParseNiriKeys(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to parse generated content: %v\nContent was:\n%s", err, content)
+	}
+
+	if len(result.Section.Keybinds) != 4 {
+		t.Errorf("Expected 4 keybinds after round-trip, got %d", len(result.Section.Keybinds))
+	}
+
+	foundFocusWS1 := false
+	foundMoveWS1 := false
+	foundSetWidth := false
+
+	for _, kb := range result.Section.Keybinds {
+		switch {
+		case kb.Action == "focus-workspace" && len(kb.Args) > 0 && kb.Args[0] == "1":
+			foundFocusWS1 = true
+		case kb.Action == "move-column-to-workspace" && len(kb.Args) > 0 && kb.Args[0] == "1":
+			foundMoveWS1 = true
+		case kb.Action == "set-column-width" && len(kb.Args) > 0 && kb.Args[0] == "-10%":
+			foundSetWidth = true
+		}
+	}
+
+	if !foundFocusWS1 {
+		t.Error("focus-workspace 1 not found after round-trip")
+	}
+	if !foundMoveWS1 {
+		t.Error("move-column-to-workspace 1 not found after round-trip")
+	}
+	if !foundSetWidth {
+		t.Error("set-column-width -10% not found after round-trip")
+	}
+}
