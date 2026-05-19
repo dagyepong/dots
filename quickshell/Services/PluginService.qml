@@ -1,0 +1,904 @@
+﻿pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtCore
+import QtQuick
+import Qt.labs.folderlistmodel
+import Quickshell
+import Quickshell.Io
+import qs.Common
+import qs.Services
+
+Singleton {
+    id: root
+    readonly property var log: Log.scoped("PluginService")
+
+    property var availablePlugins: ({})
+    property var loadedPlugins: ({})
+    property var pluginWidgetComponents: ({})
+    property var pluginDaemonComponents: ({})
+    property var pluginLauncherComponents: ({})
+    property var pluginDesktopComponents: ({})
+    property var availablePluginsList: []
+    readonly property string pluginDirectory: Paths.strip(Paths.config) + "/plugins"
+
+    property bool pluginDirectoryExists: false
+    property string systemPluginDirectory: "/etc/xdg/quickshell/hype-plugins"
+
+    property var knownManifests: ({})
+    property var pathToPluginId: ({})
+    property var pluginInstances: ({})
+    property var globalVars: ({})
+
+    property var _stateCache: ({})
+    property var _stateLoaded: ({})
+    property var _stateWriters: ({})
+    property var _stateDirtyPlugins: ({})
+    property bool _stateDirCreated: false
+
+    signal pluginLoaded(string pluginId)
+    signal pluginUnloaded(string pluginId)
+    signal pluginLoadFailed(string pluginId, string error)
+    signal pluginDataChanged(string pluginId)
+    signal pluginStateChanged(string pluginId)
+    signal pluginListUpdated
+    signal globalVarChanged(string pluginId, string varName)
+    signal requestLauncherUpdate(string pluginId)
+
+    Timer {
+        id: resyncDebounce
+        interval: 120
+        repeat: false
+        onTriggered: resyncAll()
+    }
+
+    Timer {
+        id: _stateWriteTimer
+        interval: 150
+        repeat: false
+        onTriggered: root._flushDirtyStates()
+    }
+
+    Process {
+        id: directoryCheckProcess
+        command: ["test", "-d", root.pluginDirectory]
+        onExited: (exitCode) => {
+            root.pluginDirectoryExists = (exitCode === 0);
+        }
+    }
+
+    function checkPluginDirectoryExists() {
+        directoryCheckProcess.running = true;
+    }
+
+    Component.onCompleted: {
+        userWatcher.folder = Paths.toFileUrl(root.pluginDirectory);
+        systemWatcher.folder = Paths.toFileUrl(root.systemPluginDirectory);
+        Qt.callLater(resyncAll);
+        Qt.callLater(checkPluginDirectoryExists);
+    }
+
+    FolderListModel {
+        id: userWatcher
+        showDirs: true
+        showFiles: false
+        showDotAndDotDot: false
+
+        onCountChanged: resyncDebounce.restart()
+        onStatusChanged: {
+            if (status === FolderListModel.Ready)
+                resyncDebounce.restart();
+        }
+    }
+
+    FolderListModel {
+        id: systemWatcher
+        showDirs: true
+        showFiles: false
+        showDotAndDotDot: false
+
+        onCountChanged: resyncDebounce.restart()
+        onStatusChanged: {
+            if (status === FolderListModel.Ready)
+                resyncDebounce.restart();
+        }
+    }
+
+    function snapshotModel(model, sourceTag) {
+        const out = [];
+        const n = model.count;
+        const baseDir = sourceTag === "user" ? pluginDirectory : systemPluginDirectory;
+        for (let i = 0; i < n; i++) {
+            let dirPath = model.get(i, "filePath");
+            if (dirPath.startsWith("file://")) {
+                dirPath = dirPath.substring(7);
+            }
+            if (!dirPath.startsWith(baseDir)) {
+                continue;
+            }
+            const manifestPath = dirPath + "/plugin.json";
+            out.push({
+                path: manifestPath,
+                source: sourceTag
+            });
+        }
+        return out;
+    }
+
+    function resyncAll() {
+        const userList = snapshotModel(userWatcher, "user");
+        const sysList = snapshotModel(systemWatcher, "system");
+        const seenPaths = {};
+
+        function consider(entry) {
+            const key = entry.path;
+            seenPaths[key] = true;
+            const prev = knownManifests[key];
+            if (!prev) {
+                loadPluginManifestFile(entry.path, entry.source, Date.now());
+            }
+        }
+        for (let i = 0; i < userList.length; i++)
+            consider(userList[i]);
+        for (let i = 0; i < sysList.length; i++)
+            consider(sysList[i]);
+
+        const removed = [];
+        for (const path in knownManifests) {
+            if (!seenPaths[path])
+                removed.push(path);
+        }
+        if (removed.length) {
+            removed.forEach(function (path) {
+                const pid = pathToPluginId[path];
+                if (pid) {
+                    unregisterPluginByPath(path, pid);
+                }
+                delete knownManifests[path];
+                delete pathToPluginId[path];
+            });
+            _updateAvailablePluginsList();
+            pluginListUpdated();
+        }
+    }
+
+    function loadPluginManifestFile(manifestPathNoScheme, sourceTag, mtimeEpochMs) {
+        const loader = manifestFvComp.createObject(root, {
+            absPath: manifestPathNoScheme,
+            path: manifestPathNoScheme,
+            sourceTag: sourceTag,
+            mtimeEpochMs: mtimeEpochMs
+        });
+    }
+
+    Component {
+        id: manifestFvComp
+        FileView {
+            id: fv
+            property string absPath: ""
+            property string sourceTag: ""
+            property double mtimeEpochMs: 0
+            onLoaded: {
+                try {
+                    let raw = text();
+                    if (raw.charCodeAt(0) === 0xFEFF)
+                        raw = raw.slice(1);
+                    const manifest = JSON.parse(raw);
+                    root._onManifestParsed(absPath, manifest, sourceTag, mtimeEpochMs);
+                } catch (e) {
+                    root.log.error("bad manifest", absPath, e.message);
+                    root.knownManifests[absPath] = {
+                        mtime: mtimeEpochMs,
+                        source: sourceTag,
+                        bad: true
+                    };
+                }
+                fv.destroy();
+            }
+            onLoadFailed: err => {
+                root.log.warn("manifest load failed", absPath, err);
+                fv.destroy();
+            }
+        }
+    }
+
+    function _onManifestParsed(absPath, manifest, sourceTag, mtimeEpochMs) {
+        if (!manifest || !manifest.id || !manifest.name || !manifest.component) {
+            log.error("invalid manifest fields:", absPath);
+            knownManifests[absPath] = {
+                mtime: mtimeEpochMs,
+                source: sourceTag,
+                bad: true
+            };
+            return;
+        }
+
+        const dir = absPath.substring(0, absPath.lastIndexOf('/'));
+        let comp = manifest.component;
+        if (comp.startsWith("./"))
+            comp = comp.slice(2);
+        let settings = manifest.settings;
+        if (settings && settings.startsWith("./"))
+            settings = settings.slice(2);
+
+        const info = {};
+        for (const k in manifest)
+            info[k] = manifest[k];
+
+        let perms = manifest.permissions;
+        if (typeof perms === "string") {
+            perms = perms.split(/\s*,\s*/);
+        }
+        if (!Array.isArray(perms)) {
+            perms = [];
+        }
+        info.permissions = perms.map(p => String(p).trim());
+
+        info.manifestPath = absPath;
+        info.pluginDirectory = dir;
+        info.componentPath = dir + "/" + comp;
+        info.settingsPath = settings ? (dir + "/" + settings) : null;
+        info.loaded = isPluginLoaded(manifest.id);
+        info.type = manifest.type || "widget";
+        info.source = sourceTag;
+        info.requires_hype = manifest.requires_hype || null;
+
+        const existing = availablePlugins[manifest.id];
+        const shouldReplace = (!existing) || (existing && existing.source === "system" && sourceTag === "user");
+
+        if (shouldReplace) {
+            if (existing && existing.loaded && existing.source !== sourceTag) {
+                unloadPlugin(manifest.id);
+            }
+            const newMap = Object.assign({}, availablePlugins);
+            newMap[manifest.id] = info;
+            availablePlugins = newMap;
+            pathToPluginId[absPath] = manifest.id;
+            knownManifests[absPath] = {
+                mtime: mtimeEpochMs,
+                source: sourceTag
+            };
+            _updateAvailablePluginsList();
+            pluginListUpdated();
+            const enabled = info.type === "desktop" || SettingsData.getPluginSetting(manifest.id, "enabled", false);
+            if (enabled && !info.loaded)
+                loadPlugin(manifest.id);
+        } else {
+            knownManifests[absPath] = {
+                mtime: mtimeEpochMs,
+                source: sourceTag,
+                shadowedBy: existing.source
+            };
+            pathToPluginId[absPath] = manifest.id;
+        }
+    }
+
+    function unregisterPluginByPath(absPath, pluginId) {
+        const current = availablePlugins[pluginId];
+        if (current && current.manifestPath === absPath) {
+            if (current.loaded)
+                unloadPlugin(pluginId);
+            const newMap = Object.assign({}, availablePlugins);
+            delete newMap[pluginId];
+            availablePlugins = newMap;
+        }
+    }
+
+    function loadPlugin(pluginId, bustCache) {
+        const plugin = availablePlugins[pluginId];
+        if (!plugin) {
+            log.error("Plugin not found:", pluginId);
+            pluginLoadFailed(pluginId, "Plugin not found");
+            return false;
+        }
+
+        if (plugin.loaded) {
+            return true;
+        }
+
+        const isDaemon = plugin.type === "daemon";
+        const isLauncher = plugin.type === "launcher" || (plugin.capabilities && plugin.capabilities.includes("launcher"));
+        const isDesktop = plugin.type === "desktop";
+
+        const prevInstance = pluginInstances[pluginId];
+        if (prevInstance) {
+            prevInstance.destroy();
+            const newInstances = Object.assign({}, pluginInstances);
+            delete newInstances[pluginId];
+            pluginInstances = newInstances;
+        }
+
+        try {
+            let url = "file://" + plugin.componentPath;
+            if (bustCache)
+                url += "?t=" + Date.now();
+            const comp = Qt.createComponent(url, Component.PreferSynchronous);
+            if (comp.status === Component.Error) {
+                log.error("component error", pluginId, comp.errorString());
+                pluginLoadFailed(pluginId, comp.errorString());
+                return false;
+            }
+
+            if (isDaemon) {
+                const newDaemons = Object.assign({}, pluginDaemonComponents);
+                newDaemons[pluginId] = comp;
+                pluginDaemonComponents = newDaemons;
+            } else if (isLauncher) {
+                const instance = comp.createObject(root, {
+                    "pluginService": root
+                });
+                if (!instance) {
+                    log.error("failed to instantiate plugin:", pluginId, comp.errorString());
+                    pluginLoadFailed(pluginId, comp.errorString());
+                    return false;
+                }
+                const newInstances = Object.assign({}, pluginInstances);
+                newInstances[pluginId] = instance;
+                pluginInstances = newInstances;
+
+                const newLaunchers = Object.assign({}, pluginLauncherComponents);
+                newLaunchers[pluginId] = comp;
+                pluginLauncherComponents = newLaunchers;
+            } else if (isDesktop) {
+                const newDesktop = Object.assign({}, pluginDesktopComponents);
+                newDesktop[pluginId] = comp;
+                pluginDesktopComponents = newDesktop;
+            } else {
+                const newComponents = Object.assign({}, pluginWidgetComponents);
+                newComponents[pluginId] = comp;
+                pluginWidgetComponents = newComponents;
+            }
+
+            plugin.loaded = true;
+            const newLoaded = Object.assign({}, loadedPlugins);
+            newLoaded[pluginId] = plugin;
+            loadedPlugins = newLoaded;
+
+            pluginLoaded(pluginId);
+            return true;
+        } catch (e) {
+            log.error("Error loading plugin:", pluginId, e.message);
+            pluginLoadFailed(pluginId, e.message);
+            return false;
+        }
+    }
+
+    function unloadPlugin(pluginId) {
+        const plugin = loadedPlugins[pluginId];
+        if (!plugin) {
+            log.warn("Plugin not loaded:", pluginId);
+            return false;
+        }
+
+        try {
+            const isDaemon = plugin.type === "daemon";
+            const isLauncher = plugin.type === "launcher" || (plugin.capabilities && plugin.capabilities.includes("launcher"));
+            const isDesktop = plugin.type === "desktop";
+
+            const instance = pluginInstances[pluginId];
+            if (instance) {
+                instance.destroy();
+                const newInstances = Object.assign({}, pluginInstances);
+                delete newInstances[pluginId];
+                pluginInstances = newInstances;
+            }
+
+            if (isDaemon && pluginDaemonComponents[pluginId]) {
+                const newDaemons = Object.assign({}, pluginDaemonComponents);
+                delete newDaemons[pluginId];
+                pluginDaemonComponents = newDaemons;
+            } else if (isLauncher && pluginLauncherComponents[pluginId]) {
+                const newLaunchers = Object.assign({}, pluginLauncherComponents);
+                delete newLaunchers[pluginId];
+                pluginLauncherComponents = newLaunchers;
+            } else if (isDesktop && pluginDesktopComponents[pluginId]) {
+                const newDesktop = Object.assign({}, pluginDesktopComponents);
+                delete newDesktop[pluginId];
+                pluginDesktopComponents = newDesktop;
+            } else if (pluginWidgetComponents[pluginId]) {
+                const newComponents = Object.assign({}, pluginWidgetComponents);
+                delete newComponents[pluginId];
+                pluginWidgetComponents = newComponents;
+            }
+
+            plugin.loaded = false;
+            const newLoaded = Object.assign({}, loadedPlugins);
+            delete newLoaded[pluginId];
+            loadedPlugins = newLoaded;
+
+            _cleanupPluginStateWriter(pluginId);
+            pluginUnloaded(pluginId);
+            return true;
+        } catch (error) {
+            log.error("Error unloading plugin:", pluginId, "Error:", error.message);
+            return false;
+        }
+    }
+
+    function getWidgetComponents() {
+        return pluginWidgetComponents;
+    }
+
+    function getDaemonComponents() {
+        return pluginDaemonComponents;
+    }
+
+    function getDesktopComponents() {
+        return pluginDesktopComponents;
+    }
+
+    function getAvailablePlugins() {
+        return availablePluginsList;
+    }
+
+    function _updateAvailablePluginsList() {
+        const result = [];
+        for (const key in availablePlugins) {
+            result.push(availablePlugins[key]);
+        }
+        availablePluginsList = result;
+    }
+
+    function getPluginVariants(pluginId) {
+        const plugin = availablePlugins[pluginId];
+        if (!plugin) {
+            return [];
+        }
+        const variants = SettingsData.getPluginSetting(pluginId, "variants", []);
+        return variants;
+    }
+
+    function getAllPluginVariants() {
+        const result = [];
+        for (const pluginId in availablePlugins) {
+            const plugin = availablePlugins[pluginId];
+            if (plugin.type !== "widget") {
+                continue;
+            }
+            const variants = getPluginVariants(pluginId);
+            if (variants.length === 0) {
+                result.push({
+                    pluginId: pluginId,
+                    variantId: null,
+                    fullId: pluginId,
+                    name: plugin.name,
+                    icon: plugin.icon || "extension",
+                    description: plugin.description || "Plugin widget",
+                    loaded: plugin.loaded
+                });
+            } else {
+                for (let i = 0; i < variants.length; i++) {
+                    const variant = variants[i];
+                    result.push({
+                        pluginId: pluginId,
+                        variantId: variant.id,
+                        fullId: pluginId + ":" + variant.id,
+                        name: plugin.name + " - " + variant.name,
+                        icon: variant.icon || plugin.icon || "extension",
+                        description: variant.description || plugin.description || "Plugin widget variant",
+                        loaded: plugin.loaded
+                    });
+                }
+            }
+        }
+        return result;
+    }
+
+    function createPluginVariant(pluginId, variantName, variantConfig) {
+        const variants = getPluginVariants(pluginId);
+        const variantId = "variant_" + Date.now();
+        const newVariant = Object.assign({}, variantConfig, {
+            id: variantId,
+            name: variantName
+        });
+        variants.push(newVariant);
+        SettingsData.setPluginSetting(pluginId, "variants", variants);
+        pluginDataChanged(pluginId);
+        return variantId;
+    }
+
+    function removePluginVariant(pluginId, variantId) {
+        const variants = getPluginVariants(pluginId);
+        const newVariants = variants.filter(function (v) {
+            return v.id !== variantId;
+        });
+        SettingsData.setPluginSetting(pluginId, "variants", newVariants);
+
+        const fullId = pluginId + ":" + variantId;
+        removeWidgetFromHypeBar(fullId);
+
+        pluginDataChanged(pluginId);
+    }
+
+    function removeWidgetFromHypeBar(widgetId) {
+        function filterWidget(widget) {
+            const id = typeof widget === "string" ? widget : widget.id;
+            return id !== widgetId;
+        }
+
+        const defaultBar = SettingsData.barConfigs[0] || SettingsData.getBarConfig("default");
+        if (!defaultBar)
+            return;
+        const leftWidgets = defaultBar.leftWidgets || [];
+        const centerWidgets = defaultBar.centerWidgets || [];
+        const rightWidgets = defaultBar.rightWidgets || [];
+
+        const newLeft = leftWidgets.filter(filterWidget);
+        const newCenter = centerWidgets.filter(filterWidget);
+        const newRight = rightWidgets.filter(filterWidget);
+
+        if (newLeft.length !== leftWidgets.length) {
+            SettingsData.setHypeBarLeftWidgets(newLeft);
+        }
+        if (newCenter.length !== centerWidgets.length) {
+            SettingsData.setHypeBarCenterWidgets(newCenter);
+        }
+        if (newRight.length !== rightWidgets.length) {
+            SettingsData.setHypeBarRightWidgets(newRight);
+        }
+    }
+
+    function updatePluginVariant(pluginId, variantId, variantConfig) {
+        const variants = getPluginVariants(pluginId);
+        for (let i = 0; i < variants.length; i++) {
+            if (variants[i].id === variantId) {
+                variants[i] = Object.assign({}, variants[i], variantConfig);
+                break;
+            }
+        }
+        SettingsData.setPluginSetting(pluginId, "variants", variants);
+        pluginDataChanged(pluginId);
+    }
+
+    function getPluginVariantData(pluginId, variantId) {
+        const variants = getPluginVariants(pluginId);
+        for (let i = 0; i < variants.length; i++) {
+            if (variants[i].id === variantId) {
+                return variants[i];
+            }
+        }
+        return null;
+    }
+
+    function getLoadedPlugins() {
+        const result = [];
+        for (const key in loadedPlugins) {
+            result.push(loadedPlugins[key]);
+        }
+        return result;
+    }
+
+    function isPluginLoaded(pluginId) {
+        return loadedPlugins[pluginId] !== undefined;
+    }
+
+    function enablePlugin(pluginId) {
+        SettingsData.setPluginSetting(pluginId, "enabled", true);
+        return loadPlugin(pluginId);
+    }
+
+    function disablePlugin(pluginId) {
+        SettingsData.setPluginSetting(pluginId, "enabled", false);
+        return unloadPlugin(pluginId);
+    }
+
+    function reloadPlugin(pluginId) {
+        if (isPluginLoaded(pluginId))
+            unloadPlugin(pluginId);
+        return loadPlugin(pluginId, true);
+    }
+
+    function togglePlugin(pluginId) {
+        let instance = pluginInstances[pluginId];
+
+        // Lazy instantiate daemon plugins on first toggle
+        // This respects the daemon lifecycle (not instantiated on load)
+        // while supporting toggle functionality for slideout-capable daemons
+        if (!instance && pluginDaemonComponents[pluginId]) {
+            const comp = pluginDaemonComponents[pluginId];
+            const newInstance = comp.createObject(root, {
+                "pluginId": pluginId,
+                "pluginService": root
+            });
+            if (newInstance) {
+                const newInstances = Object.assign({}, pluginInstances);
+                newInstances[pluginId] = newInstance;
+                pluginInstances = newInstances;
+                instance = newInstance;
+            }
+        }
+
+        if (instance && typeof instance.toggle === "function") {
+            instance.toggle();
+            return true;
+        }
+        return false;
+    }
+
+    function savePluginData(pluginId, key, value) {
+        SettingsData.setPluginSetting(pluginId, key, value);
+        pluginDataChanged(pluginId);
+        return true;
+    }
+
+    function loadPluginData(pluginId, key, defaultValue) {
+        return SettingsData.getPluginSetting(pluginId, key, defaultValue);
+    }
+
+    function getPluginPath(pluginId) {
+        const plugin = availablePlugins[pluginId];
+        if (!plugin)
+            return "";
+        return plugin.pluginDirectory || "";
+    }
+
+    function saveAllPluginSettings() {
+        SettingsData.savePluginSettings();
+    }
+
+    function getPluginStatePath(pluginId) {
+        return Paths.strip(Paths.state) + "/plugins/" + pluginId + "_state.json";
+    }
+
+    function loadPluginState(pluginId, key, defaultValue) {
+        if (!_stateLoaded[pluginId])
+            _loadStateFromDisk(pluginId);
+        const state = _stateCache[pluginId];
+        if (!state)
+            return defaultValue;
+        return state[key] !== undefined ? state[key] : defaultValue;
+    }
+
+    function savePluginState(pluginId, key, value) {
+        if (!_stateLoaded[pluginId])
+            _loadStateFromDisk(pluginId);
+        if (!_stateCache[pluginId])
+            _stateCache[pluginId] = {};
+        _stateCache[pluginId][key] = value;
+        _stateDirtyPlugins[pluginId] = true;
+        _stateWriteTimer.restart();
+        pluginStateChanged(pluginId);
+    }
+
+    function clearPluginState(pluginId) {
+        _stateCache[pluginId] = {};
+        _stateLoaded[pluginId] = true;
+        _flushStateToDisk(pluginId);
+        pluginStateChanged(pluginId);
+    }
+
+    function removePluginStateKey(pluginId, key) {
+        if (!_stateCache[pluginId])
+            return;
+        delete _stateCache[pluginId][key];
+        _stateDirtyPlugins[pluginId] = true;
+        _stateWriteTimer.restart();
+        pluginStateChanged(pluginId);
+    }
+
+    function _ensureStateDir() {
+        if (_stateDirCreated)
+            return;
+        _stateDirCreated = true;
+        Paths.mkdir(Paths.state + "/plugins");
+    }
+
+    function _loadStateFromDisk(pluginId) {
+        _stateLoaded[pluginId] = true;
+        _ensureStateDir();
+        const path = getPluginStatePath(pluginId);
+        try {
+            const fv = stateLoadFvComp.createObject(root, {
+                path: path
+            });
+            const raw = fv.text();
+            if (raw && raw.trim()) {
+                _stateCache[pluginId] = JSON.parse(raw);
+            } else {
+                _stateCache[pluginId] = {};
+            }
+            _stateWriters[pluginId] = fv;
+        } catch (e) {
+            _stateCache[pluginId] = {};
+        }
+    }
+
+    function _flushStateToDisk(pluginId) {
+        _ensureStateDir();
+        const content = JSON.stringify(_stateCache[pluginId] || {}, null, 2);
+        if (_stateWriters[pluginId]) {
+            _stateWriters[pluginId].setText(content);
+            return;
+        }
+        const path = getPluginStatePath(pluginId);
+        try {
+            const fv = stateSaveFvComp.createObject(root, {
+                path: path
+            });
+            _stateWriters[pluginId] = fv;
+            fv.loaded.connect(function () {
+                fv.setText(content);
+            });
+            fv.loadFailed.connect(function () {
+                fv.setText(content);
+            });
+        } catch (e) {
+            log.warn("Failed to write state for", pluginId, e.message);
+        }
+    }
+
+    Component {
+        id: stateLoadFvComp
+        FileView {
+            blockLoading: true
+            blockWrites: true
+            atomicWrites: true
+        }
+    }
+
+    Component {
+        id: stateSaveFvComp
+        FileView {
+            blockWrites: true
+            atomicWrites: true
+        }
+    }
+
+    function _flushDirtyStates() {
+        const dirty = _stateDirtyPlugins;
+        _stateDirtyPlugins = {};
+        for (const pluginId in dirty)
+            _flushStateToDisk(pluginId);
+    }
+
+    function _cleanupPluginStateWriter(pluginId) {
+        if (!_stateWriters[pluginId])
+            return;
+        _stateWriters[pluginId].destroy();
+        delete _stateWriters[pluginId];
+    }
+
+    function scanPlugins() {
+        const userUrl = Paths.toFileUrl(root.pluginDirectory);
+        const systemUrl = Paths.toFileUrl(root.systemPluginDirectory);
+        userWatcher.folder = "";
+        userWatcher.folder = userUrl;
+        systemWatcher.folder = "";
+        systemWatcher.folder = systemUrl;
+        resyncDebounce.restart();
+        checkPluginDirectoryExists();
+    }
+
+    function forceRescanPlugin(pluginId) {
+        const plugin = availablePlugins[pluginId];
+        if (plugin && plugin.manifestPath) {
+            const manifestPath = plugin.manifestPath;
+            const source = plugin.source || "user";
+            delete knownManifests[manifestPath];
+            const newMap = Object.assign({}, availablePlugins);
+            delete newMap[pluginId];
+            availablePlugins = newMap;
+            loadPluginManifestFile(manifestPath, source, Date.now());
+        }
+    }
+
+    function createPluginDirectory() {
+        Quickshell.execDetached(["mkdir", "-p", pluginDirectory]);
+        Qt.callLater(checkPluginDirectoryExists);
+        return true;
+    }
+
+    function openPluginDirectory() {
+        Qt.openUrlExternally(Paths.toFileUrl(pluginDirectory));
+        return true;
+    }
+
+    // Launcher plugin helper functions
+    function getLauncherPlugins() {
+        const launchers = {};
+
+        // Check plugins that have launcher components
+        for (const pluginId in pluginLauncherComponents) {
+            const plugin = availablePlugins[pluginId];
+            if (plugin && plugin.loaded) {
+                launchers[pluginId] = plugin;
+            }
+        }
+        return launchers;
+    }
+
+    function getLauncherPlugin(pluginId) {
+        const plugin = availablePlugins[pluginId];
+        if (plugin && plugin.loaded && pluginLauncherComponents[pluginId]) {
+            return plugin;
+        }
+        return null;
+    }
+
+    function getPluginTrigger(pluginId) {
+        const plugin = getLauncherPlugin(pluginId);
+        if (plugin) {
+            // Check if noTrigger is set (always active mode)
+            const noTrigger = SettingsData.getPluginSetting(pluginId, "noTrigger", false);
+            if (noTrigger) {
+                return "";
+            }
+            // Otherwise load the custom trigger, defaulting to plugin manifest trigger
+            const customTrigger = SettingsData.getPluginSetting(pluginId, "trigger", plugin.trigger || "!");
+            return customTrigger;
+        }
+        return null;
+    }
+
+    function getAllPluginTriggers() {
+        const triggers = {};
+        const launchers = getLauncherPlugins();
+
+        for (const pluginId in launchers) {
+            const trigger = getPluginTrigger(pluginId);
+            if (trigger && trigger.trim() !== "") {
+                triggers[trigger] = pluginId;
+            }
+        }
+        return triggers;
+    }
+
+    function getPluginsWithEmptyTrigger() {
+        const plugins = [];
+        const launchers = getLauncherPlugins();
+
+        for (const pluginId in launchers) {
+            const trigger = getPluginTrigger(pluginId);
+            if (!trigger || trigger.trim() === "") {
+                plugins.push(pluginId);
+            }
+        }
+        return plugins;
+    }
+
+    function getPluginViewPreference(pluginId) {
+        const plugin = availablePlugins[pluginId];
+        if (!plugin)
+            return null;
+
+        return {
+            mode: plugin.viewMode || null,
+            enforced: plugin.viewModeEnforced === true
+        };
+    }
+
+    function getGlobalVar(pluginId, varName, defaultValue) {
+        if (globalVars[pluginId] && varName in globalVars[pluginId]) {
+            return globalVars[pluginId][varName];
+        }
+        return defaultValue;
+    }
+
+    function setGlobalVar(pluginId, varName, value) {
+        const newGlobals = Object.assign({}, globalVars);
+        if (!newGlobals[pluginId]) {
+            newGlobals[pluginId] = {};
+        }
+        newGlobals[pluginId] = Object.assign({}, newGlobals[pluginId]);
+        newGlobals[pluginId][varName] = value;
+        globalVars = newGlobals;
+        globalVarChanged(pluginId, varName);
+    }
+
+    function checkPluginCompatibility(requiresDms) {
+        if (!requiresDms)
+            return true;
+        return ShellVersionService.checkVersionRequirement(requiresDms, ShellVersionService.getParsedShellVersion());
+    }
+
+    function getIncompatiblePlugins() {
+        const result = [];
+        for (const pluginId in availablePlugins) {
+            const plugin = availablePlugins[pluginId];
+            if (plugin.loaded && plugin.requires_hype && !checkPluginCompatibility(plugin.requires_hype)) {
+                result.push(plugin);
+            }
+        }
+        return result;
+    }
+}

@@ -1,0 +1,4 @@
+[templates.hypehyprland]
+input_path = 'SHELL_DIR/matugen/templates/hypr-colors.conf'
+output_path = 'CONFIG_DIR/hypr/hype/colors.conf'
+post_hook = 'sh -c "command -v hyprctl >/dev/null 2>&1 && hyprctl reload 2>&1 || true"'

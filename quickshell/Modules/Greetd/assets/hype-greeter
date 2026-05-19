@@ -1,0 +1,423 @@
+#!/bin/bash
+
+set -e
+
+COMPOSITOR=""
+COMPOSITOR_CONFIG=""
+HYPE_PATH="hype"
+CACHE_DIR="/var/cache/hype-greeter"
+REMEMBER_LAST_SESSION=""
+REMEMBER_LAST_USER=""
+DEBUG_MODE=0
+
+show_help() {
+    cat << EOF
+hype-greeter - HypeShell greeter launcher
+
+Usage: hype-greeter --command COMPOSITOR [OPTIONS]
+
+Required:
+    --command COMPOSITOR    Compositor to use (niri, hyprland, sway, scroll, miracle, mango, or labwc)
+
+Options:
+    -C, --config PATH       Custom compositor config file
+    -p, --path PATH         HypeShell path (config name or absolute path)
+                           (default: hype)
+    --cache-dir PATH        Cache directory for greeter data
+                           (default: /var/cache/hype-greeter)
+    --remember-last-session BOOL
+                           Persist selected session to greeter memory
+                           (BOOL: true/false, default: from settings.json)
+    --remember-last-user BOOL
+                           Persist last successful username to greeter memory
+                           (BOOL: true/false, default: from settings.json)
+    --no-save-session      Alias for --remember-last-session false
+    --no-save-username     Alias for --remember-last-user false
+    --debug                Enable verbose startup logging to stderr
+    -h, --help             Show this help message
+
+Examples:
+    hype-greeter --command hyprland
+    hype-greeter --command hyprland -C /etc/greetd/custom-hypr.conf
+    hype-greeter --command hyprland -p /home/user/.config/quickshell/custom-hype
+    hype-greeter --command hyprland --cache-dir /tmp/hype-greeter
+EOF
+}
+
+require_command() {
+    local cmd="$1"
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: required command '$cmd' was not found in PATH" >&2
+        exit 1
+    fi
+}
+
+normalize_bool_flag() {
+    local flag_name="$1"
+    local value="$2"
+    local normalized="${value,,}"
+
+    case "$normalized" in
+        1|true|yes|on)
+            echo "1"
+            ;;
+        0|false|no|off)
+            echo "0"
+            ;;
+        *)
+            echo "Error: $flag_name must be true/false (or 1/0, yes/no, on/off)" >&2
+            exit 1
+            ;;
+    esac
+}
+
+exec_compositor() {
+    local log_tag="$1"
+    shift
+
+    if [[ "$DEBUG_MODE" == "1" ]]; then
+        exec "$@"
+    fi
+
+    if command -v systemd-cat >/dev/null 2>&1; then
+        exec "$@" > >(systemd-cat -t "hype-greeter/$log_tag" -p info) 2>&1
+    fi
+
+    exec "$@"
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --command)
+            COMPOSITOR="$2"
+            shift 2
+            ;;
+        -C|--config)
+            COMPOSITOR_CONFIG="$2"
+            shift 2
+            ;;
+        -p|--path)
+            HYPE_PATH="$2"
+            shift 2
+            ;;
+        --cache-dir)
+            CACHE_DIR="$2"
+            shift 2
+            ;;
+        --remember-last-session)
+            REMEMBER_LAST_SESSION="$2"
+            shift 2
+            ;;
+        --remember-last-user)
+            REMEMBER_LAST_USER="$2"
+            shift 2
+            ;;
+        --no-save-session)
+            REMEMBER_LAST_SESSION="0"
+            shift
+            ;;
+        --no-save-username)
+            REMEMBER_LAST_USER="0"
+            shift
+            ;;
+        --debug)
+            DEBUG_MODE=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$COMPOSITOR" ]]; then
+    echo "Error: --command COMPOSITOR is required" >&2
+    show_help
+    exit 1
+fi
+
+locate_hype_config() {
+    local config_name="$1"
+    local search_paths=()
+
+    local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    search_paths+=("$config_home/quickshell/$config_name")
+
+    search_paths+=("/usr/local/share/quickshell/$config_name")
+    search_paths+=("/usr/share/quickshell/$config_name")
+
+    local config_dirs="${XDG_CONFIG_DIRS:-/etc/xdg}"
+    IFS=':' read -ra dirs <<< "$config_dirs"
+    for dir in "${dirs[@]}"; do
+        if [[ -n "$dir" ]]; then
+            search_paths+=("$dir/quickshell/$config_name")
+        fi
+    done
+
+    for path in "${search_paths[@]}"; do
+        if [[ -f "$path/shell.qml" ]]; then
+            echo "$path"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+export XDG_SESSION_TYPE=wayland
+export QT_QPA_PLATFORM=wayland
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+export EGL_PLATFORM=gbm
+export HYPE_RUN_GREETER=1
+
+if [[ ! -d "$CACHE_DIR" ]]; then
+    echo "Error: cache directory '$CACHE_DIR' does not exist." >&2
+    echo "  Run 'hype greeter sync' to initialize it, or pass --cache-dir to an existing directory." >&2
+    exit 1
+fi
+
+export HYPE_GREET_CFG_DIR="$CACHE_DIR"
+
+if [[ -n "$REMEMBER_LAST_SESSION" ]]; then
+        HYPE_GREET_REMEMBER_LAST_SESSION=$(normalize_bool_flag "--remember-last-session" "$REMEMBER_LAST_SESSION")
+        export HYPE_GREET_REMEMBER_LAST_SESSION
+    if [[ "$HYPE_GREET_REMEMBER_LAST_SESSION" == "1" ]]; then
+        HYPE_SAVE_SESSION=true
+    else
+        HYPE_SAVE_SESSION=false
+    fi
+    export HYPE_SAVE_SESSION
+fi
+
+if [[ -n "$REMEMBER_LAST_USER" ]]; then
+    HYPE_GREET_REMEMBER_LAST_USER=$(normalize_bool_flag "--remember-last-user" "$REMEMBER_LAST_USER")
+    export HYPE_GREET_REMEMBER_LAST_USER
+    if [[ "$HYPE_GREET_REMEMBER_LAST_USER" == "1" ]]; then
+        HYPE_SAVE_USERNAME=true
+    else
+        HYPE_SAVE_USERNAME=false
+    fi
+    export HYPE_SAVE_USERNAME
+fi
+
+export HOME="$CACHE_DIR"
+export XDG_STATE_HOME="$CACHE_DIR/.local/state"
+export XDG_DATA_HOME="$CACHE_DIR/.local/share"
+export XDG_CACHE_HOME="$CACHE_DIR/.cache"
+
+
+# Keep greeter VT clean by default; callers can override via env or --debug.
+if [[ -z "${RUST_LOG:-}" ]]; then
+    export RUST_LOG=warn
+fi
+if [[ -z "${NIRI_LOG:-}" ]]; then
+    export NIRI_LOG=warn
+fi
+
+if command -v qs >/dev/null 2>&1; then
+    QS_BIN="qs"
+elif command -v quickshell >/dev/null 2>&1; then
+    QS_BIN="quickshell"
+else
+    echo "Error: neither 'qs' nor 'quickshell' was found in PATH" >&2
+    exit 1
+fi
+
+QS_CMD="$QS_BIN"
+if [[ "$HYPE_PATH" == /* ]]; then
+    QS_CMD="$QS_BIN -p $HYPE_PATH"
+else
+    RESOLVED_PATH=$(locate_hype_config "$HYPE_PATH")
+    if [[ $? -eq 0 && -n "$RESOLVED_PATH" ]]; then
+        if [[ "$DEBUG_MODE" == "1" ]]; then
+            echo "Located HypeShell config at: $RESOLVED_PATH" >&2
+        fi
+        QS_CMD="$QS_BIN -p $RESOLVED_PATH"
+    else
+        echo "Error: Could not find HypeShell config '$HYPE_PATH' (shell.qml) in any valid config path" >&2
+        exit 1
+    fi
+fi
+
+case "$COMPOSITOR" in
+    niri)
+        require_command "niri"
+        if [[ -z "$COMPOSITOR_CONFIG" ]]; then
+            TEMP_CONFIG=$(mktemp)
+			# base/default config
+            cat > "$TEMP_CONFIG" << NIRI_EOF
+hotkey-overlay {
+    skip-at-startup
+}
+
+environment {
+    HYPE_RUN_GREETER "1"
+}
+
+debug {
+  keep-max-bpc-unchanged
+}
+
+gestures {
+   hot-corners {
+     off
+   }
+}
+
+layout {
+  background-color "#000000"
+}
+NIRI_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        else
+            TEMP_CONFIG=$(mktemp)
+            cat "$COMPOSITOR_CONFIG" > "$TEMP_CONFIG"
+        fi
+		# Append includes if override_files exist
+		OVERRIDE_FILES=(
+			/usr/share/greetd/niri_overrides.kdl # for building into a system image
+			/etc/greetd/niri_overrides.kdl # for local overrides
+			)
+		for override_file in "${OVERRIDE_FILES[@]}"; do
+			if [[ -e "$override_file" ]]; then
+		# TODO: maybe move to optional=true when Niri Next drops, so we can avoid these checks ;-)
+				cat >> "$TEMP_CONFIG" << NIRI_EOF
+
+include "$override_file"
+NIRI_EOF
+			fi
+		done
+		# Append spawn command
+            cat >> "$TEMP_CONFIG" << NIRI_EOF
+
+spawn-at-startup "sh" "-c" "$QS_CMD; niri msg action quit --skip-confirmation"
+NIRI_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        exec_compositor "niri" niri -c "$COMPOSITOR_CONFIG"
+        ;;
+
+    hyprland)
+        if ! command -v hypeshell-hyprland-session >/dev/null 2>&1 && ! command -v start-hyprland >/dev/null 2>&1 && ! command -v Hyprland >/dev/null 2>&1; then
+            echo "Error: neither 'hypeshell-hyprland-session' nor 'Hyprland' was found in PATH" >&2
+            exit 1
+        fi
+        if [[ -z "$COMPOSITOR_CONFIG" ]]; then
+            TEMP_CONFIG=$(mktemp)
+            cat > "$TEMP_CONFIG" << HYPRLAND_EOF
+env = HYPE_RUN_GREETER,1
+
+misc {
+    disable_hyprland_logo = true
+}
+
+exec-once = sh -c "$QS_CMD; hyprctl dispatch exit"
+HYPRLAND_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        else
+            TEMP_CONFIG=$(mktemp)
+            cat "$COMPOSITOR_CONFIG" > "$TEMP_CONFIG"
+            cat >> "$TEMP_CONFIG" << HYPRLAND_EOF
+
+exec-once = sh -c "$QS_CMD; hyprctl dispatch exit"
+HYPRLAND_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        fi
+        if command -v hypeshell-hyprland-session >/dev/null 2>&1; then
+            exec_compositor "hyprland" hypeshell-hyprland-session -- --config "$COMPOSITOR_CONFIG"
+        elif command -v start-hyprland >/dev/null 2>&1; then
+            exec_compositor "hyprland" start-hyprland -- --config "$COMPOSITOR_CONFIG"
+        else
+            exec_compositor "hyprland" Hyprland -c "$COMPOSITOR_CONFIG"
+        fi
+        ;;
+
+    sway)
+        require_command "sway"
+        if [[ -z "$COMPOSITOR_CONFIG" ]]; then
+            TEMP_CONFIG=$(mktemp)
+            cat > "$TEMP_CONFIG" << SWAY_EOF
+exec "$QS_CMD; swaymsg exit"
+SWAY_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        else
+            TEMP_CONFIG=$(mktemp)
+            cat "$COMPOSITOR_CONFIG" > "$TEMP_CONFIG"
+            cat >> "$TEMP_CONFIG" << SWAY_EOF
+
+exec "$QS_CMD; swaymsg exit"
+SWAY_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        fi
+        exec_compositor "sway" sway --unsupported-gpu -c "$COMPOSITOR_CONFIG"
+        ;;
+
+    scroll)
+        require_command "scroll"
+        if [[ -z "$COMPOSITOR_CONFIG" ]]; then
+            TEMP_CONFIG=$(mktemp)
+            cat > "$TEMP_CONFIG" << SCROLL_EOF
+exec "$QS_CMD; scrollmsg exit"
+SCROLL_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        else
+            TEMP_CONFIG=$(mktemp)
+            cat "$COMPOSITOR_CONFIG" > "$TEMP_CONFIG"
+            cat >> "$TEMP_CONFIG" << SCROLL_EOF
+
+exec "$QS_CMD; scrollmsg exit"
+SCROLL_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        fi
+        exec_compositor "scroll" scroll -c "$COMPOSITOR_CONFIG"
+        ;;
+
+    miracle|miracle-wm)
+        require_command "miracle-wm"
+        if [[ -z "$COMPOSITOR_CONFIG" ]]; then
+            TEMP_CONFIG=$(mktemp)
+            cat > "$TEMP_CONFIG" << MIRACLE_EOF
+exec "$QS_CMD; miraclemsg exit"
+MIRACLE_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        else
+            TEMP_CONFIG=$(mktemp)
+            cat "$COMPOSITOR_CONFIG" > "$TEMP_CONFIG"
+            cat >> "$TEMP_CONFIG" << MIRACLE_EOF
+
+exec "$QS_CMD; miraclemsg exit"
+MIRACLE_EOF
+            COMPOSITOR_CONFIG="$TEMP_CONFIG"
+        fi
+        exec_compositor "miracle" miracle-wm -c "$COMPOSITOR_CONFIG"
+        ;;
+
+    labwc)
+        require_command "labwc"
+        if [[ -n "$COMPOSITOR_CONFIG" ]]; then
+            exec_compositor "labwc" labwc --config "$COMPOSITOR_CONFIG" --session "$QS_CMD"
+        else
+            exec_compositor "labwc" labwc --session "$QS_CMD"
+        fi
+        ;;
+
+    mango|mangowc)
+        require_command "mango"
+        if [[ -n "$COMPOSITOR_CONFIG" ]]; then
+            exec_compositor "mango" mango -c "$COMPOSITOR_CONFIG" -s "$QS_CMD && mmsg -d quit"
+        else
+            exec_compositor "mango" mango -s "$QS_CMD && mmsg -d quit"
+        fi
+        ;;
+
+    *)
+        echo "Error: Unsupported compositor: $COMPOSITOR" >&2
+        echo "Supported compositors: niri, hyprland, sway, scroll, miracle, mango, labwc" >&2
+        exit 1
+        ;;
+esac

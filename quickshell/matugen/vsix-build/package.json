@@ -1,0 +1,47 @@
+﻿{
+  "name": "hype-theme",
+  "displayName": "HYPE - Hype Material Shell Theme",
+  "description": "Dynamic theme using matugen & hype16 terminal colors - auto-updated by HypeMaterialShell",
+  "publisher": "HypeLinux",
+  "version": "0.0.3",
+  "icon": "hypelogo.png",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "hype",
+    "hype",
+    "material",
+    "hypeshell",
+    "hypelinux"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AvengeMedia/HypeMaterialShell"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "label": "Dynamic Base16 HypeShell",
+        "uiTheme": "vs-dark",
+        "path": "./themes/hypeshell-default.json",
+        "_watch": true
+      },
+      {
+        "label": "Dynamic Base16 HypeShell (Dark)",
+        "uiTheme": "vs-dark",
+        "path": "./themes/hypeshell-dark.json",
+        "_watch": true
+      },
+      {
+        "label": "Dynamic Base16 HypeShell (Light)",
+        "uiTheme": "vs",
+        "path": "./themes/hypeshell-light.json",
+        "_watch": true
+      }
+    ]
+  }
+}

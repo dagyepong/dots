@@ -1,0 +1,407 @@
+﻿pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Services.Pam
+import qs.Common
+
+Scope {
+    id: root
+
+    property bool lockSecured: false
+    property bool unlockInProgress: false
+
+    readonly property alias passwd: passwd
+    readonly property alias fprint: fprint
+    readonly property alias u2f: u2f
+    property string lockMessage
+    property string state
+    property string fprintState
+    property string u2fState
+    property bool u2fPending: false
+    property string buffer
+
+    signal flashMsg
+    signal unlockRequested
+
+    function resetAuthFlows(): void {
+        passwd.abort();
+        fprint.abort();
+        u2f.abort();
+        errorRetry.running = false;
+        u2fErrorRetry.running = false;
+        u2fPendingTimeout.running = false;
+        passwdActiveTimeout.running = false;
+        unlockRequestTimeout.running = false;
+        root.u2fPending = false;
+        root.u2fState = "";
+        root.unlockInProgress = false;
+    }
+
+    function recoverFromAuthStall(newState: string): void {
+        resetAuthFlows();
+        root.state = newState;
+        flashMsg();
+        stateReset.restart();
+        fprint.checkAvail();
+        u2f.checkAvail();
+    }
+
+    function completeUnlock(): void {
+        if (!root.unlockInProgress) {
+            root.unlockInProgress = true;
+            passwd.abort();
+            fprint.abort();
+            u2f.abort();
+            errorRetry.running = false;
+            u2fErrorRetry.running = false;
+            u2fPendingTimeout.running = false;
+            root.u2fPending = false;
+            root.u2fState = "";
+            unlockRequestTimeout.restart();
+            unlockRequested();
+        }
+    }
+
+    function proceedAfterPrimaryAuth(): void {
+        if (SettingsData.enableU2f && SettingsData.u2fMode === "and" && u2f.available) {
+            u2f.startForSecondFactor();
+        } else {
+            completeUnlock();
+        }
+    }
+
+    function cancelU2fPending(): void {
+        if (!root.u2fPending)
+            return;
+        u2f.abort();
+        u2fErrorRetry.running = false;
+        u2fPendingTimeout.running = false;
+        root.u2fPending = false;
+        root.u2fState = "";
+        fprint.checkAvail();
+    }
+
+    FileView {
+        id: hypeshellConfigWatcher
+
+        path: "/etc/pam.d/hypeshell"
+        printErrors: false
+    }
+
+    FileView {
+        id: nixosMarker
+
+        path: "/etc/NIXOS"
+        printErrors: false
+    }
+
+    FileView {
+        id: u2fConfigWatcher
+
+        path: "/etc/pam.d/hypeshell-u2f"
+        printErrors: false
+    }
+
+    // Detects Nix-installed HYPE on non-NixOS systems
+    readonly property bool runningFromNixStore: Quickshell.shellDir.startsWith("/nix/store/")
+
+    PamContext {
+        id: passwd
+
+        config: hypeshellConfigWatcher.loaded ? "hypeshell" : "login"
+        configDirectory: (hypeshellConfigWatcher.loaded || nixosMarker.loaded || root.runningFromNixStore) ? "/etc/pam.d" : Quickshell.shellDir + "/assets/pam"
+
+        onMessageChanged: {
+            if (message.startsWith("The account is locked")) {
+                root.lockMessage = message;
+            } else if (root.lockMessage && message.endsWith(" left to unlock)")) {
+                root.lockMessage += "\n" + message;
+            } else if (root.lockMessage && message && message.length > 0) {
+                root.lockMessage = "";
+            }
+        }
+
+        onResponseRequiredChanged: {
+            if (!responseRequired)
+                return;
+
+            respond(root.buffer);
+        }
+
+        onCompleted: res => {
+            if (res === PamResult.Success) {
+                if (!root.unlockInProgress) {
+                    fprint.abort();
+                    root.proceedAfterPrimaryAuth();
+                }
+                return;
+            }
+
+            unlockRequestTimeout.running = false;
+            root.unlockInProgress = false;
+            root.u2fPending = false;
+            root.u2fState = "";
+            u2fPendingTimeout.running = false;
+            u2f.abort();
+
+            if (res === PamResult.Error)
+                root.state = "error";
+            else if (res === PamResult.MaxTries)
+                root.state = "max";
+            else if (res === PamResult.Failed)
+                root.state = "fail";
+
+            root.flashMsg();
+            stateReset.restart();
+        }
+    }
+
+    Connections {
+        target: passwd
+
+        function onActiveChanged() {
+            if (passwd.active) {
+                passwdActiveTimeout.restart();
+            } else {
+                passwdActiveTimeout.running = false;
+            }
+        }
+    }
+
+    PamContext {
+        id: fprint
+
+        property bool available: SettingsData.lockFingerprintReady
+        property int tries
+        property int errorTries
+
+        function checkAvail(): void {
+            if (!available || !SettingsData.enableFprint || !root.lockSecured) {
+                abort();
+                return;
+            }
+            if (active)
+                return;
+
+            tries = 0;
+            errorTries = 0;
+            start();
+        }
+
+        config: "fprint"
+        configDirectory: Quickshell.shellDir + "/assets/pam"
+
+        onCompleted: res => {
+            if (!available)
+                return;
+
+            switch (res) {
+            case PamResult.Success:
+                if (!root.unlockInProgress) {
+                    passwd.abort();
+                    root.proceedAfterPrimaryAuth();
+                }
+                return;
+            case PamResult.Error:
+                errorTries++;
+                if (errorTries < 200) {
+                    abort();
+                    errorRetry.restart();
+                    return;
+                }
+                abort();
+                return;
+            case PamResult.MaxTries:
+                tries++;
+                if (tries < SettingsData.maxFprintTries) {
+                    root.fprintState = "fail";
+                    start();
+                } else {
+                    root.fprintState = "max";
+                    abort();
+                }
+                break;
+            default:
+                return;
+            }
+
+            root.flashMsg();
+            fprintStateReset.start();
+        }
+    }
+
+    PamContext {
+        id: u2f
+
+        property bool available: SettingsData.lockU2fReady
+
+        function checkAvail(): void {
+            if (!available || !SettingsData.enableU2f || !root.lockSecured) {
+                abort();
+                return;
+            }
+
+            if (SettingsData.u2fMode === "or") {
+                start();
+            }
+        }
+
+        function startForSecondFactor(): void {
+            if (!available || !SettingsData.enableU2f) {
+                root.completeUnlock();
+                return;
+            }
+            abort();
+            root.u2fPending = true;
+            root.u2fState = "";
+            u2fPendingTimeout.restart();
+            start();
+        }
+
+        config: u2fConfigWatcher.loaded ? "hypeshell-u2f" : "u2f"
+        configDirectory: u2fConfigWatcher.loaded ? "/etc/pam.d" : Quickshell.shellDir + "/assets/pam"
+
+        onMessageChanged: {
+            if (message.toLowerCase().includes("touch"))
+                root.u2fState = "waiting";
+        }
+
+        onCompleted: res => {
+            if (!available || root.unlockInProgress)
+                return;
+
+            if (res === PamResult.Success) {
+                root.completeUnlock();
+                return;
+            }
+
+            if (res === PamResult.Error || res === PamResult.MaxTries || res === PamResult.Failed) {
+                abort();
+
+                if (root.u2fPending) {
+                    if (root.u2fState === "waiting") {
+                        // AND mode: device was found but auth failed → back to password
+                        root.u2fPending = false;
+                        root.u2fState = "";
+                        fprint.checkAvail();
+                    } else {
+                        // AND mode: no device found → keep pending, show "Insert...", retry
+                        root.u2fState = "insert";
+                        u2fErrorRetry.restart();
+                    }
+                } else {
+                    // OR mode: prompt to insert key, silently retry
+                    root.u2fState = "insert";
+                    u2fErrorRetry.restart();
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: errorRetry
+
+        interval: 1500
+        onTriggered: fprint.start()
+    }
+
+    Timer {
+        id: u2fErrorRetry
+
+        interval: 800
+        onTriggered: u2f.start()
+    }
+
+    Timer {
+        id: u2fPendingTimeout
+
+        interval: 30000
+        onTriggered: root.cancelU2fPending()
+    }
+
+    Timer {
+        id: passwdActiveTimeout
+
+        interval: 15000
+        onTriggered: {
+            if (passwd.active)
+                root.recoverFromAuthStall("error");
+        }
+    }
+
+    Timer {
+        id: unlockRequestTimeout
+
+        interval: 8000
+        onTriggered: {
+            if (root.unlockInProgress)
+                root.recoverFromAuthStall("error");
+        }
+    }
+
+    Timer {
+        id: stateReset
+
+        interval: 4000
+        onTriggered: {
+            if (root.state !== "max")
+                root.state = "";
+        }
+    }
+
+    Timer {
+        id: fprintStateReset
+
+        interval: 4000
+        onTriggered: root.fprintState = ""
+    }
+
+    onLockSecuredChanged: {
+        if (!lockSecured) {
+            root.resetAuthFlows();
+            return;
+        }
+        root.state = "";
+        root.fprintState = "";
+        root.u2fState = "";
+        root.u2fPending = false;
+        root.lockMessage = "";
+        root.resetAuthFlows();
+        fprint.checkAvail();
+        u2f.checkAvail();
+    }
+
+    Connections {
+        target: SettingsData
+
+        function onEnableFprintChanged(): void {
+            fprint.checkAvail();
+        }
+
+        function onLockFingerprintReadyChanged(): void {
+            fprint.checkAvail();
+        }
+
+        function onEnableU2fChanged(): void {
+            u2f.checkAvail();
+        }
+
+        function onLockU2fReadyChanged(): void {
+            u2f.checkAvail();
+        }
+
+        function onU2fModeChanged(): void {
+            if (root.lockSecured) {
+                u2f.abort();
+                u2fErrorRetry.running = false;
+                u2fPendingTimeout.running = false;
+                unlockRequestTimeout.running = false;
+                root.u2fPending = false;
+                root.u2fState = "";
+                u2f.checkAvail();
+            }
+        }
+    }
+}
