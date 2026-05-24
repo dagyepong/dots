@@ -1,0 +1,235 @@
+/* we can use webcss variables, fabric compiles that to gtk css.
+   global variables can be stored in :vars */
+:vars {
+    --background: #000A0E;
+    --foreground: #b3b7bd;
+    --color0: #000A0E;
+    --color1: #6791C9;
+    --color2: #6791C9;
+    --color3: #333B3F;
+    --color4: #6791C9;
+    --color5: #6791C9;
+    --color6: #6791C9;
+    --color7: #6791C9;
+    --color8: #2d3139;
+    --color9: #6791C9;
+    --color10: #6791C9;
+    --color11: #6791C9;
+    --color12: #6791C9;
+    --color13: #6791C9;
+    --color14: #6791C9;
+    --color15: #6791C9;
+    --window-bg: alpha(var(--background), 1);
+    --module-bg: #111A1F;
+    --border-color: var(--background);
+    --ws-active: var(--color9);
+    --ws-inactive: var(--color3);
+    --ws-empty: var(--color8);
+    --ws-hover: var(--color1);
+    --ws-urgent: var(--color12);
+}
+
+/* unset so we can style everything from the ground up. */
+* {
+    all: unset;
+    color: var(--foreground);
+    font-size: 12px;
+    font-family: "Jost*", sans-serif;
+    border-radius: 4px;
+}
+
+button {
+    background-size: 400% 400%;
+}
+
+#bar-inner {
+    padding: 5px;
+    border-color: var(--border-color);
+    background-color: var(--window-bg);
+    border-radius: 0px;
+/*    min-height: 28px;*/
+}
+
+#workspaces {
+    padding: 6px 13px 6px 13px;
+    margin: 2px;
+    min-height: 0px;
+    background-color: var(--module-bg);
+}
+
+#workspaces>button {
+    padding: 0px 12px 0px 0px;
+    transition: padding 0.05s steps(8);
+    background-color: var(--ws-inactive);
+    border-radius: 1px;
+}
+
+#workspaces>button.active {
+  padding: 0px 45px 0px 0px;
+  background-color: var(--ws-active);
+}
+
+#workspaces>button>label {
+    font-size: 0px;
+}
+
+#workspaces>button:hover {
+    background-color: var(--ws-hover);
+}
+
+#workspaces>button.urgent {
+    background-color: var(--ws-urgent);
+}
+
+
+#workspaces>button.empty {
+    background-color: var(--ws-empty);
+}
+
+#battery-widget {
+    padding: 6px 10px 6px 6px;
+    margin: 2px;
+    min-width: 25px;
+    background-color: #333B3F;
+}
+
+#volume-widget {
+    padding: 6px 10px 6px 6px;
+    margin: 2px;
+    min-width: 50px;
+    background-color: var(--module-bg);
+}
+
+#date-time,
+#hyprland-language,
+#hyprland-window {
+    background-color: var(--module-bg);
+    padding: 0px 0px 0px 0px;
+}
+
+menu>menuitem>label,
+#date-time>label,
+#hyprland-language>label,
+#hyprland-window>label {
+    font-weight: 900;
+}
+
+#all-corners {
+  border-right: 9px solid var(--background);
+  border-top: 1px solid var(--background);
+  border-bottom: 7px solid var(--background);
+  border-left: 7px solid var(--background);
+  border-radius: 0px;
+}
+
+#corner {
+    background-color: var(--background);
+    border-radius: 0;
+}
+
+#corner-container {
+  min-width: 20px;
+  min-height: 5px;
+  margin: 0px -15px 0px 0px;
+}
+
+#date-time {
+  font-family: 'Cartograph CF Thin';
+  font-size: 30px;
+  background-color: #171C21;
+  color: #78B892;
+  margin: -2px 0px -2px 0px;
+  padding: 2px 4px 2px 4px;
+  border-radius: 5px;
+}
+
+/* system tray */
+#system-tray, #internet-container {
+    padding: 1px 5px 1px 5px;
+    margin: -2px 3px -2px -2px;
+    background-color: var(--module-bg);
+    border-radius: 5px;
+}
+
+/* menu and menu items (written for the system tray) */
+menu {
+    border: solid 2px;
+    border-radius: 10px;
+    border-color: var(--border-color);
+    background-color: var(--window-bg);
+}
+
+menu>menuitem {
+    border-radius: 0px;
+    background-color: var(--module-bg);
+    padding: 6px;
+    margin-left: 2px;
+    margin-right: 2px;
+}
+
+menu>menuitem:first-child {
+    margin-top: 1px;
+    border-radius: 8px 8px 0px 0px;
+}
+
+menu>menuitem:last-child {
+    margin-bottom: 1px;
+    border-radius: 0px 0px 8px 8px;
+}
+
+menu>menuitem:hover {
+    background-color: var(--border-color);
+}
+
+
+#cpu-progress-bar,
+#ram-progress-bar,
+#volume-progress-bar {
+    color: transparent;
+    background-color: transparent
+}
+
+
+#ram-progress-bar,
+#cpu-progress-bar {
+    margin: 0px;
+}
+
+#radial-indicators {
+  margin: -1px 1px -1px -1px;
+  padding: 1px 6px 1px 6px;
+}
+
+#cpu-progress-bar {
+    border: solid 0px #78B892;
+}
+
+#ram-progress-bar {
+    border: solid 0px #F26E74;
+}
+
+#volume-progress-bar {
+    border: solid 0px var(--border-color);
+}
+
+
+#pfp-container,
+#widgets-container {
+    background-color: var(--module-bg);
+    padding: 2px;
+}
+
+#pfp-container {
+  padding: 2px;
+  margin: -2px;
+}
+
+tooltip {
+    border: solid 2px;
+    border-color: var(--border-color);
+    background-color: var(--window-bg);
+}
+
+tooltip>* {
+    padding: 2px 4px
+}
