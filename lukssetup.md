@@ -234,7 +234,7 @@ installkernel -a /lib/modules
 #### Configure kernel parameters
 `nano /etc/default/uefi-mkconfig`
 ```bash
-KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.label=GentooLuks root=LABEL=GentooRoot rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0"
+KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.label=GentooLuks root=LABEL=GentooRoot rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0 acpi=noirq iommu=soft"
 ```
 #### Finalize and reboot
 ```bash
