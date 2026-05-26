@@ -153,9 +153,8 @@ emerge --ask sys-kernel/linux-firmware sys-firmware/sof-firmware sys-fs/btrfs-pr
 #### Configure dracut
 `nano /etc/dracut.conf`
 ```bash
-hostonly="yes"
-hostonly_mode=strict
-add_dracutmodules+=" crypt "
+hostonly="no"
+add_dracutmodules+=" dm_crypt encrypted nvme ahci "
 ```
 #### Installing a distribution kernel
 ```bash
