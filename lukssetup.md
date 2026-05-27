@@ -242,14 +242,20 @@ mkdir -p /efi/EFI/Gentoo
 installkernel -a /lib/modules
 ```
 #### Configure kernel parameters
+#### Look closely at rhe output of blkid uuid="..." of /dev/nvme0n1p2(the raw  crypto_LUKS contanier).
+#### uuid="..." of /dev/mapper/root(the internal btrfs filesystem)
+
 `nano /etc/default/uefi-mkconfig`
+
+
 ```bash
 KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0 acpi=noirq iommu=soft"
 ```
 #### Finalize and reboot
 ```bash
 # Create a boot entry
-uefi-mkconfig
+emerge -av sys-boot/uefi-mkconfig
+uefi-mkconfig -f
 
 # If your EFI stub boot isn't working, consider using other boot methods
 reboot
