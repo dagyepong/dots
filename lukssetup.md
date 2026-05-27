@@ -163,6 +163,9 @@ hostonly="no"
 add_dracutmodules+=" crypt btrfs "
 add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
 ```
+#### Manually generate the chroot bypass file
+touch /etc/kernel/preinst.d/05-check-chroot.install
+
 #### Installing a distribution kernel
 ```bash
 emerge --ask sys-kernel/gentoo-kernel-bin
@@ -232,6 +235,7 @@ echo "sys-kernel/installkernel efistub" >> /etc/portage/package.use/installkerne
 # And Rebuild the installkernel
 emerge sys-kernel/installkernel
 
+mkdir -p /efi/EFI/Linux
 mkdir -p /efi/EFI/Gentoo
 
 # Generate initramfs again using installkernel
@@ -240,7 +244,7 @@ installkernel -a /lib/modules
 #### Configure kernel parameters
 `nano /etc/default/uefi-mkconfig`
 ```bash
-KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.label=GentooLuks root=LABEL=GentooRoot rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0 acpi=noirq iommu=soft"
+KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0 acpi=noirq iommu=soft"
 ```
 #### Finalize and reboot
 ```bash
