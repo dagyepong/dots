@@ -144,7 +144,8 @@ env-update && source /etc/profile && export PS1="(chroot) ${PS1}"
 ```
 #### Configure installkernel for initramfs
 ```bash
-echo "sys-kernel/installkernel dracut" >> /etc/portage/package.use/installkernel
+echo "sys-kernel/installkernel dracut uki efistub -systemd" >> /etc/portage/package.use/installkernel
+echo "sys-apps/systemd-utls boot kernel-install" >> /etc/portage/package.use/systemd-utils
 ```
 #### Install some required packages
 ```bash
