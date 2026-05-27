@@ -232,6 +232,7 @@ app-emulation/virt-firmware
 
 
 # And Rebuild the installkernel
+```bash
 emerge sys-kernel/installkernel
 
 mkdir -p /efi/EFI/Linux
