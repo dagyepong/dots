@@ -145,7 +145,7 @@ env-update && source /etc/profile && export PS1="(chroot) ${PS1}"
 #### Configure installkernel for initramfs
 ```bash
 echo "sys-kernel/installkernel dracut uki efistub -systemd" >> /etc/portage/package.use/installkernel
-echo "sys-apps/systemd-utls boot kernel-install" >> /etc/portage/package.use/systemd-utils
+echo "sys-apps/systemd-utils boot kernel-install" >> /etc/portage/package.use/systemd-utils
 ```
 ### run emerge again
 
@@ -229,8 +229,7 @@ sys-kernel/installkernel
 sys-boot/uefi-mkconfig
 app-emulation/virt-firmware
 ```
-```bash
-echo "sys-kernel/installkernel efistub" >> /etc/portage/package.use/installkernel
+
 
 # And Rebuild the installkernel
 emerge sys-kernel/installkernel
