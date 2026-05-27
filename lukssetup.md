@@ -147,6 +147,11 @@ env-update && source /etc/profile && export PS1="(chroot) ${PS1}"
 echo "sys-kernel/installkernel dracut uki efistub -systemd" >> /etc/portage/package.use/installkernel
 echo "sys-apps/systemd-utls boot kernel-install" >> /etc/portage/package.use/systemd-utils
 ```
+### run emerge again
+
+```bash
+emerge --oneshot sys-apps/systemd-utils sys-kernel/installkernel
+
 #### Install some required packages
 ```bash
 emerge --ask sys-kernel/linux-firmware sys-firmware/sof-firmware sys-fs/btrfs-progs sys-fs/cryptsetup sys-kernel/installkernel
@@ -155,7 +160,8 @@ emerge --ask sys-kernel/linux-firmware sys-firmware/sof-firmware sys-fs/btrfs-pr
 `nano /etc/dracut.conf`
 ```bash
 hostonly="no"
-add_dracutmodules+=" dm_crypt encrypted nvme ahci "
+add_dracutmodules+=" crypt btrfs "
+add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
 ```
 #### Installing a distribution kernel
 ```bash
