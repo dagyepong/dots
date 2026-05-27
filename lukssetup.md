@@ -151,7 +151,7 @@ echo "sys-apps/systemd-utils boot kernel-install" >> /etc/portage/package.use/sy
 
 ```bash
 emerge --oneshot sys-apps/systemd-utils sys-kernel/installkernel
-
+```
 #### Install some required packages
 ```bash
 emerge --ask sys-kernel/linux-firmware sys-firmware/sof-firmware sys-fs/btrfs-progs sys-fs/cryptsetup sys-kernel/installkernel
