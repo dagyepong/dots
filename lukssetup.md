@@ -249,7 +249,7 @@ installkernel -a /lib/modules
 
 
 ```bash
-KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@ video=efifb:mode=0 acpi=noirq iommu=soft"
+KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@"
 ```
 #### Finalize and reboot
 ```bash
