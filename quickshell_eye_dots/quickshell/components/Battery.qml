@@ -27,7 +27,6 @@ Item {
 
     MouseArea { 
         anchors.fill: parent
-        hoverEnabled: true
         onClicked: {} 
     }
 
@@ -36,7 +35,6 @@ Item {
         anchors.centerIn: parent
         spacing: Appearance.spacing.p1 + 2
 
-        // --- EYE CANDY BATTERY ICON CANVAS ---
         Item {
             id: batteryIconContainer
             Layout.preferredWidth: 28
@@ -47,13 +45,13 @@ Item {
             Rectangle {
                 id: batteryBorder
                 anchors.fill: parent
-                anchors.rightMargin: 3 // Leave space for the battery tip node
+                anchors.rightMargin: 3 
                 color: "transparent"
                 border.color: root.stateColor
                 border.width: 1.5
                 radius: 3
 
-                // The smooth fluid internal fluid fill indicator
+                // Smooth structural filling
                 Rectangle {
                     id: batteryFill
                     anchors.left: parent.left
@@ -61,11 +59,11 @@ Item {
                     anchors.bottom: parent.bottom
                     anchors.margins: 2.5
                     
-                    // Smooth structural interpolation when battery state moves
                     width: Math.max(0, (parent.width - 5) * (root.percent / 100))
                     color: root.stateColor
                     radius: 1.5
 
+                    // Runs ONLY when percentage changes (rare), otherwise 0% CPU
                     Behavior on width {
                         NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
                     }
@@ -75,7 +73,7 @@ Item {
                 }
             }
 
-            // Battery Positive Terminal Node (The Tip)
+            // Battery Positive Terminal Node
             Rectangle {
                 anchors.left: batteryBorder.right
                 anchors.leftMargin: 0.5
@@ -90,21 +88,18 @@ Item {
                 }
             }
 
-            // Flashy Charging Glow & Pulse Animation
-            SequentialAnimation on opacity {
-                running: root.charging
-                loops: Animation.Infinite
-                alwaysRunToEnd: true
-
-                NumberAnimation { to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+            // --- STATIC CHARGING INDICATOR (CLEAN & SILENT) ---
+            // Instead of looping animations, we show a clean minimal lightning bolt inside the bar when charging
+            Text {
+                text: "⚡"
+                visible: root.charging
+                font.pixelSize: 10
+                color: Appearance.srcery.black
+                anchors.centerIn: batteryBorder
             }
-
-            // Fallback reset if charging stops instantly
-            onOpacityChanged: { if (!root.charging && opacity !== 1.0) opacity = 1.0 }
         }
 
-        // --- PERCENTAGE TEXT DISPLAY ---
+        // Percentage Text Display
         Text {
             id: batteryLabel
             text: root.percent + "%"
