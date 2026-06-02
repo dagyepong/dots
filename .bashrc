@@ -10,6 +10,7 @@
 #doas emerge --ask media-fonts/nerd-fonts   # or a specific one like media-fonts/firacode-nerd
 
 
+alias htop='ktop'
 alias l='ls -CF'
 alias b='bash'
 alias vim='nvim'
@@ -365,5 +366,7 @@ alias eleven='echo "ᕦ( ͡° ͜ʖ ͡°)ᕤ"'
 
 
   if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
-    dbus-run-session mango
+    dbus-run-session start-hyprland
 fi
+export GPG_TTY=$(tty)
+export PATH="/home/nana/.local/bin:$PATH"
