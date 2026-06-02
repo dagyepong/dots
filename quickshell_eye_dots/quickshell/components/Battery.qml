@@ -17,91 +17,94 @@ Item {
     implicitHeight: Appearance.bar.height
     implicitWidth: visible ? (mainLayout.implicitWidth) : 0
 
-    // Dynamic state colors mapped cleanly from your theme
-    readonly property color stateColor: {
-        if (charging) return Appearance.srcery.cyan
+    // High-visibility base colors from your Srcery palette
+    readonly property color baseColor: {
         if (percent < 20) return Appearance.srcery.red
         if (percent < 50) return Appearance.srcery.yellow
         return Appearance.srcery.green
     }
 
-    MouseArea { 
-        anchors.fill: parent
-        onClicked: {} 
+    // This tracking property controls the block stepping during charging waves
+    property int chargeStep: 0
+
+    // Low-frequency timer (0.8s interval = virtually zero CPU overhead)
+    Timer {
+        interval: 800
+        running: root.charging
+        repeat: true
+        onTriggered: root.chargeStep = (root.chargeStep + 1) % 4
+        onRunningChanged: if (!running) root.chargeStep = 0
     }
+
+    MouseArea { anchors.fill: parent; onClicked: {} }
 
     RowLayout {
         id: mainLayout
         anchors.centerIn: parent
         spacing: Appearance.spacing.p1 + 2
 
+        // --- RETRO STEP BATTERY FRAME ---
         Item {
-            id: batteryIconContainer
             Layout.preferredWidth: 28
             Layout.preferredHeight: 14
             Layout.alignment: Qt.AlignVCenter
 
-            // Battery Outer Shell
+            // Outer Shell Case
             Rectangle {
                 id: batteryBorder
                 anchors.fill: parent
-                anchors.rightMargin: 3 
+                anchors.rightMargin: 3
                 color: "transparent"
-                border.color: root.stateColor
+                border.color: root.charging ? Appearance.srcery.cyan : root.baseColor
                 border.width: 1.5
                 radius: 3
 
-                // Smooth structural filling
-                Rectangle {
-                    id: batteryFill
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
+                // Container for the 3 distinct battery level cells
+                Row {
+                    anchors.fill: parent
                     anchors.margins: 2.5
-                    
-                    width: Math.max(0, (parent.width - 5) * (root.percent / 100))
-                    color: root.stateColor
-                    radius: 1.5
+                    spacing: 1.5
 
-                    // Runs ONLY when percentage changes (rare), otherwise 0% CPU
-                    Behavior on width {
-                        NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
+                    // Segment 1 (Low)
+                    Rectangle {
+                        width: 6; height: parent.height
+                        radius: 1
+                        color: (root.charging ? (root.chargeStep >= 1) : (root.percent >= 15)) 
+                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
                     }
-                    Behavior on color {
-                        ColorAnimation { duration: 250 }
+
+                    // Segment 2 (Medium)
+                    Rectangle {
+                        width: 6; height: parent.height
+                        radius: 1
+                        color: (root.charging ? (root.chargeStep >= 2) : (root.percent >= 50)) 
+                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
+                    }
+
+                    // Segment 3 (High)
+                    Rectangle {
+                        width: 6; height: parent.height
+                        radius: 1
+                        color: (root.charging ? (root.chargeStep >= 3) : (root.percent >= 85)) 
+                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
                     }
                 }
             }
 
-            // Battery Positive Terminal Node
+            // Positive Terminal Tip
             Rectangle {
                 anchors.left: batteryBorder.right
                 anchors.leftMargin: 0.5
                 anchors.verticalCenter: batteryBorder.verticalCenter
                 width: 2.5
                 height: 6
-                color: root.stateColor
+                color: root.charging ? Appearance.srcery.cyan : root.baseColor
                 radius: 1
-
-                Behavior on color {
-                    ColorAnimation { duration: 250 }
-                }
-            }
-
-            // --- STATIC CHARGING INDICATOR (CLEAN & SILENT) ---
-            // Instead of looping animations, we show a clean minimal lightning bolt inside the bar when charging
-            Text {
-                text: "⚡"
-                visible: root.charging
-                font.pixelSize: 10
-                color: Appearance.srcery.black
-                anchors.centerIn: batteryBorder
             }
         }
 
-        // Percentage Text Display
+        // --- PERCENTAGE TEXT ---
         Text {
-            id: batteryLabel
             text: root.percent + "%"
             font {
                 family: "JetBrainsMono Nerd Font"
@@ -110,10 +113,6 @@ Item {
             }
             color: root.charging ? Appearance.srcery.cyan : Appearance.srcery.gray4
             Layout.alignment: Qt.AlignVCenter
-            
-            Behavior on color {
-                ColorAnimation { duration: 250 }
-            }
         }
     }
 }
