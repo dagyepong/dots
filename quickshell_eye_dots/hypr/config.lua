@@ -31,8 +31,21 @@ hl.config({
 
     allow_tearing = false,
 
-    layout = "dwindle",
-  },
+    layout = "scrolling",
+  
+ },
+    
+     -- Add the scrolling layout options here
+    scrolling = {
+        fullscreen_on_one_column = true,
+        column_width = 0.90,
+        follow_focus = true,
+        focus_fit_method = 1,
+        explicit_column_widths = "0.75, 0.75, 0.75, 0.75",
+
+
+
+ },
 
   cursor = {
     inactive_timeout = 30
