@@ -1,7 +1,0 @@
-// Copy to `Config.qml`
-pragma Singleton
-
-import QtQuick
-import qs.config
-
-ConfigDark {}

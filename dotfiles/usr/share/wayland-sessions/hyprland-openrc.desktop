@@ -1,7 +1,0 @@
-[Desktop Entry]
-Name=Hyprland
-Comment=An intelligent dynamic tiling Wayland compositor
-Exec=dbus-launch Hyprland
-Type=Application
-DesktopNames=Hyprland
-Keywords=tiling;wayland;compositor;
