@@ -7,7 +7,7 @@
 // ├┤ Author  : Daniel Berg <mail@roosta.sh>      ├┤
 // ││ Repo    : https://github.com/roosta/dotfiles││
 // ││ Site    : https://www.roosta.sh             ││
-// ├┤ License : GNU General Public License v3     ├┤
+// ├┤ License : GNU General Public License v3      ├┤
 // ┆└─────────────────────────────────────────────┘┆
 
 import QtQuick
@@ -63,6 +63,7 @@ Item {
     }
   }
 
+  // --- PRIMARY DISPLAY BAR ---
   Component {
     id: primaryBar
     Rectangle {
@@ -109,8 +110,7 @@ Item {
           id: rightSection
           Layout.fillHeight: true
           Layout.fillWidth: true
-          // === DEBUG: Green background to see if right section is visible ===
-          color: "transparent"   // change back to "transparent" when done
+          color: "transparent"
           RowLayout {
             spacing: Appearance.spacing.p1
             anchors.right: parent.right
@@ -125,83 +125,64 @@ Item {
     }
   }
 
+  // --- RIGHT MONITOR DISPLAY BAR ---
   Component {
     id: rightBar
     Rectangle {
       color: "transparent"
       RowLayout {
-        anchors {
-          top: parent.top
-          left: parent.left
-          bottom: parent.bottom
-          right: parent.right
-        }
+        anchors.fill: parent
+        
         RowLayout {
-          id: leftSection
+          id: leftSecRightBar
           spacing: Appearance.spacing.p1
           Layout.leftMargin: Appearance.spacing.p1
           LauncherButton { monitorId: root.monitorId }
           Workspaces { monitorId: root.monitorId }
         }
+        
+        Item { Layout.fillWidth: true } // Clean spacer pusher
+
         RowLayout {
-          id: centerSection
+          id: rightSecRightBar
           spacing: Appearance.spacing.p1
-        }
-        // === DEBUG: Wrap rightSection in a Rectangle to see its bounds ===
-        Rectangle {
-          id: rightSection
-          color: "transparent"   // temporary debug, change to "transparent" later
-          Layout.fillHeight: true
-          Layout.preferredWidth: childrenRect.width
-          RowLayout {
-            anchors.centerIn: parent
-            spacing: Appearance.spacing.p1
-            Battery { monitorId: root.monitorId }
-          }
+          Layout.rightMargin: Appearance.spacing.p1
+          Layout.alignment: Qt.AlignVCenter
+          Battery { monitorId: root.monitorId }
         }
       }
     }
   }
 
+  // --- LEFT MONITOR DISPLAY BAR ---
   Component {
     id: leftBar
     Rectangle {
       color: "transparent"
       RowLayout {
-        anchors {
-          top: parent.top
-          left: parent.left
-          bottom: parent.bottom
-          right: parent.right
-        }
+        anchors.fill: parent
+        
         RowLayout {
-          id: leftSection
-          Layout.fillWidth: true
+          id: leftSecLeftBar
           Layout.fillHeight: true
         }
+        
+        Item { Layout.fillWidth: true } // Clean spacer pusher
+
         RowLayout {
-          id: centerSection
+          id: rightSecLeftBar
           spacing: Appearance.spacing.p1
-        }
-        // === DEBUG: Wrap rightSection in a Rectangle to see its bounds ===
-        Rectangle {
-          id: rightSection
-          color: "transparent"   // temporary debug
-          Layout.fillHeight: true
-          Layout.preferredWidth: childrenRect.width
-          RowLayout {
-            anchors.centerIn: parent
-            spacing: Appearance.spacing.p1
-            Layout.rightMargin: Appearance.spacing.p1
-            Workspaces { monitorId: root.monitorId }
-            LauncherButton { monitorId: root.monitorId }
-            Battery { monitorId: root.monitorId }
-          }
+          Layout.rightMargin: Appearance.spacing.p1
+          Layout.alignment: Qt.AlignVCenter
+          Workspaces { monitorId: root.monitorId }
+          LauncherButton { monitorId: root.monitorId }
+          Battery { monitorId: root.monitorId }
         }
       }
     }
   }
 
+  // --- TOP MONITOR DISPLAY BAR ---
   Component {
     id: topBar
     Rectangle {
@@ -211,19 +192,13 @@ Item {
         anchors.fill: parent
         spacing: 0
         Rectangle {
-          id: leftSection
+          id: leftSecTopBar
           Layout.fillWidth: true
           Layout.fillHeight: true
           color: "transparent"
-          RowLayout {
-            spacing: Appearance.spacing.p1
-            anchors.left: parent.left
-            anchors.leftMargin: Appearance.spacing.p1
-            anchors.fill: parent
-          }
         }
         Rectangle {
-          id: centerSection
+          id: centerSecTopBar
           color: "transparent"
           Layout.fillHeight: true
           Layout.fillWidth: true
@@ -235,15 +210,10 @@ Item {
           }
         }
         Rectangle {
-          id: rightSection
-          Layout.fillHeight: true
+          id: rightSecTopBar
           Layout.fillWidth: true
+          Layout.fillHeight: true
           color: "transparent"
-          RowLayout {
-            spacing: Appearance.spacing.p1
-            anchors.right: parent.right
-            anchors.rightMargin: Appearance.spacing.p1
-          }
         }
       }
     }
