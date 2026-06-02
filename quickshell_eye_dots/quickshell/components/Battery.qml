@@ -15,104 +15,52 @@ Item {
 
     visible: hasBattery
     implicitHeight: Appearance.bar.height
-    implicitWidth: visible ? (mainLayout.implicitWidth) : 0
+    implicitWidth: visible ? mainLayout.implicitWidth : 0
 
-    // High-visibility base colors from your Srcery palette
-    readonly property color baseColor: {
-        if (percent < 20) return Appearance.srcery.red
-        if (percent < 50) return Appearance.srcery.yellow
-        return Appearance.srcery.green
-    }
-
-    // This tracking property controls the block stepping during charging waves
-    property int chargeStep: 0
-
-    // Low-frequency timer (0.8s interval = virtually zero CPU overhead)
+    // Low frequency clock to shift matrix elements safely
+    property int matrixTick: 0
     Timer {
-        interval: 800
+        interval: 600
         running: root.charging
         repeat: true
-        onTriggered: root.chargeStep = (root.chargeStep + 1) % 4
-        onRunningChanged: if (!running) root.chargeStep = 0
+        onTriggered: root.matrixTick = (root.matrixTick + 1) % 4
     }
-
-    MouseArea { anchors.fill: parent; onClicked: {} }
 
     RowLayout {
         id: mainLayout
         anchors.centerIn: parent
-        spacing: Appearance.spacing.p1 + 2
+        spacing: 4
 
-        // --- RETRO STEP BATTERY FRAME ---
-        Item {
-            Layout.preferredWidth: 28
-            Layout.preferredHeight: 14
-            Layout.alignment: Qt.AlignVCenter
-
-            // Outer Shell Case
-            Rectangle {
-                id: batteryBorder
-                anchors.fill: parent
-                anchors.rightMargin: 3
-                color: "transparent"
-                border.color: root.charging ? Appearance.srcery.cyan : root.baseColor
-                border.width: 1.5
-                radius: 3
-
-                // Container for the 3 distinct battery level cells
-                Row {
-                    anchors.fill: parent
-                    anchors.margins: 2.5
-                    spacing: 1.5
-
-                    // Segment 1 (Low)
-                    Rectangle {
-                        width: 6; height: parent.height
-                        radius: 1
-                        color: (root.charging ? (root.chargeStep >= 1) : (root.percent >= 15)) 
-                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
-                    }
-
-                    // Segment 2 (Medium)
-                    Rectangle {
-                        width: 6; height: parent.height
-                        radius: 1
-                        color: (root.charging ? (root.chargeStep >= 2) : (root.percent >= 50)) 
-                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
-                    }
-
-                    // Segment 3 (High)
-                    Rectangle {
-                        width: 6; height: parent.height
-                        radius: 1
-                        color: (root.charging ? (root.chargeStep >= 3) : (root.percent >= 85)) 
-                               ? (root.charging ? Appearance.srcery.cyan : root.baseColor) : "transparent"
-                    }
-                }
-            }
-
-            // Positive Terminal Tip
-            Rectangle {
-                anchors.left: batteryBorder.right
-                anchors.leftMargin: 0.5
-                anchors.verticalCenter: batteryBorder.verticalCenter
-                width: 2.5
-                height: 6
-                color: root.charging ? Appearance.srcery.cyan : root.baseColor
-                radius: 1
-            }
-        }
-
-        // --- PERCENTAGE TEXT ---
+        // Complete Text-Based Matrix Node
         Text {
-            text: root.percent + "%"
             font {
                 family: "JetBrainsMono Nerd Font"
                 pixelSize: 10
-                weight: Font.Bold
+                weight: Font.DemiBold
             }
             color: root.charging ? Appearance.srcery.cyan : Appearance.srcery.gray4
             Layout.alignment: Qt.AlignVCenter
+
+            // Custom procedural formatting logic
+            text: {
+                let opening = "["
+                let closing = "] " + root.percent + "%"
+                let b1 = "░", b2 = "░", b3 = "░"
+
+                if (root.charging) {
+                    // Animates a sequential data-stream across the cells
+                    if (root.matrixTick === 1) b1 = "█"
+                    if (root.matrixTick === 2) b2 = "█"
+                    if (root.matrixTick === 3) b3 = "█"
+                    return opening + b1 + b2 + b3 + closing
+                } else {
+                    // Static blocks representing exact charge ranges
+                    if (root.percent >= 20) b1 = "█"
+                    if (root.percent >= 55) b2 = "█"
+                    if (root.percent >= 85) b3 = "█"
+                    return opening + b1 + b2 + b3 + closing
+                }
+            }
         }
     }
 }
