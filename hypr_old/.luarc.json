@@ -1,7 +1,7 @@
 {
   "workspace": {
     "library": [
-      "/usr/share/hypr/stubs"
+      "/home/nana/.config/hypr"
     ]
   },
   "diagnostics": {
