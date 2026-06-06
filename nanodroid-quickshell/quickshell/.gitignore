@@ -1,0 +1,7 @@
+.cache/
+cache/
+*.log
+*.tmp
+data/app_usage.json
+node_modules/
+.trackerignore
