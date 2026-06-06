@@ -12,10 +12,10 @@ Scope {
     property int selectedIndex: 0
 
     readonly property var entries: [
-        { glyph: "󰒲", label: "Suspend",  accent: Theme.accent.purple, cmd: ["systemctl", "suspend"] },
+        { glyph: "󰒲", label: "Suspend",  accent: Theme.accent.purple, cmd: ["loginctl", "suspend"] },
         { glyph: "󰗽", label: "Logout",   accent: Theme.accent.yellow, cmd: ["hyprctl", "dispatch", "exit"] },
-        { glyph: "󰜉", label: "Reboot",   accent: Theme.accent.orange, cmd: ["systemctl", "reboot"] },
-        { glyph: "󰐥", label: "Shutdown", accent: Theme.accent.red,    cmd: ["systemctl", "poweroff"] },
+        { glyph: "󰜉", label: "Reboot",   accent: Theme.accent.orange, cmd: ["loginctl", "reboot"] },
+        { glyph: "󰐥", label: "Shutdown", accent: Theme.accent.red,    cmd: ["loginctl", "poweroff"] },
     ]
 
     function toggle()  { open = !open; if (open) selectedIndex = 0; }
