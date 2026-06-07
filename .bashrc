@@ -1,15 +1,13 @@
 #!/bin/bash
-# demogorgon_prompt.sh - A Stranger Things demogorgon-themed bash prompt
+# ==============================================================================
+# 🌀 DE-FRAMED & POLISHED BASHRC CONFIGURATION
+# Theme: Modern Aesthetic Demogorgon (Stranger Things / Pastel Dark)
+# Optimized for: Gentoo Linux, Hyprland, and Noto-Emoji / Nerd Fonts
+# ==============================================================================
 
-
-# -------------------- Useful Aliases (doas version) --------------------
-
-# Basic ls enhancements
-# required font
-#doas emerge --ask media-fonts/noto-emoji   # Emoji support
-#doas emerge --ask media-fonts/nerd-fonts   # or a specific one like media-fonts/firacode-nerd
-
-
+# ------------------------------------------------------------------------------
+# 🛠️ SYSTEM ALIASES & TOOLS
+# ------------------------------------------------------------------------------
 alias htop='ktop'
 alias l='ls -CF'
 alias b='bash'
@@ -21,21 +19,23 @@ alias cat="bat -p"
 alias pfetch="curl -s https://raw.githubusercontent.com/dylanaraps/pfetch/master/pfetch | sh"
 alias rm='rm -fr'
 
-# Grep with color
+# Grep enhancements
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
-# Human-readable sizes
+
+# Human-readable system stats
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
 
-# Process management
+# Process tracking
 alias psa='ps auxf'
 alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
 alias psmem='ps auxf | sort -nr -k 4'
 alias pscpu='ps auxf | sort -nr -k 3'
-# Gentoo package management (using doas)
+
+# Gentoo Package Management (Using doas)
 alias sync='doas emaint -a sync'
 alias update='doas emerge -avuDN @world'
 alias upgrade='doas emerge -avuDN @world'
@@ -47,92 +47,71 @@ alias revdep='doas revdep-rebuild'
 alias etc-update='doas etc-update'
 alias conf-update='doas dispatch-conf'
 
-# Search installed packages
+# Package search utilities
 alias qlist='qlist -IC'
 alias qfile='qfile'
 alias equery='equery'
-# System maintenance
+
+# Logs and Diagnostics
 alias syslog='doas tail -f /var/log/messages'
-alias journal='doas journalctl -xe'           # if using systemd
+alias journal='doas journalctl -xe'
 alias kern-log='doas dmesg -T -w'
 
-# Security / Hardening
+# Security & Hardening checks
 alias checksec='scanelf -pvf'
 alias hardened-check='hardened-check'
 
-# Networking
+# Networking utilities
 alias ip='ip -color'
 alias myip='curl -s ifconfig.me'
 
-# Quick navigation
+# Fast Navigation
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 
-# Color definitions
+# Easter-Egg Demogorgon Themes
+alias demo-status='echo "The Demogorgon is watching..."'
+alias upside-down='echo "Welcome to the Upside Down"'
+alias vecna-cursed='echo "You have been cursed by Vecna!"'
+alias eleven='echo "ᕦ( ͡° ͜ʖ ͡°)ᕤ"'
+
+# ------------------------------------------------------------------------------
+# 🎨 MODERN PALETTE & NOTO-EMOJI LAYOUT DEFINITIONS
+# ------------------------------------------------------------------------------
 RESET='\[\e[0m\]'
-BLACK='\[\e[30m\]'
-RED='\[\e[31m\]'
-GREEN='\[\e[32m\]'
-YELLOW='\[\e[33m\]'
-BLUE='\[\e[34m\]'
-MAGENTA='\[\e[35m\]'
-CYAN='\[\e[36m\]'
-WHITE='\[\e[37m\]'
-BRIGHT_RED='\[\e[91m\]'
-BRIGHT_GREEN='\[\e[92m\]'
-BRIGHT_YELLOW='\[\e[93m\]'
-BRIGHT_BLUE='\[\e[94m\]'
-BRIGHT_MAGENTA='\[\e[95m\]'
-BRIGHT_CYAN='\[\e[96m\]'
-BRIGHT_WHITE='\[\e[97m\]'
+BOLD='\[\e[1m\]'
 
-# Background colors
-BG_RED='\[\e[41m\]'
-BG_GREEN='\[\e[42m\]'
-BG_YELLOW='\[\e[43m\]'
-BG_BLUE='\[\e[44m\]'
-BG_MAGENTA='\[\e[45m\]'
-BG_CYAN='\[\e[46m\]'
-BG_BRIGHT_RED='\[\e[101m\]'
+# 256-Color Muted Pastel Spectrum
+COLOR_TEXT='\[\e[38;5;253m\]'       # Soft white typography
+COLOR_MONO_DARK='\[\e[38;5;239m\]'   # Clean slate gray separator elements
+DEMO_RED='\[\e[38;5;167m\]'         # Balanced Crimson
+DEMO_PURPLE='\[\e[38;5;141m\]'      # Pastel Lavender
+DEMO_CYAN='\[\e[38;5;116m\]'        # Soft Mint for working path directories
+DEMO_GREEN='\[\e[38;5;150m\]'       # Sage Green for tracking states
+UPSIDE_DOWN='\[\e[38;5;209m\]'      # Terracotta Orange for secondary items
 
-# Demogorgon colors
-DEMO_RED='\[\e[38;5;124m\]'    # Dark red
-DEMO_PURPLE='\[\e[38;5;90m\]'  # Purple
-DEMO_GREEN='\[\e[38;5;106m\]'  # Sickly green
-DEMO_GRAY='\[\e[38;5;245m\]'   # Gray
-UPSIDE_DOWN='\[\e[38;5;202m\]' # Upside down orange
-
-# Symbols
+# Noto-Emoji Asset Links
 DEMOGORGON="👹"
-DEMOGORGON_FACE="🗿"
-VINES="🌿"
-FLOWER="🌸"
-UPSIDE_DOWN_EMOJI="🙃"
 PORTAL="🌀"
-BLOOD="🩸"
 SKULL="💀"
-WARNING="⚠️"
-ALIEN="👽"
 
-# Git status symbols
+# Git Info Glyphs
 GIT_BRANCH=""
 GIT_STAGED="●"
 GIT_UNSTAGED="✚"
 GIT_UNTRACKED="…"
 GIT_STASH="⚑"
-GIT_AHEAD="↑"
-GIT_BEHIND="↓"
-GIT_CONFLICT="✖"
 GIT_CLEAN="✔"
 
-# Powerline symbols
+# Powerline Connectors
 SEPARATOR_RIGHT=""
-SEPARATOR_LEFT=""
-SEPARATOR_ROUND_RIGHT=""
-SEPARATOR_ROUND_LEFT=""
 
-# Function to get git branch info
+# ------------------------------------------------------------------------------
+# 🔍 PROMPT SUBSYSTEM ENGINE FUNCTIONS
+# ------------------------------------------------------------------------------
+
+# Parse active git environment status indicators
 function demogorgon_git_info() {
     local git_branch=$(git branch 2>/dev/null | grep '\*' | sed 's/* //')
     
@@ -143,13 +122,11 @@ function demogorgon_git_info() {
         local untracked=$(git ls-files --others --exclude-standard 2>/dev/null | head -1)
         local stash=$(git stash list 2>/dev/null | head -1)
         
-        # Build status string
         [ $staged -ne 0 ] && git_status+="$GIT_STAGED"
         [ $unstaged -ne 0 ] && git_status+="$GIT_UNSTAGED"
         [ -n "$untracked" ] && git_status+="$GIT_UNTRACKED"
         [ -n "$stash" ] && git_status+="$GIT_STASH"
         
-        # Check if we have any status
         if [ -n "$git_status" ]; then
             echo " $GIT_BRANCH $git_branch $git_status"
         else
@@ -158,7 +135,7 @@ function demogorgon_git_info() {
     fi
 }
 
-# Function to get conda/env info
+# Parse sandbox execution spaces (Python virtualenvs / Conda environments)
 function demogorgon_env_info() {
     if [ -n "$CONDA_DEFAULT_ENV" ]; then
         echo "  $CONDA_DEFAULT_ENV"
@@ -167,14 +144,14 @@ function demogorgon_env_info() {
     fi
 }
 
-# Function to get exit code if not 0
+# Monitor system faults and report exit issues cleanly
 function demogorgon_exit_code() {
     if [ $1 -ne 0 ]; then
         echo " $1 $SKULL"
     fi
 }
 
-# Function to get background jobs
+# Capture asynchronous background processing counters
 function demogorgon_jobs() {
     local job_count=$(jobs | wc -l | tr -d ' ')
     if [ $job_count -gt 0 ]; then
@@ -182,7 +159,7 @@ function demogorgon_jobs() {
     fi
 }
 
-# Function to truncate current directory
+# Keep paths aesthetic inside structural limitations
 function demogorgon_pwd() {
     local dir=$(pwd | sed "s|^$HOME|~|")
     local max_len=30
@@ -194,179 +171,104 @@ function demogorgon_pwd() {
     fi
 }
 
-# Main prompt function
+# ------------------------------------------------------------------------------
+# 🚀 CORE PROMPT BUILDERS
+# ------------------------------------------------------------------------------
 function set_demogorgon_prompt() {
     local exit_code=$?
     
-    # First line: User info and path
+    # structural breakout newline
     PS1="\n"
     
-    # Demogorgon symbol with red background
-    PS1+="${BG_BRIGHT_RED}${BRIGHT_WHITE} ${DEMOGORGON} ${RESET}"
-    PS1+="${DEMO_RED}${SEPARATOR_RIGHT}${RESET}"
+    # Primary identity anchor
+    PS1+="${DEMO_RED}${DEMOGORGON} ${RESET}"
     
-    # User info (only show if not default or SSH)
+    # Conditional environment tagging (SSH/Alternative profiles)
     if [ "$USER" != "nana" ] || [ -n "$SSH_CONNECTION" ]; then
-        PS1+="${BG_RED}${WHITE} \u@\h ${RESET}"
-        PS1+="${DEMO_RED}${SEPARATOR_RIGHT}${RESET}"
+        PS1+="${BOLD}${DEMO_RED}\u${RESET}${COLOR_MONO_DARK}@${RESET}${DEMO_RED}\h ${RESET}"
     fi
     
-    # Current directory
-    PS1+="${DEMO_PURPLE}${BG_BLUE}${WHITE} 📁 $(demogorgon_pwd) ${RESET}"
-    PS1+="${BLUE}${SEPARATOR_RIGHT}${RESET}"
+    # Workspace Tracking Frame
+    PS1+="${COLOR_MONO_DARK}${SEPARATOR_RIGHT}${RESET}"
+    PS1+=" ${DEMO_CYAN}$(demogorgon_pwd)${RESET}"
     
-    # Git info
+    # Code Repository Overlay
     local git_info=$(demogorgon_git_info)
     if [ -n "$git_info" ]; then
-        PS1+="${DEMO_GREEN}${BG_GREEN}${BLACK}$git_info ${RESET}"
-        PS1+="${GREEN}${SEPARATOR_RIGHT}${RESET}"
+        PS1+=" ${COLOR_MONO_DARK}${SEPARATOR_RIGHT}${RESET}"
+        PS1+="${DEMO_GREEN}${git_info}${RESET}"
     fi
     
-    # Python env info
+    # Execution Layer Overlay
     local env_info=$(demogorgon_env_info)
     if [ -n "$env_info" ]; then
-        PS1+="${UPSIDE_DOWN}${BG_YELLOW}${BLACK}$env_info ${RESET}"
-        PS1+="${YELLOW}${SEPARATOR_RIGHT}${RESET}"
+        PS1+=" ${COLOR_MONO_DARK}${SEPARATOR_RIGHT}${RESET}"
+        PS1+="${UPSIDE_DOWN}${env_info}${RESET}"
     fi
     
-    # End of first line
+    # Break to interactive terminal standard baseline input rows
     PS1+="\n"
     
-    # Second line: Prompt with demogorgon face
-    PS1+="${DEMO_RED}${PORTAL}${RESET} "
+    # Context Action Node (The Portal Entrypoint)
+    PS1+="${DEMO_PURPLE}${PORTAL}${RESET} "
     
-    # Show exit code if not 0
+    # Append fault telemetry notifications if required
     local exit_display=$(demogorgon_exit_code $exit_code)
     if [ -n "$exit_display" ]; then
-        PS1+="${BRIGHT_RED}${exit_display} ${RESET}"
+        PS1+="${DEMO_RED}${exit_display} ${RESET}"
     fi
     
-    # Show background jobs
+    # Append multi-thread layout tracking states
     local jobs_display=$(demogorgon_jobs)
     if [ -n "$jobs_display" ]; then
-        PS1+="${BRIGHT_YELLOW}${jobs_display} ${RESET}"
+        PS1+="${UPSIDE_DOWN}${jobs_display} ${RESET}"
     fi
     
-    # Final prompt character (changes based on user)
+    # Finalize indicator permissions profile assignment
     if [ $EUID -eq 0 ]; then
-        PS1+="${BRIGHT_RED}#${RESET} "
+        PS1+="${DEMO_RED}#${RESET} "
     else
-        PS1+="${DEMO_GREEN}❯${RESET} "
+        PS1+="${COLOR_TEXT}❯${RESET} "
     fi
 }
 
-# Alternative minimalist version
-function set_minimal_demogorgon_prompt() {
-    local exit_code=$?
-    
-    # Simple one-line prompt
-    PS1="${DEMO_RED}${DEMOGORGON}${RESET} "
-    PS1+="${DEMO_PURPLE}\w${RESET}"
-    
-    # Git info
-    local git_info=$(demogorgon_git_info)
-    if [ -n "$git_info" ]; then
-        PS1+="${DEMO_GREEN}$git_info${RESET}"
-    fi
-    
-    # Exit code if not 0
-    if [ $exit_code -ne 0 ]; then
-        PS1+=" ${BRIGHT_RED}[$exit_code]${RESET}"
-    fi
-    
-    # Prompt character
-    PS1+="\n"
-    if [ $EUID -eq 0 ]; then
-        PS1+="${BRIGHT_RED}#${RESET} "
-    else
-        PS1+="${DEMO_GREEN}❯${RESET} "
-    fi
-}
-
-# ASCII art version (no emoji support)
-function set_ascii_demogorgon_prompt() {
-    local exit_code=$?
-    
-    PS1="\n"
-    PS1+="${BG_BRIGHT_RED}${BRIGHT_WHITE} D ${RESET}"
-    PS1+="${DEMO_RED}${RESET}"
-    PS1+="${DEMO_PURPLE}${BG_BLUE}${WHITE} \w ${RESET}"
-    PS1+="${BLUE}${RESET}"
-    
-    local git_info=$(demogorgon_git_info 2>/dev/null)
-    if [ -n "$git_info" ]; then
-        PS1+="${DEMO_GREEN}${BG_GREEN}${BLACK}$git_info ${RESET}"
-        PS1+="${GREEN}${RESET}"
-    fi
-    
-    PS1+="\n"
-    
-    if [ $exit_code -ne 0 ]; then
-        PS1+="${BRIGHT_RED}[$exit_code]${RESET} "
-    fi
-    
-    if [ $EUID -eq 0 ]; then
-        PS1+="${BRIGHT_RED}#${RESET} "
-    else
-        PS1+="${DEMO_GREEN}>${RESET} "
-    fi
-}
-
-# Interactive version with different styles
+# Interactive configuration toggle layout modes
 function demogorgon_prompt_menu() {
     echo "Select Demogorgon Prompt Style:"
-    echo "1. Full Demogorgon (with emoji)"
-    echo "2. Minimal Demogorgon"
-    echo "3. ASCII Demogorgon (no emoji)"
-    echo "4. Disable Demogorgon prompt"
-    read -p "Choice [1-4]: " choice
+    echo "1. Full Aesthetic Demogorgon (Pastel / Transparent Blocks)"
+    echo "2. Disable Demogorgon prompt completely"
+    read -p "Choice [1-2]: " choice
     
     case $choice in
         1)
             PROMPT_COMMAND=set_demogorgon_prompt
-            echo "Full Demogorgon prompt enabled!"
+            echo "Aesthetic Demogorgon prompt tracking engine loaded!"
             ;;
         2)
-            PROMPT_COMMAND=set_minimal_demogorgon_prompt
-            echo "Minimal Demogorgon prompt enabled!"
-            ;;
-        3)
-            PROMPT_COMMAND=set_ascii_demogorgon_prompt
-            echo "ASCII Demogorgon prompt enabled!"
-            ;;
-        4)
             unset PROMPT_COMMAND
             PS1='\u@\h:\w\$ '
-            echo "Demogorgon prompt disabled!"
+            echo "Demogorgon prompt hooks disconnected."
             ;;
         *)
-            echo "Invalid choice!"
+            echo "Aborted: System choice unknown."
             ;;
     esac
 }
 
-# Set the default prompt
+# Attach execution variables directly to active bash hooks
 PROMPT_COMMAND=set_demogorgon_prompt
 
+# ------------------------------------------------------------------------------
+# 🌐 HARDWARE ENVIRONMENT INTEGRATION HOOKS
+# ------------------------------------------------------------------------------
 
-# Add some demogorgon-themed aliases
-alias demo-status='echo "The Demogorgon is watching..."'
-alias upside-down='echo "Welcome to the Upside Down"'
-alias vecna-cursed='echo "You have been cursed by Vecna!"'
-alias eleven='echo "ᕦ( ͡° ͜ʖ ͡°)ᕤ"'
+# Global Bin Path Structuring
+export PATH="/home/nana/.local/bin:$PATH"
 
-# Welcome message
-#echo -e "${DEMO_RED}"
-#echo "   ___  ___  __  __  ___  ____   ___  ____  "
-#echo "  / _ \/ _ \/ / / / / _ \/ __ \ / _ \/ __ \ "
-#echo " / // / , _/ /_/ / / // / /_/ / // / /_/ / "
-#echo "/____/_/|_|\____/ /____/\____/____/\____/  "
-#echo -e "${RESET}"
-#echo "Demogorgon prompt activated! Type 'demogorgon_prompt_menu' to change styles."
+# TTY Binding for VS Code & Keyring GPG Handshakes
+export GPG_TTY=$(tty)
 
-
-  if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
+# Auto-Launch Hyprland on Local Hardware Login Shell (TTY1)
+if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
     dbus-run-session start-hyprland
 fi
-export GPG_TTY=$(tty)
-export PATH="/home/nana/.local/bin:$PATH"
