@@ -14,8 +14,9 @@ I am a Cyber Security Analyst by day and a builder of systems by night. I specia
 
 ### 🛠️ Featured Projects
 
-**Homelab** [ s ] — Self-hosted infrastructure managed with Proxmox and Docker[cite: 1].
-**Dots** [ s ] — Highly usable, performant Wayland shell built on Quickshell[cite: 1].
+**Home-Lab** [ s ] — Self-hosted infrastructure managed with Proxmox and Docker.
+
+**Dots** [ s ] — Highly usable, performant Wayland shell built on Quickshell.
 
 ### 💻 Code & Tools
 **100-Days-Python** [ s ] — A Great way to Learn Python.
