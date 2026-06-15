@@ -24,7 +24,7 @@
     "light": "Gruvbox Dark",
     "dark": "One Dark"
   },
-  "icon_theme": "Catppuccin Mocha",
+  "icon_theme": "Warm Charmed Icons",
   "base_keymap": "SublimeText",
 
   // "vim_mode": true,
