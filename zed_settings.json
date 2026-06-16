@@ -1,9 +1,17 @@
-// Zed settings
-
 {
+  "language_models": {
+    "ollama": {
+      "api_url": "http://localhost:11434",
+      "context_window": 8192
+    }
+  },
+  "colorize_brackets": true,
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
   "context_servers": {
     "mcp-server-context7": {
-      "source": "extension",
       "enabled": true,
       "settings": {
         "default_minimum_tokens": "10000"
@@ -11,33 +19,33 @@
     }
   },
   "agent": {
-    "always_allow_tool_actions": true,
-    "play_sound_when_agent_done": true,
+    "tool_permissions": {
+      "default": "allow"
+    },
+    "play_sound_when_agent_done": "always",
     "default_profile": "write",
     "default_model": {
-      "provider": "google",
-      "model": "gemini-flash-latest"
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b"
     }
   },
   "theme": {
-    "mode": "system",
+    "mode": "dark",
     "light": "Gruvbox Dark",
-    "dark": "One Dark"
+    "dark": "Srcery"
   },
   "icon_theme": "Warm Charmed Icons",
   "base_keymap": "SublimeText",
-
-  // "vim_mode": true,
   "ui_font_size": 16,
   "buffer_font_size": 16.0,
-  "buffer_line_height": { "custom": 1.4 },
+  "buffer_line_height": {
+    "custom": 1.4
+  },
   "buffer_font_family": "Iosevka Nerd Font Mono",
-
   "buffer_font_features": {
     "calt": false
   },
   "buffer_font_weight": 300,
-
   "toolbar": {
     "breadcrumbs": false,
     "quick_actions": false,
