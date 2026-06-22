@@ -5,67 +5,10 @@
 
 local main_mod = "SUPER"
 local vars = require("variables").vars
-local menu        = "qs -c ~/.config/quickshell/ ipc call launcher toggle"
-local settings = "qs -c ~/.config/quickshell/ ipc call settings open_direct"
-local monitor = "qs -c ~/.config/quickshell/ ipc call systemmonitor open_direct"
-
 
 -- General
 hl.bind(main_mod .. " + SHIFT + R", hl.dsp.exec_cmd("hyprctl reload"))
 hl.bind(main_mod .. " + C", hl.dsp.window.close())
-hl.bind(main_mod .. " + D", hl.dsp.exec_cmd(menu))
-hl.bind("SUPER + F", hl.dsp.global("quickshell:spotlightFiles"))
-hl.bind(main_mod .. " + T", hl.dsp.exec_cmd(settings))
-hl.bind(main_mod .. " + M", hl.dsp.exec_cmd(monitor))
-
-
-
--- Local modifier assignment
-
--- Local modifier assignment
-
--- Local modifier assignment
-
-
--- =======================================================================
--- QUICKSHELL DISPATCH INTERFACE BINDINGS (FIXED KEY FORMATTING)
--- =======================================================================
--- =======================================================================
--- Quickshell Native Global Protocol Bindings
--- =======================================================================
-hl.bind(main_mod .. " + Tab",       hl.dsp.global("quickshell:toggleLauncher"))
-hl.bind(main_mod .. " + Home",      hl.dsp.global("quickshell:toggleNotifications"))
-hl.bind(main_mod .. " + BackSpace", hl.dsp.global("quickshell:discardLastNotification"))
-hl.bind("SHIFT + code:66",          hl.dsp.global("quickshell:shiftlock"))
-
--- New Custom Integrated Quick-Actions
-hl.bind(main_mod .. " + SHIFT + E", hl.dsp.global("quickshell:powermenu"))
-hl.bind(main_mod .. " + F1",        hl.dsp.global("quickshell:keybinds"))
-hl.bind(main_mod .. " + M",         hl.dsp.global("quickshell:sysmon"))
-hl.bind(main_mod .. " + A",         hl.dsp.global("quickshell:quickactions"))
-hl.bind(main_mod .. " + S",         hl.dsp.global("quickshell:audiopower"))
-hl.bind(main_mod .. " + D",         hl.dsp.global("quickshell:calendar"))
-hl.bind(main_mod .. " + N",         hl.dsp.global("quickshell:notifications"))
-hl.bind(main_mod .. " + V",         hl.dsp.global("quickshell:clipboard"))
-hl.bind("ALT + space",              hl.dsp.global("quickshell:spotlight"))
-
--- Note: Window Overview Cycles (Using pure SUPER / Mod4)
-hl.bind("SUPER + Tab",              hl.dsp.global("quickshell:overview-cycle"))
-hl.bind("SUPER + SHIFT + Tab",      hl.dsp.global("quickshell:overview-cycle-prev"))
-
--- Single Key Mod Tap Release Trigger
-hl.bind("SUPER + Super_L",          hl.dsp.global("quickshell:supertap"), { release = true })
-
-
-
-
-
-
-
-
-
-
-
 
 -- Groups
 hl.bind(main_mod .. " + G", hl.dsp.group.toggle())
@@ -84,7 +27,7 @@ hl.bind(main_mod .. " + F15", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-disp
 hl.bind(main_mod .. " + F16", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-display.sh all"))
 
 -- Fullscreen states
--- hl.bind(main_mod .. " + F", hl.dsp.window.fullscreen({ mode = 0 }))
+hl.bind(main_mod .. " + F", hl.dsp.window.fullscreen({ mode = 0 }))
 hl.bind(main_mod .. " + Return", hl.dsp.window.fullscreen({ mode = 1 })) -- maximize
 
 -- Layout
@@ -93,8 +36,7 @@ hl.bind(main_mod .. " + equal", hl.dsp.layout("togglesplit"))
 hl.bind(main_mod .. " + SHIFT + space", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(main_mod .. " + space", hl.dsp.layout("cyclenext"))
 
-
-
+-- Media keys
 -- Laptop multimedia keys for volume and LCD brightness
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
     { locked = true, repeating = true })
@@ -107,11 +49,6 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURC
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), { locked = true, repeating = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), { locked = true, repeating = true })
 
-
--- Media keys
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { repeating = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { repeating = true })
-hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
 
 -- Requires playerctl
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
@@ -169,7 +106,11 @@ hl.bind(main_mod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(main_mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Screenshot
-hl.bind(main_mod .. " + Print", hl.dsp.exec_cmd(vars.scripts_home .. "/screenshot.sh"))
+
+hl.bind("ALT + H", hl.dsp.exec_cmd("quickshell -p ~/.config/quickshell/Lock.qml"))
+hl.bind(main_mod .. " + A", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh"))
+
+
 
 -- -------------------------
 -- Media menu (kando) toggle

@@ -11,8 +11,8 @@ hl.config({
 
   -- https://wiki.hypr.land/Configuring/Basics/Variables/#general
   general = {
-    gaps_in = 2,
-    gaps_out = 2,
+    gaps_in = 3,
+    gaps_out = 6,
     border_size = vars.bordersize,
 
     snap = {
@@ -31,21 +31,8 @@ hl.config({
 
     allow_tearing = false,
 
-    layout = "scrolling",
-  
- },
-    
-     -- Add the scrolling layout options here
-    scrolling = {
-        fullscreen_on_one_column = true,
-        column_width = 0.90,
-        follow_focus = true,
-        focus_fit_method = 1,
-        explicit_column_widths = "0.75, 0.75, 0.75, 0.75",
-
-
-
- },
+    layout = "dwindle",
+  },
 
   cursor = {
     inactive_timeout = 30
@@ -142,8 +129,8 @@ hl.config({
   -- https://wiki.hypr.land/Configuring/Basics/Variables/#input
   input = {
     kb_layout = "us",
+    numlock_by_default = true,
     sensitivity = 0,
-    -- kb_model = "pc104",
 
     -- Dont steal focus
     follow_mouse = 2,

@@ -24,7 +24,7 @@ hl.monitor({
 })
 
 -- Pull in current monitor layout
-
+--require("monitors/current")
 
 -- Config
 require("config")
@@ -41,23 +41,19 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("quickshell")
   hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
   hl.exec_cmd("/usr/libexec/polkit-gnome-authentication-agent-1 &")
+  hl.exec_cmd("gammastep -l 41.525032:-88.081726 &")
+  hl.exec_cmd("~/.config/hypr/xdg-portal-hyprland")
+  hl.exec_cmd("swaybg -i /home/nana/Pictures/wallpaper/RenderBall.png &")
+  hl.exec_cmd("hyprctl setcursor Bibata-Original-Classic 24")
+  hl.exec_cmd("gentoo-pipewire-launcher restart &")
   hl.exec_cmd("[workspace 3 silent] " .. vars.browser)
   hl.exec_cmd("[workspace 2 silent] steam -silent")
   hl.exec_cmd("[workspace 21 silent] flatpak run com.discordapp.Discord --start-minimized")
   hl.exec_cmd("flatpak run menu.kando.Kando")
   hl.exec_cmd("[workspace 1] " .. vars.terminal)
   hl.exec_cmd("hypridle")
---   hl.exec_cmd("swaybg -i /home/nana/Pictures/wallpaper/RenderBall.png &")
-  hl.exec_cmd("gammastep -l 41.525032:-88.081726 &")
-  hl.exec_cmd("~/.config/hypr/xdg-portal-hyprland")
-  hl.exec_cmd("systemctl --user start hyprpolkitagent")
-  hl.exec_cmd("hyprctl setcursor Bibata-Original-Classic 24")
-  hl.exec_cmd("gentoo-pipewire-launcher restart &")
   -- hl.exec_cmd("hyprpm reload -n")
   -- hl.exec_cmd("blueman-manager")
 end)
 
 -- vim: set ts=2 sw=2 tw=0 fdm=marker ft=lua et :
-
--- Brain_ShellKeybinds
-dofile("/home/nana/Brain_Shell/Brain_ShellKeybinds.lua")

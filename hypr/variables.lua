@@ -36,7 +36,7 @@ local srcery = {
 local variables = {
   srcery = srcery,
   vars = {
-    terminal = "ghostty",
+    terminal = "kitty",
     browser = "firefox",
     bordersize = 1,
     active_border = { colors = {srcery.magenta, srcery.blue}, angle = 45 },
