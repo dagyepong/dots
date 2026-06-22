@@ -19,7 +19,7 @@ Scope {
     Process {
         id: listProc
         command: ["sh", "-c",
-            "find $HOME/Pictures/wallpaper -type f \\( " +
+            "find $HOME/Pictures/wallpapers -type f \\( " +
             "-iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' " +
             "-o -iname '*.webp' \\) | sort"]
         running: false

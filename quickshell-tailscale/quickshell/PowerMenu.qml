@@ -12,10 +12,10 @@ Scope {
     property int selectedIndex: 0
 
     readonly property var entries: [
-        { glyph: "󰒲", label: "Suspend",  accent: Theme.accent.purple, cmd: ["loginctl", "suspend"] },
+        { glyph: "󰒲", label: "Suspend",  accent: Theme.accent.purple, cmd: ["systemctl", "suspend"] },
         { glyph: "󰗽", label: "Logout",   accent: Theme.accent.yellow, cmd: ["hyprctl", "dispatch", "exit"] },
-        { glyph: "󰜉", label: "Reboot",   accent: Theme.accent.orange, cmd: ["loginctl", "reboot"] },
-        { glyph: "󰐥", label: "Shutdown", accent: Theme.accent.red,    cmd: ["loginctl", "poweroff"] },
+        { glyph: "󰜉", label: "Reboot",   accent: Theme.accent.orange, cmd: ["systemctl", "reboot"] },
+        { glyph: "󰐥", label: "Shutdown", accent: Theme.accent.red,    cmd: ["systemctl", "poweroff"] },
     ]
 
     function toggle()  { open = !open; if (open) selectedIndex = 0; }
@@ -84,8 +84,10 @@ Scope {
                                 : Theme.bgHover
         border.color: tile.highlighted ? tile.entry.accent : Theme.borderSubtle
         border.width: 1
+        scale: tileMa.pressed ? 0.94 : (tile.highlighted ? 1.05 : 1.0)
         Behavior on color { ColorAnimation { duration: Theme.duration.fast } }
         Behavior on border.color { ColorAnimation { duration: Theme.duration.fast } }
+        Behavior on scale { NumberAnimation { duration: Theme.duration.normal; easing.type: Theme.easing.standard } }
 
         ColumnLayout {
             anchors.centerIn: parent
@@ -108,6 +110,7 @@ Scope {
         }
 
         MouseArea {
+            id: tileMa
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor

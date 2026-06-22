@@ -20,6 +20,23 @@ hl.bind(main_mod .. " + Home", hl.dsp.global("quickshell:toggleNotifications"))
 hl.bind(main_mod .. " + BackSpace", hl.dsp.global("quickshell:discardLastNotification"))
 hl.bind("SHIFT + code:66", hl.dsp.global("quickshell:shiftlock"))
 
+-- Spotlight / Clipboard / Notes
+hl.bind(main_mod .. " + R", hl.dsp.global("quickshell:spotlight"))
+hl.bind("ALT + space", hl.dsp.global("quickshell:spotlight"))
+hl.bind(main_mod .. " + N", hl.dsp.global("quickshell:notifications"))
+hl.bind(main_mod .. " + V", hl.dsp.global("quickshell:clipboard"))
+
+-- System / Media / Tools
+hl.bind(main_mod .. " + SHIFT + E", hl.dsp.global("quickshell:powermenu"))
+hl.bind(main_mod .. " + F1", hl.dsp.global("quickshell:keybinds"))
+hl.bind(main_mod .. " + M", hl.dsp.global("quickshell:sysmon"))
+hl.bind(main_mod .. " + A", hl.dsp.global("quickshell:quickactions"))
+hl.bind(main_mod .. " + S", hl.dsp.global("quickshell:audiopower"))
+hl.bind(main_mod .. " + D", hl.dsp.global("quickshell:calendar"))
+hl.bind(main_mod .. " + W", hl.dsp.global("quickshell:wallpaper"))
+
+
+
 -- Switch display
 hl.bind(main_mod .. " + F13", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-display.sh desk"))
 hl.bind(main_mod .. " + F14", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-display.sh tv"))
