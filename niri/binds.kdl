@@ -25,7 +25,7 @@ binds {
     Mod+Alt+V hotkey-overlay-title="Show clipboard manager: quickshell" { spawn-sh "qs ipc --newest call shell toggleClipboard"; }
     Mod+E hotkey-overlay-title="Show Calendar: quickshell" { spawn-sh "qs ipc --newest call shell toggleCalendar"; }
     Mod+Alt+W hotkey-overlay-title="Show wallpaper selector: quickshell" { spawn-sh "qs ipc --newest call shell toggleWallpaper"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "quickshell -c $HOME/.config/quickshell/lockscreen/"; }
+    Mod+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "quickshell -p $HOME/.config/hypr/scripts/quickshell/Lock.qml"; }
     Mod+P hotkey-overlay-title="Show power Menu" { spawn-sh "qs ipc --newest call shell togglePowermenu"; }
     Mod+Alt+M hotkey-overlay-title="Show System Monitor" { spawn-sh "qs ipc --newest call shell toggleSysmon"; }
 
@@ -33,8 +33,8 @@ binds {
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
-
-    Mod+Shift+S { screenshot; }
+    Mod+Shift+S hotkey-overlay-title="Take a Screenshot" {spawn-sh "~/.config/hypr/scripts/screenshot.sh"; }
+    //Mod+Shift+S { screenshot; }
 
     // ── Focus: columns & windows (Mod) ──────────────────────────────────────
     Mod+Left  { focus-column-left; }
