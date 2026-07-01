@@ -2,8 +2,8 @@
 {
  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {
-      "type": "kitty",
-      "source": "/home/ron/.config/fastfetch/void.png",
+      "type": "file",
+      "source": "/home/nana/.config/fastfetch/lantern.txt",
       "width": 24
     },
 
