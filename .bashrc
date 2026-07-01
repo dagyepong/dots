@@ -30,6 +30,7 @@ if [ "$TERM" = "linux" ]; then
   clear
 fi
 
+
 # ------------------------------------------------------------------------------
 # 🛠️ SYSTEM ALIASES & TOOLS
 # ------------------------------------------------------------------------------
@@ -234,6 +235,15 @@ PROMPT_COMMAND=set_demogorgon_prompt
 export PATH="/home/nana/.local/bin:$PATH"
 export GPG_TTY=$(tty)
 
-if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
-    dbus-run-session start-hyprland
-fi
+
+
+eval "$(starship init bash)"
+
+
+# Custom greeting function
+greet() {
+    bash ~/.config/torii-greeting.sh
+}
+
+# Run it automatically on login
+greet

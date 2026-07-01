@@ -53,6 +53,5 @@ fi
 
 #exec dbus-run-session -- herbstluftwm ##for gentoo dbus issue
 
+dbus-run-session niri --session
 
-
-dbus-run-session start-hyprland
