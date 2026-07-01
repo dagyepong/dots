@@ -6,8 +6,11 @@
 
 // wallpaper restore script
 spawn-sh-at-startup "~/.config/niri/scripts/wallpaper-restore.sh"
-spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/wallhaven-j3k89w.png"
+spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/Solitary-Glow.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
+// Assuming the GUI binary path is known
+spawn-at-startup "xwayland-satellite"
+spawn-at-startup "/usr/local/bin/pia-start.sh"
 // quickshell bar:
 spawn-sh-at-startup "quickshell"
 

@@ -130,3 +130,10 @@ window-rule {
     default-floating-position x=10 y=10 relative-to="bottom-right"
     open-focused false
 }
+
+//
+
+window-rule {
+    match app-id="pia-client"
+    open-floating true
+}
