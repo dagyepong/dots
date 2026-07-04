@@ -25,7 +25,7 @@ hl.env("QT_AUTO_SCREEN_SCALE_FACTOR", "2")
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 hl.env("QT_QPA_PLATFORMTHEME", "kde")
 hl.env("XDG_MENU_PREFIX", "plasma-")
-hl.env("QSG_RHI_BACKEND", "vulkan")
+
 
 -- XDG Specifications
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
