@@ -79,6 +79,10 @@ sudo rc-service pia-daemon status
 ### **Niri wayland Integration**
 
 ```bash
+sudo emerge -av xwayland-satellite
+```
+
+```bash
 
 sudo nano /usr/local/bin/pia-start.sh
 ```
