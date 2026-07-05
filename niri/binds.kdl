@@ -20,15 +20,12 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 
     // ── Launching programs ──────────────────────────────────────────────────
-    Mod+Return hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
-    Mod+Space hotkey-overlay-title="Open launcher: quickshell" { spawn-sh "qs ipc --newest call shell toggleSpotlight"; }
-    Mod+Alt+V hotkey-overlay-title="Show clipboard manager: quickshell" { spawn-sh "qs ipc --newest call shell toggleClipboard"; }
-    Mod+E hotkey-overlay-title="Show Calendar: quickshell" { spawn-sh "qs ipc --newest call shell toggleCalendar"; }
-    Mod+Alt+W hotkey-overlay-title="Show wallpaper selector: quickshell" { spawn-sh "qs ipc --newest call shell toggleWallpaper"; }
-    Mod+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "quickshell -p $HOME/.config/hypr/scripts/quickshell/Lock.qml"; }
-    Mod+P hotkey-overlay-title="Show power Menu" { spawn-sh "qs ipc --newest call shell togglePowermenu"; }
-    Mod+Alt+M hotkey-overlay-title="Show System Monitor" { spawn-sh "qs ipc --newest call shell toggleSysmon"; }
-
+    // ── Launching programs with Quickshell IPC ──────────────────────────────
+    // ── Fixed IPC commands for Niri ──────────────────────────────
+	Mod+Space { spawn-sh "rofi -show drun"; }
+    Mod+Return { spawn "kitty"; }
+	// For the Lock script, ensure the path is absolute and reachable
+	Mod+Alt+L { spawn-sh "quickshell -p $HOME/.config/niri/scripts/quickshell/Lock.qml"; }
     // ── Screenshots ─────────────────────────────────────────────────────────
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
