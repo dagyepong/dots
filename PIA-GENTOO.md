@@ -76,3 +76,40 @@ sudo rc-service pia-daemon status
 
 
 
+### **Niri wayland Integration**
+
+```bash
+
+sudo nano /usr/local/bin/pia-start.sh
+```
+### **Paste this code:**
+
+```bash
+
+# /usr/local/bin/pia-start.sh
+#!/bin/sh
+# Give xwayland-satellite a moment to initialize the socket
+sleep 3
+export DISPLAY=:0
+exec /opt/piavpn/bin/pia-client
+
+```
+
+```bash
+sudo chmod +x /usr/local/bin/pia-start.sh
+
+```
+
+### **Update your Niri Autostart:**
+
+```bash
+nano ~/.config/niri/autostart.kdl
+```
+
+```bash
+// autostart.kdl
+spawn-at-startup "xwayland-satellite"
+spawn-at-startup "/usr/local/bin/pia-start.sh"
+```
+
+I already have the windows rules setup in niri for PIA Client
