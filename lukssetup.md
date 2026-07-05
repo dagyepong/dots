@@ -11,34 +11,36 @@ This guide outlines the complete process for installing Gentoo Linux utilizing n
 Initialize your storage drive partitioning scheme:
 ```bash
 cfdisk /dev/nvme0n1
-
+```
+```bash
 Create a layout matching the following partition map:
 
     /dev/nvme0n1p1: 1G size, type EFI System
 
     /dev/nvme0n1p2: Remaining space, type Linux filesystem
-
+```
 Encrypt the root partition
 
 Format your primary system block layer using LUKS2 encryption parameters:
-Bash
+```bash
 
 cryptsetup luksFormat --type luks2 --cipher aes-xts-plain64 --key-size 512 --pbkdf argon2id --pbkdf-memory 1048576 --iter-time 4000 --label "GentooLuks" /dev/nvme0n1p2
 
 cryptsetup open /dev/nvme0n1p2 root
+```
 
 Create filesystems
 
 Initialize filesystems on the newly created partitions:
-Bash
+```bash
 
 mkfs.vfat -n GentooBoot -F 32 /dev/nvme0n1p1
 mkfs.btrfs -L GentooRoot /dev/mapper/root
-
+```
 2. Btrfs Subvolumes & Mounts
 
 Mount the root file layer and create targeted Btrfs subvolumes to safely separate system states:
-Bash
+```bash
 
 mkdir -p /mnt/gentoo
 mount LABEL=GentooRoot /mnt/gentoo/
@@ -88,9 +90,10 @@ mount -o subvol=@boot LABEL=GentooRoot /mnt/gentoo/boot
 
 # Mount the EFI System Partition
 mount LABEL=GentooBoot /mnt/gentoo/efi
+```
 
 3. Stage3 Unpacking & Portage Configuration
-Bash
+```bash
 
 cd /mnt/gentoo
 # Download your preferred OpenRC stage3 archive (Hardened recommended)
@@ -98,10 +101,12 @@ wget [https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd6
 
 # Extract stage image with extended attributes intact
 tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner -C /mnt/gentoo
+```
 
-Configure make.conf
+## Configure make.conf
 
 Modify compilation profiles, features, and binary execution structures:
+```bash
 nano /mnt/gentoo/etc/portage/make.conf
 Plaintext
 
@@ -116,9 +121,9 @@ ACCEPT_LICENSE="*"
 USE="dist-kernel"
 
 FEATURES="${FEATURES} getbinpkg binpkg-request-signature"
-
-Copy live environment DNS resolution attributes prior to initializing the chroot:
-Bash
+```
+## Copy live environment DNS resolution attributes prior to initializing the chroot:
+```bash
 
 cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
 
@@ -138,9 +143,10 @@ mount --make-slave /mnt/gentoo/run
 chroot /mnt/gentoo /bin/bash
 source /etc/profile
 export PS1="(chroot) ${PS1}"
+```
 
-5. System Configuration & Package Initialization
-Bash
+## 5. System Configuration & Package Initialization
+```bash
 
 # Sync repositories and set up binary package verification keys
 emerge-webrsync
@@ -156,34 +162,38 @@ echo "*/* $(cpuid2cpuflags)" > /etc/portage/package.use/00cpu-flags
 # Update world set to match profile changes
 emerge -avuDUg @world
 emerge --ask --depclean
+```
 
-# Install essential system utilities
+## Install essential system utilities
+```bash
 emerge --ask app-editors/nano net-misc/networkmanager sys-fs/btrfs-progs sys-fs/cryptsetup sys-kernel/linux-firmware sys-firmware/sof-firmware
+```
 
-Set up Localizations & Timezone
+## Set up Localizations & Timezone
 
 Define system generation locales:
+```bash
 nano /etc/locale.gen
 Plaintext
 
 en_US.UTF-8 UTF-8
 
-Bash
+
 
 locale-gen
 eselect locale set en_US.utf8
 
 # Set timezone (Adjust America/New_York to your regional path)
 ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
-
-6. Kernel & Bootloader Setup
+```
+ ## 6. Kernel & Bootloader Setup
 Set up Package Flags
 
     [!IMPORTANT]
 
     We explicitly avoid enabling the uki flag on installkernel. This prevents conflicting execution pathways, ensuring that standard EFISTUB file patterns are compiled directly for native parsing by uefi-mkconfig.
 
-Bash
+```bash
 
 mkdir -p /etc/portage/package.use
 echo "sys-kernel/installkernel dracut efistub -uki -systemd" > /etc/portage/package.use/installkernel
@@ -193,9 +203,10 @@ echo "sys-apps/systemd-utils boot kernel-install" >> /etc/portage/package.use/sy
 mkdir -p /etc/portage/package.accept_keywords
 echo "sys-kernel/installkernel" >> /etc/portage/package.accept_keywords/installkernel
 echo "sys-boot/uefi-mkconfig" >> /etc/portage/package.accept_keywords/installkernel
+```
 
-Build or recompile boot hooks using the designated flags:
-Bash
+## Build or recompile boot hooks using the designated flags:
+```bash
 
 emerge --oneshot sys-apps/systemd-utils sys-kernel/installkernel sys-boot/uefi-mkconfig
 
@@ -210,14 +221,15 @@ hostonly="no"
 add_dracutmodules+=" crypt btrfs dm "
 add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
 force_drivers+=" dm_crypt btrfs "
+```
 
-Install the Distribution Kernel
-Bash
+## Install the Distribution Kernel
+```bash
 
 emerge --ask sys-kernel/gentoo-kernel-bin
 
 Prepare EFI target structural paths
-Bash
+
 
 mkdir -p /efi/EFI/Linux
 mkdir -p /efi/EFI/Gentoo
@@ -228,19 +240,24 @@ Obtain block information via blkid. Map the raw crypto_LUKS UUID container parti
 
 nano /etc/default/uefi-mkconfig
 Plaintext
+```
 
-# Map your structural storage device specifications explicitly
+## Map your structural storage device specifications explicitly
+```bash
 KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@"
+```
 
-Compile NVRAM motherboard execution items:
-Bash
+## Compile NVRAM motherboard execution items:
+```bash
 
 uefi-mkconfig -f
+```
 
-7. Base System Configurations
+## 7. Base System Configurations
 Configure filesystem mounts
 
 Define persistent storage mounts within your environment configuration table:
+```bash
 nano /etc/fstab
 Plaintext
 
@@ -261,14 +278,15 @@ LABEL=GentooRoot /var/cache/binpkgs btrfs rw,noatime,ssd,discard=async,space_cac
 LABEL=GentooRoot /var/cache/distfiles btrfs rw,noatime,ssd,discard=async,space_cache=v2,compress-force=zstd:1,subvol=/@distfiles 0 0
 LABEL=GentooRoot /boot btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=/@boot 0 0
 LABEL=GentooBoot /efi vfat rw,nosuid,nodev,noexec,fmask=0077,dmask=0077,utf8,discard 0 2
+```
 
-Install Essential Administration Tools
-Bash
+## Install Essential Administration Tools
+```bash
 
 emerge --ask app-admin/sudo app-shells/bash-completion
 
 Setup Core Environments
-Bash
+
 
 # Set Root Password
 passwd root
@@ -285,14 +303,15 @@ echo "gentoo" > /etc/hostname
 
 # Enable System Networking Services on startup
 rc-update add NetworkManager default
+```
 
-8. Secure Boot Signing & Automated Hook Installation
-Bash
+## 8. Secure Boot Signing & Automated Hook Installation
+```bash
 
 emerge --ask app-crypt/efitools app-crypt/sbsigntools dev-libs/openssl app-crypt/clevis
 
 Generate Signature Infrastructure Keys
-Bash
+
 
 mkdir -p /etc/efikeys && cd /etc/efikeys
 uuidgen --random > guid.txt
@@ -311,10 +330,10 @@ efi-readvar -v KEK -o old_KEK.esl
 efi-readvar -v db -o old_db.esl
 cat old_KEK.esl kek.esl > combined_KEK.esl
 cat old_db.esl db.esl > combined_db.esl
-
-(Enroll your final signature packages—combined_KEK.esl, combined_db.esl, and pk.auth—manually inside your motherboard's native UEFI BIOS interface configuration menus).
+```
+### (Enroll your final signature packages—combined_KEK.esl, combined_db.esl, and pk.auth—manually inside your motherboard's native UEFI BIOS interface configuration menus).
 Encrypt Key Records with TPM2 via Clevis
-Bash
+```bash
 
 clevis encrypt tpm2 '{"pcr_bank":"sha256","pcr_ids":"0"}' < /etc/efikeys/db.key > /etc/efikeys/db.key.jwe
 
@@ -354,14 +373,15 @@ emerge -1 gentoo-kernel-bin
 Enable Automatic LUKS Decryption via TPM2
 
 Bind your LUKS partition key slot to your motherboard's secure cryptographic module architecture:
-Bash
+
 
 clevis luks bind -d /dev/nvme0n1p2 tpm2 '{"pcr_bank":"sha256","pcr_ids":"0,7,9"}'
 
 Regenerate kernel image files and update the NVRAM mapping strings one final time:
-Bash
+
 
 installkernel -a /lib/modules
 uefi-mkconfig -f
 
 Your system is now successfully built. Exit the active shell context, cleanly unmount your temporary system nodes, and restart your computer to enter your production-hardened environment.
+```
