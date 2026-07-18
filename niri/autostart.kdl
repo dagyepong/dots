@@ -8,11 +8,13 @@
 spawn-sh-at-startup "~/.config/niri/scripts/wallpaper-restore.sh"
 spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/wallhaven-j3k89w.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
+spawn-at-startup "sh" "-c" "skwd bar toggle"
+
 // Assuming the GUI binary path is known
 spawn-at-startup "xwayland-satellite"
 spawn-at-startup "/usr/local/bin/pia-start.sh"
 // quickshell bar:
-spawn-sh-at-startup "quickshell"
+spawn-sh-at-startup "quickshell -p ~/.config/skwd/skwd-bar/shell.qml"
 
 // Polkit authentication agent (adjust path to whatever your distro ships).
 // spawn-at-startup "/usr/lib/polkit-kde-authentication-agent-1"

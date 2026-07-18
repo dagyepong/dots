@@ -1,0 +1,5 @@
+AppLauncher 1.0 AppLauncher.qml
+AppLauncherService 1.0 AppLauncherService.qml
+LauncherShell 1.0 LauncherShell.qml
+SliceDelegate 1.0 SliceDelegate.qml
+HexDelegate 1.0 HexDelegate.qml
