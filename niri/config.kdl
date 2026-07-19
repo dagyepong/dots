@@ -13,3 +13,6 @@ include "window-rules.kdl"
 include "layer-rules.kdl"
 include "binds.kdl"
 include "autostart.kdl"
+
+// Tide Island shortcut bindings
+include "/home/nana/.config/tide-island/niri-shortcuts.kdl"
