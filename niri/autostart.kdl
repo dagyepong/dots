@@ -18,7 +18,7 @@ spawn-at-startup "/usr/local/bin/pia-start.sh"
 
 // Polkit authentication agent (adjust path to whatever your distro ships).
 // spawn-at-startup "/usr/lib/polkit-kde-authentication-agent-1"
-spawn-sh-at-startup "usr/libexec/polkit-gnome-authentication-agent-1"
+spawn-sh-at-startup "/usr/libexec/polkit-gnome-authentication-agent-1"
 // clipboard history daemon
 spawn-sh-at-startup "wl-paste --watch cliphist store"
 
