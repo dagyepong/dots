@@ -386,7 +386,7 @@ config && init
 # ------------------------------------------------------------------------------
 export PATH="/home/nana/.local/bin:$PATH"
 export GPG_TTY=$(tty)
-
+alias tide-island-config-app='QML2_IMPORT_PATH=/usr/lib/qt6/qml /usr/bin/tide-island-config-app'
 # eval "$(starship init bash)" # Commented out to prevent conflict with custom prompt
 
 # Custom greeting function

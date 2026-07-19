@@ -1,3 +1,0 @@
-module Modules.shellmenu
-ShellMenuPopup 1.0 ShellMenuPopup.qml
-ShellMenuButton 1.0 ShellMenuButton.qml
