@@ -6,7 +6,7 @@
 
 // wallpaper restore script
 spawn-sh-at-startup "~/.config/niri/scripts/wallpaper-restore.sh"
-spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/wallhaven-j3k89w.png"
+spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/dopesmoker_gruvbox.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-at-startup "tide-island"
 spawn-at-startup "vicinae" "server"   

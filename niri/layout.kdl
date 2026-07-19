@@ -2,12 +2,8 @@ layout {
     gaps 3
     center-focused-column "on-overflow"
     always-center-single-column
-    // empty-workspace-above-first
-    default-column-display "tabbed"
     background-color "#151221"
 
-    // Column widths that Mod+R cycles through. Tuned for actual
-    // multitasking: a third, half, two-thirds, and full width.
     preset-column-widths {
         proportion 0.33333
         proportion 0.5
@@ -25,43 +21,32 @@ layout {
 
     focus-ring {
         off
-        // on
         width 3
-        active-color "#ff71ce"
+        active-color "#FF5A1F"      // neon orange
         inactive-color "#4e4e6a"
         urgent-color "#ff5555"
-		active-gradient from="#ff71ce" to="#05ffa1" angle=45
-        // active-gradient from="#80c8ff" to="#bbddff" angle=45
-        // inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
-        // urgent-gradient from="#800" to="#a33" angle=45
+        active-gradient from="#FF5A1F" to="#00F5D4" angle=45  // neon orange -> cyan/mint
     }
 
     border {
-        // off
         on
         width 3
-        active-color "#ff71ce"
+        active-color "#FF5A1F"      // neon orange
         inactive-color "#4e4e6a"
         urgent-color "#ff5555"
-		active-gradient from="#ff71ce" to="#05ffa1" angle=45
-        // active-gradient from="#ffbb66" to="#ffc880" angle=45 relative-to="workspace-view"
-        // inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view" in="srgb-linear"
-        // urgent-gradient from="#800" to="#a33" angle=45
+        active-gradient from="#FF5A1F" to="#00F5D4" angle=45
     }
 
     shadow {
         off
-        // on
         softness 30
         spread 4
         offset x=0 y=4
         draw-behind-window true
         color "#00000040"
-        // inactive-color "#00000054"
     }
 
     tab-indicator {
-        // off
         on
         hide-when-single-tab
         place-within-column
@@ -71,26 +56,18 @@ layout {
         position "left"
         gaps-between-tabs 2
         corner-radius 8
-        active-color "#ff71ce"
+        active-color "#FF5A1F"      // neon orange
         inactive-color "#4e4e6a"
         urgent-color "#ff5555"
-		active-gradient from="#ff71ce" to="#05ffa1" angle=45
-        // active-gradient from="#80c8ff" to="#bbddff" angle=45
-        // inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
-        // urgent-gradient from="#800" to="#a33" angle=45
+        active-gradient from="#FF5A1F" to="#00F5D4" angle=45
     }
 
     insert-hint {
-        // off
         on
-        color "#ff71ce80"
-        // gradient from="#ffbb6680" to="#ffc88080" angle=45 relative-to="workspace-view"
+        color "#FF5A1F80"           // neon orange w/ alpha
     }
 
     struts {
-        // left 64
-        // right 64
-        // top 64
-        // bottom 64
     }
 }
+
