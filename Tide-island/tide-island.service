@@ -1,0 +1,12 @@
+[Unit]
+Description=Tide Island Dynamic Island for Hyprland and niri
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tide-island
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

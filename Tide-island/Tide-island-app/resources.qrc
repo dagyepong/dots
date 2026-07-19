@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Main.qml</file>
+        <file>RES/InterVariable.ttf</file>
+        <file>RES/Lora-Regular.ttf</file>
+    </qresource>
+</RCC>
