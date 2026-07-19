@@ -315,3 +315,80 @@ Thanks to:
     Made for Wayland users who like quiet and practical desktops.
   </sub>
 </p>
+
+
+#### **Gentoo:**
+
+```bash
+./install.sh --skip-deps
+```
+
+1. Remove the Preference
+Try commenting out that line to force it to look at the filesystem instead:
+
+```bash
+sudo sed -i 's/^prefer :/#!prefer :/' /usr/lib/qt6/qml/TideIsland/qmldir
+```
+
+Now, try running the application again:
+
+```bash
+QML2_IMPORT_PATH=/usr/lib/qt6/qml /usr/bin/tide-island-config-app
+```
+
+Create a wrapper script (Recommended)
+This avoids cluttering your global path while ensuring the environment is always set correctly when you launch the app.
+
+```bash
+# Create the local bin directory if it doesn't exist
+mkdir -p ~/.local/bin
+
+# Create the wrapper
+cat << 'EOF' > ~/.local/bin/tide-island-config-app
+#!/bin/bash
+export QML2_IMPORT_PATH=/usr/lib/qt6/qml
+exec /usr/bin/tide-island-config-app "$@"
+EOF
+
+# Make it executable
+chmod +x ~/.local/bin/tide-island-config-app
+```
+
+Add an Alias
+If you prefer not to create a file, you can add an alias to your shell configuration (e.g., ~/.bashrc or ~/.zshrc):
+
+```bash
+alias tide-island-config-app='QML2_IMPORT_PATH=/usr/lib/qt6/qml /usr/bin/tide-island-config-app'
+```
+
+
+Great. Now that the TideIsland module is resolving correctly via QML2_IMPORT_PATH, let's apply that same logic to the main shell launch.
+
+The shell execution likely requires the same environment to avoid the "Module unavailable" errors you saw earlier. Use this command to launch the full shell:
+
+```bash
+QML2_IMPORT_PATH=/usr/lib/qt6/qml quickshell -p ~/Tide-island/shell.qml
+```
+
+Now that you have the launch command working, the final step is to integrate this into your workflow.
+
+1. Create a Startup Script
+Rather than typing that environment variable every time, create a clean launcher script.
+
+```bash
+
+cat << 'EOF' > ~/.local/bin/start-tide-island
+#!/bin/bash
+export QML2_IMPORT_PATH=/usr/lib/qt6/qml
+exec quickshell -p ~/Tide-island/shell.qml
+EOF
+
+chmod +x ~/.local/bin/start-tide-island
+```
+
+Autostart with Niri
+To have Tide Island start automatically when you log into Niri, add it to your ~/.config/niri/config.kdl under the spawn-at-startup section:
+
+```bash
+spawn-at-startup "start-tide-island"
+```
