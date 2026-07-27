@@ -87,7 +87,7 @@ window-rule {
 
 // ---- Rounded corners + clip everywhere, matching meloworld's pill design -
 window-rule {
-    geometry-corner-radius 10
+    //geometry-corner-radius 10
     clip-to-geometry true
 }
 
