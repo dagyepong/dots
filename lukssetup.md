@@ -208,7 +208,7 @@ echo "sys-boot/uefi-mkconfig" >> /etc/portage/package.accept_keywords/installker
 ## Build or recompile boot hooks using the designated flags:
 ```bash
 
-emerge --oneshot sys-apps/systemd-utils sys-kernel/installkernel sys-boot/uefi-mkconfig
+emerge --oneshot sys-apps/systemd-utils sys-kernel/installkernel sys-boot/uefi-mkconfig sys-fs/btrfs-progs sys-fs/cryptsetup
 
 Configure Dracut for Encrypted Btrfs Storage
 
