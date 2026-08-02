@@ -2,7 +2,7 @@ layout {
     gaps 3
     center-focused-column "on-overflow"
     always-center-single-column
-    background-color "#151221"
+    background-color "#181E2B"
 
     preset-column-widths {
         proportion 0.33333
@@ -22,19 +22,19 @@ layout {
     focus-ring {
         off
         width 3
-        active-color "#FF5A1F"      // neon orange
-        inactive-color "#4e4e6a"
-        urgent-color "#ff5555"
-        active-gradient from="#FF5A1F" to="#00F5D4" angle=45  // neon orange -> cyan/mint
+        active-color "#E9A929"       // Retro Vibes gold/yellow
+        inactive-color "#242C3E"     // Inactive border/panel color
+        urgent-color "#aa0f36"       // Theme error color
+        active-gradient from="#E9A929" to="#0088ff" angle=45  // Gold -> Blue
     }
 
     border {
         on
         width 3
-        active-color "#FF5A1F"      // neon orange
-        inactive-color "#4e4e6a"
-        urgent-color "#ff5555"
-        active-gradient from="#FF5A1F" to="#00F5D4" angle=45
+        active-color "#E9A929"       // Retro Vibes gold/yellow
+        inactive-color "#242C3E"     // Inactive border/panel color
+        urgent-color "#aa0f36"       // Theme error color
+        active-gradient from="#E9A929" to="#0088ff" angle=45
     }
 
     shadow {
@@ -43,7 +43,7 @@ layout {
         spread 4
         offset x=0 y=4
         draw-behind-window true
-        color "#00000040"
+        color "#0059ff40"            // Theme widget shadow color
     }
 
     tab-indicator {
@@ -56,18 +56,17 @@ layout {
         position "left"
         gaps-between-tabs 2
         corner-radius 8
-        active-color "#FF5A1F"      // neon orange
-        inactive-color "#4e4e6a"
-        urgent-color "#ff5555"
-        active-gradient from="#FF5A1F" to="#00F5D4" angle=45
+        active-color "#E9A929"       // Retro Vibes gold/yellow
+        inactive-color "#242C3E"
+        urgent-color "#aa0f36"
+        active-gradient from="#E9A929" to="#0088ff" angle=45
     }
 
     insert-hint {
         on
-        color "#FF5A1F80"           // neon orange w/ alpha
+        color "#E9A92980"            // Retro Vibes gold w/ alpha
     }
 
     struts {
     }
 }
-
