@@ -159,6 +159,13 @@ window-rule {
     open-floating true
 }
 
+// Scratchpad terminal rule
+window-rule {
+    match app-id="scratchpad"
+    open-floating true
+    default-column-width { proportion 0.8; }
+}
+
 window-rule {
     match app-id="^xdg-desktop-portal-gtk$"
     match title="^Open File$"
@@ -187,6 +194,7 @@ binds {
     Mod+Return { spawn "kitty"; }
     Mod+Space hotkey-overlay-title="Run an Application: vicinae open" { spawn-sh "vicinae open"; }
     Mod+Alt+L { spawn-sh "quickshell -p $HOME/.config/niri/scripts/quickshell/Lock.qml"; }
+    Mod+P hotkey-overlay-title="Toggle Scratchpad" { spawn "kitty" "--class" "scratchpad"; }
 
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
