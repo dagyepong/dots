@@ -7,9 +7,7 @@
 // Find the full list of options on the wiki:
 // https://yalter.github.io/niri/Configuration:-Input
 prefer-no-csd
-//spawn-sh-at-startup "swaybg -i /home/bath/Pictures/ots_12.jpg -m fill"
-spawn-sh-at-startup "~/.config/niri/scripts/wallpaper-restore.sh"
-spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/multi.jpg"
+spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/1.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-at-startup "tide-island"
 spawn-at-startup "vicinae" "server"   
