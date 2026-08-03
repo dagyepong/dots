@@ -8,13 +8,13 @@ prefer-no-csd
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/1.png"
+spawn-sh-at-startup "swaybg -i /home/nana/Pictures/wallpaper/dopesmoker_gruvbox.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
-spawn-at-startup "tide-island"
+//spawn-at-startup "tide-island"
 spawn-at-startup "vicinae" "server"    
 spawn-at-startup "xwayland-satellite"
 spawn-at-startup "/usr/local/bin/pia-start.sh"
-
+spawn-at-startup "quickshell"
 // Polkit authentication agent
 spawn-sh-at-startup "/usr/libexec/polkit-gnome-authentication-agent-1"
 
@@ -195,6 +195,12 @@ binds {
     Mod+Space hotkey-overlay-title="Run an Application: vicinae open" { spawn-sh "vicinae open"; }
     Mod+Alt+L { spawn-sh "quickshell -p $HOME/.config/niri/scripts/quickshell/Lock.qml"; }
     Mod+P hotkey-overlay-title="Toggle Scratchpad" { spawn "kitty" "--class" "scratchpad"; }
+    
+	//chill-pill Quickshell
+	Mod+D { spawn-sh "qs ipc -p .config/quickshell/ call appLauncher toggle"; }
+    Mod+A { spawn-sh "qs ipc -p .config/quickshell/ call cliphist toggle"; }
+    Mod+B { spawn-sh "qs ipc -p .config/quickshell/ call miniDashboard toggle"; }
+	Mod+G { spawn-sh "qs ipc -p .config/quickshell/ call controlCenter toggle"; }
 
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
