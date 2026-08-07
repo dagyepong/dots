@@ -337,5 +337,4 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// Tide Island shortcut bindings
-include "/home/nana/.config/tide-island/niri-shortcuts.kdl"
+
