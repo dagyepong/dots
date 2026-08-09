@@ -1,2 +1,0 @@
-#!/usr/bin/sh
-sleep $1 && grim ~/Pictures/as.png && cat ~/Pictures/as.png | wl-copy
