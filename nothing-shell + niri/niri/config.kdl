@@ -90,23 +90,23 @@ layout {
     focus-ring {
         off
         width 3
-        active-color "#00E5FF"
-        inactive-color "#0A313D"
+        active-color "#BB9AF7"
+        inactive-color "#292E42"
     }
 
     border {
         on
         width 3
-        active-color "#00E5FF"
-        inactive-color "#0A313D"
-        urgent-color "#aa0f36"
+        active-color "#BB9AF7"
+        inactive-color "#292E42"
+        urgent-color "#F7768E"
     }
 
     shadow {
-        softness 30
-        spread 5
-        offset x=0 y=5
-        color "#0059ff40"
+        softness 35
+        spread 8
+        offset x=0 y=6
+        color "#00000099"
     }
 
     // Explicitly syncs workspace layout boundaries with Quickshell frame dimensions (left strut set to 2)
@@ -169,6 +169,7 @@ window-rule {
     background-effect {
         blur true
     }
+    opacity 0.88
 }
 
 window-rule {
