@@ -21,10 +21,10 @@ background_blur                 20
 # ==============================================================================
 # FONTS & RENDERING
 # ==============================================================================
-# font_family                     Spleen
-# bold_font                       auto
-# italic_font                     auto
-# bold_italic_font                auto
+font_family                     Spleen
+bold_font                       auto
+italic_font                     auto
+bold_italic_font                auto
 font_size                       10
 
 text_composition_strategy       platform
@@ -108,11 +108,3 @@ map ctrl+shift+left             neighboring_window left
 map ctrl+shift+right            neighboring_window right
 map ctrl+shift+up               neighboring_window up
 map ctrl+shift+down             neighboring_window down
-
-
-# BEGIN_KITTY_FONTS
-font_family      family="Spleen 16x32"
-bold_font        auto
-italic_font      auto
-bold_italic_font auto
-# END_KITTY_FONTS
