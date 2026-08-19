@@ -305,7 +305,7 @@ window-rule {
 // ==============================================================================
 binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
-
+    Mod+Space {spawn-sh " qs -c $HOME/.config/quickshell/ ipc call pill launcher";}
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Shift+Return hotkey-overlay-title="Toggle Scratchpad" { spawn "foot" "--app-id=foot-scratchpad"; }
     Mod+D hotkey-overlay-title="Run an Application: vicinae open" { spawn-sh "vicinae open"; }
