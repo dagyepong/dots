@@ -1,0 +1,18 @@
+# public shell surface
+MenuWindow 1.0 MenuWindow.qml
+
+# menu-only implementation types
+internal BluetoothList BluetoothList.qml
+internal BrightnessRow BrightnessRow.qml
+internal HomePage HomePage.qml
+internal MediaCard MediaCard.qml
+internal PowerRailContent PowerRailContent.qml
+internal PowerRailRow PowerRailRow.qml
+internal RailLabelGroup RailLabelGroup.qml
+internal RailNavItem RailNavItem.qml
+internal RecentPage RecentPage.qml
+internal SettingsNav SettingsNav.qml
+internal SunArc SunArc.qml
+internal VitalsStrip VitalsStrip.qml
+internal VolumeRow VolumeRow.qml
+internal WifiList WifiList.qml

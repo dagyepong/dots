@@ -1,0 +1,292 @@
+pragma Singleton
+
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+Singleton {
+    id: root
+
+    FileView {
+        id: _pidStatFile
+        blockLoading: true
+        blockAllReads: true
+        printErrors: false
+    }
+
+    property var _parentPidCache: ({})
+    readonly property int _parentPidCacheTtlMs: 1500
+    readonly property int _parentPidCacheLimit: 128
+
+    function _clients(): var {
+        return Compositor.toplevels || []
+    }
+
+    function _hereWorkspaceRef(): int {
+        return Compositor.focusedWorkspaceRef
+    }
+
+    function _toPid(value): int {
+        const p = Number(value)
+        return isFinite(p) && p > 0 ? Math.floor(p) : -1
+    }
+
+    function _norm(value): string {
+        let text = String(value || "").slice(0, 512).trim().toLowerCase()
+        if (text.endsWith(".desktop")) text = text.slice(0, -8)
+        return text
+    }
+
+    function _compact(value): string {
+        return root._norm(value).replace(/[^a-z0-9]/g, "")
+    }
+
+    function _chooseSource(pool): var {
+        return root._chooseMatchingSource(pool || [], function() { return true })
+    }
+
+    function _chooseMatchingSource(clients, matches): var {
+        const hereRef = root._hereWorkspaceRef()
+        let bestAny = null
+        let bestElsewhere = null
+
+        for (let i = 0; i < clients.length; i++) {
+            const c = clients[i]
+            if (!c || !c.ref || c.wsId < 0 || !matches(c)) continue
+
+            const rank = c.focusRank ?? 9999
+            if (!bestAny || rank < (bestAny.focusRank ?? 9999))
+                bestAny = c
+            if (c.wsRef !== hereRef && (!bestElsewhere || rank < (bestElsewhere.focusRank ?? 9999)))
+                bestElsewhere = c
+        }
+
+        return bestElsewhere || bestAny
+    }
+
+    function _pidMatches(clients, pid): var {
+        const out = []
+        for (let i = 0; i < clients.length; i++) {
+            const c = clients[i]
+            if (root._toPid(c.pid) === pid) out.push(c)
+        }
+        return out
+    }
+
+    function _readProcStat(pid): string {
+        if (pid <= 1) return ""
+        try {
+            _pidStatFile.path = "/proc/" + pid + "/stat"
+            _pidStatFile.reload()
+            if (!_pidStatFile.waitForJob()) return ""
+            return _pidStatFile.text()
+        } catch (e) {
+            return ""
+        }
+    }
+
+    function _pruneParentPidCache(now): void {
+        const cache = root._parentPidCache
+        const keys = Object.keys(cache)
+        for (let i = 0; i < keys.length; i++) {
+            const item = cache[keys[i]]
+            if (!item || now - Number(item.time || 0) > root._parentPidCacheTtlMs)
+                delete cache[keys[i]]
+        }
+
+        const kept = Object.keys(cache)
+        if (kept.length > root._parentPidCacheLimit)
+            root._parentPidCache = ({})
+    }
+
+    function _parentPid(pid): int {
+        const p = root._toPid(pid)
+        if (p <= 1) return -1
+
+        const now = Date.now()
+        const key = String(p)
+        const cached = root._parentPidCache[key]
+        if (cached && now - Number(cached.time || 0) <= root._parentPidCacheTtlMs)
+            return root._toPid(cached.value)
+
+        const stat = root._readProcStat(p)
+        const end = stat.lastIndexOf(")")
+        let parent = -1
+        if (end >= 0) {
+            const parts = stat.slice(end + 1).trim().split(/\s+/)
+            parent = parts.length >= 2 ? root._toPid(parts[1]) : -1
+        }
+
+        root._parentPidCache[key] = { value: parent, time: now }
+        if (Object.keys(root._parentPidCache).length > root._parentPidCacheLimit)
+            root._pruneParentPidCache(now)
+        return parent
+    }
+
+    function _senderPid(notification): int {
+        const hints = notification?.hints ?? {}
+        const candidates = [
+            hints["sender-pid"],
+            hints["sender_pid"],
+            hints["senderPid"],
+            hints["process-id"],
+            hints["process_id"],
+            hints["pid"]
+        ]
+
+        for (let i = 0; i < candidates.length; i++) {
+            const pid = root._toPid(candidates[i])
+            if (pid > 0) return pid
+        }
+        return -1
+    }
+
+    function _clientFromPidChain(clients, pid, followParents: bool): var {
+        let p = root._toPid(pid)
+        const seen = ({})
+
+        for (let depth = 0; p > 1 && depth < 6 && !seen[p]; depth++) {
+            seen[p] = true
+
+            const pool = root._pidMatches(clients, p)
+            if (pool.length > 0)
+                return root._chooseSource(pool)
+
+            // arrival-time effects must not wait on /proc; name matching still applies
+            if (!followParents) break
+            p = root._parentPid(p)
+        }
+
+        return null
+    }
+
+    function _classMatches(c, hint): bool {
+        const h = root._norm(hint)
+        if (h.length === 0) return false
+
+        const cls  = root._norm(c.cls)
+        const init = root._norm(c.initialClass)
+        const hc   = root._compact(h)
+
+        return cls === h || init === h
+            || (hc.length > 0 && (root._compact(cls) === hc || root._compact(init) === hc))
+    }
+
+    function _appMatches(c, appName): bool {
+        const app = root._compact(appName)
+        if (app.length === 0) return false
+
+        const cls  = root._compact(c.cls)
+        const init = root._compact(c.initialClass)
+
+        return cls === app || init === app
+            || (cls.length  > 2 && (app.endsWith(cls)  || cls.endsWith(app)))
+            || (init.length > 2 && (app.endsWith(init) || init.endsWith(app)))
+    }
+
+    readonly property var _browserClasses: [
+        "firefox", "librewolf", "zen", "waterfox",
+        "chrome", "chromium", "brave", "edge", "opera", "vivaldi", "thorium"
+    ]
+
+    function _resolveByDesktopEntry(clients, name): var {
+        const identity = root._norm(name)
+        if (identity.length === 0) return null
+        const de = DesktopEntries.heuristicLookup(identity)
+        const startupClass = de?.startupClass ? String(de.startupClass) : ""
+        const desktopId    = de?.id ? String(de.id) : ""
+        let best = null
+        if (startupClass.length > 0)
+            best = root._chooseMatchingSource(clients, c => root._classMatches(c, startupClass))
+        if (!best && desktopId.length > 0)
+            best = root._chooseMatchingSource(clients, c => root._classMatches(c, desktopId))
+        return best
+    }
+
+    function _matchNotificationClient(notification, followPidParents: bool): var {
+        if (!notification) return null
+
+        const clients = root._clients()
+        if (clients.length === 0) return null
+
+        const hints   = notification.hints ?? {}
+        const pidHint = root._senderPid(notification)
+        const deHint  = root._norm(notification.desktopEntry || hints["desktop-entry"] || "")
+
+        const pidMatch = root._clientFromPidChain(clients, pidHint, followPidParents)
+        if (pidMatch && pidMatch.wsId >= 0) return pidMatch
+
+        if (deHint.length > 0) {
+            const bestDesktop = root._chooseMatchingSource(clients, c => root._classMatches(c, deHint))
+            if (bestDesktop && bestDesktop.wsId >= 0) return bestDesktop
+        }
+
+        const appName = root._norm(notification.appName)
+        if (appName.length === 0) return null
+
+        let bestApp = root._chooseMatchingSource(clients, c => root._appMatches(c, appName))
+
+        if (!bestApp)
+            bestApp = root._resolveByDesktopEntry(clients, appName)
+
+        return (bestApp && bestApp.wsId >= 0) ? bestApp : null
+    }
+
+    function focusNotificationSource(notification): void {
+        const c = root._matchNotificationClient(notification, true)
+        if (c) Compositor.focusToplevel(c)
+    }
+
+    function notificationSourceWorkspace(notification): int {
+        const c = root._matchNotificationClient(notification, false)
+        return c ? (c.wsId ?? -1) : -1
+    }
+
+    function focusMediaPlayer(playerName: string, songTitle: string): void {
+        const clients = root._clients()
+        if (clients.length === 0) return
+
+        const name   = String(playerName || "").toLowerCase()
+        const norm   = (s) => String(s || "").toLowerCase()
+
+        let best = name.length > 0
+            ? root._chooseMatchingSource(clients, c =>
+                norm(c.cls).includes(name) ||
+                norm(c.initialClass).includes(name) ||
+                norm(c.title).includes(name))
+            : null
+
+        if (!best && root._browserClasses.some(b => name.includes(b)))
+            best = root._chooseMatchingSource(clients, c =>
+                root._browserClasses.some(b =>
+                    norm(c.cls).includes(b) || norm(c.initialClass).includes(b)))
+
+        if (!best && songTitle && songTitle.length > 4) {
+            const t = songTitle.toLowerCase()
+            best = root._chooseMatchingSource(clients, c => norm(c.title).includes(t))
+        }
+
+        if (best) Compositor.focusToplevel(best)
+    }
+
+    function focusTrayItem(id: string, title: string, tooltip: string): bool {
+        const clients = root._clients()
+        if (clients.length === 0) return false
+
+        const hints = [id, title, tooltip].filter(s => s && String(s).length > 0)
+        let best = null
+
+        for (let i = 0; i < hints.length && !best; i++)
+            best = root._chooseMatchingSource(clients, c =>
+                root._classMatches(c, hints[i]) || root._appMatches(c, hints[i]))
+
+        for (let i = 0; i < hints.length && !best; i++)
+            best = root._resolveByDesktopEntry(clients, hints[i])
+
+        if (best) {
+            Compositor.focusToplevel(best)
+            return true
+        }
+        return false
+    }
+}

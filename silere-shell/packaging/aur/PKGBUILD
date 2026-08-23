@@ -1,0 +1,80 @@
+# Maintainer: s3rven <s3rven@users.noreply.github.com>
+
+pkgname=silere-shell-git
+_pkgname=silere-shell
+pkgver=0.8.0.r0.gbb840dd
+pkgrel=1
+pkgdesc="Quiet by default, yours by choice. A Quickshell bar for Hyprland and niri with nothing running behind your back"
+arch=('any')
+url="https://github.com/s3rven/silere-shell"
+license=('MIT')
+depends=('quickshell>=0.3')
+makedepends=('git')
+optdepends=(
+    'hyprland: compositor support'
+    'niri: compositor support'
+    'ttf-jetbrains-mono-nerd: the default bar font and every glyph in the UI'
+    'matugen: colours generated from your wallpaper'
+    'pipewire: volume and the output picker'
+    'wireplumber: volume and the output picker'
+    'upower: battery'
+    'brightnessctl: brightness'
+    'cava: media visualizer'
+    'hyprsunset: night light'
+    'power-profiles-daemon: power profiles'
+    'hyprlock: lock action'
+    'libnotify: battery, temperature and update notifications'
+    'networkmanager: VPN name fallback'
+    'inotify-tools: screenshot-file watcher for underline feedback'
+    'pacman-contrib: package update badge'
+    'paru: AUR update count'
+    'yay: AUR update count'
+)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+install="$pkgname.install"
+source=("$_pkgname::git+https://github.com/s3rven/silere-shell.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$srcdir/$_pkgname"
+    git describe --long --tags --abbrev=7 --match 'v[0-9]*' 2>/dev/null \
+        | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' \
+        || printf '0.0.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+package() {
+    cd "$srcdir/$_pkgname"
+
+    local dest="$pkgdir/usr/share/$_pkgname"
+    install -dm755 "$dest"
+    cp -a --no-preserve=ownership \
+        shell.qml config modules services "$dest/"
+
+    # only the scripts the shell itself runs; tests, probes and linters are
+    # developer tooling, and uninstall.sh would tear down a pacman-owned install
+    install -dm755 "$dest/scripts"
+    cp -a --no-preserve=ownership \
+        scripts/install.sh scripts/update.sh scripts/repair.sh \
+        scripts/silere-update.service scripts/silere-update.timer \
+        scripts/lib "$dest/scripts/"
+
+    # the shell loads no asset at runtime; only the matugen template is used, and
+    # post_install tells the user to copy it from here
+    install -Dm644 assets/matugen-theme.json "$dest/assets/matugen-theme.json"
+
+    # the checkout ships a .git-less copy: the in-shell updater detects that and
+    # steps aside so packaged installs update through pacman instead
+    find "$dest" -type d -exec chmod 755 {} +
+    find "$dest" -type f -exec chmod 644 {} +
+    find "$dest/scripts" -type f -name '*.sh' -exec chmod 755 {} +
+
+    install -Dm755 /dev/stdin "$pkgdir/usr/bin/$_pkgname" <<EOF
+#!/bin/sh
+umask 077
+exec qs -p /usr/share/$_pkgname/shell.qml "\$@"
+EOF
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$_pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$_pkgname/README.md"
+}

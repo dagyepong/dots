@@ -1,0 +1,1058 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export LC_ALL=C
+
+REPO_URL="https://github.com/s3rven/silere-shell.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/xdg.sh"
+CONFIG_HOME="$(_silere_xdg_home "${XDG_CONFIG_HOME:-}" .config)" || {
+    printf 'silere: HOME must be an absolute path\n' >&2
+    exit 1
+}
+DEFAULT_DIR="$CONFIG_HOME/silere-shell"
+
+# ── colors ──────────────────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+    R='\033[0m' BOLD='\033[1m'
+    GREEN='\033[0;32m' CYAN='\033[0;36m' YELLOW='\033[1;33m' DIM='\033[2m' RED='\033[0;31m'
+else
+    R='' BOLD='' GREEN='' CYAN='' YELLOW='' DIM='' RED=''
+fi
+
+_ok()   { printf "    ${GREEN}ok${R}      %s\n" "$*"; }
+_skip() { printf "    ${DIM}skip${R}    %s\n" "$*"; }
+_warn() { printf "    ${YELLOW}warn${R}    %s\n" "$*"; }
+_err()  { printf "    ${RED}error${R}   %s\n" "$*" >&2; }
+_die()  { _err "$*"; exit 1; }
+
+_section() { printf "\n${BOLD}==> %s${R}\n" "$1"; }
+
+# -r only stats the device node: it succeeds with no controlling terminal, where
+# opening it fails with ENXIO. Open it for real, or every prompt below dies on an
+# unset reply instead of reporting the missing terminal.
+_need_tty() {
+    { : </dev/tty; } 2>/dev/null \
+        || _die "interactive install requires a TTY — clone the repo and run scripts/install.sh from a terminal"
+}
+
+_reject_unsafe_path() {
+    if printf '%s' "$1" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+        _die "install path may not contain control characters or newlines: $1"
+    fi
+}
+
+_normalized_install_path() {
+    local path source_root home_root config_root
+    _reject_unsafe_path "$1"
+    path="$(readlink -m -- "$1" 2>/dev/null)" || _die "could not resolve install path: $1"
+    home_root="$(readlink -m -- "$HOME" 2>/dev/null)" || _die "could not resolve home directory"
+    config_root="$(readlink -m -- "$CONFIG_HOME" 2>/dev/null)" || _die "could not resolve config directory"
+    case "$path" in
+        /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var|"$home_root"|"$config_root")
+            _die "refusing unsafe install path: $path"
+            ;;
+    esac
+    source_root="$(readlink -m -- "$SCRIPT_DIR/..")"
+    if [ "$path" != "$source_root" ]; then
+        case "$source_root/" in
+            "$path/"*) _die "install path may not contain the running installer: $path" ;;
+        esac
+    fi
+    printf '%s\n' "$path"
+}
+
+_move_aside_path() {
+    local source="$1" stamp candidate suffix=0
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    candidate="${source}.silere-backup-$stamp"
+    while [ -e "$candidate" ] || [ -L "$candidate" ]; do
+        suffix=$((suffix + 1))
+        candidate="${source}.silere-backup-$stamp-$suffix"
+    done
+    mv -- "$source" "$candidate" || return 1
+    printf '%s\n' "$candidate"
+}
+
+_secure_fresh_default_install() {
+    [ "$1" = "$DEFAULT_DIR" ] || return 0
+    chmod 0700 "$1" || _warn "could not restrict permissions on $1"
+}
+
+_is_silere_checkout() {
+    local path="$1"
+    [ -f "$path/shell.qml" ] \
+        && [ -f "$path/services/qmldir" ] \
+        && [ -f "$path/scripts/update.sh" ]
+}
+
+_matugen_table_present() {
+    [ -f "$1" ] && grep -Eq '^[[:space:]]*\[templates\.silere-shell\][[:space:]]*(#.*)?$' "$1"
+}
+
+readonly -a SILERE_FONT_FILES=(
+    JetBrainsMonoNerdFont-Regular.ttf
+    JetBrainsMonoNerdFont-Medium.ttf
+    JetBrainsMonoNerdFont-SemiBold.ttf
+    JetBrainsMonoNerdFont-Bold.ttf
+)
+
+_extract_silere_fonts() {
+    local archive="$1" destination="$2"
+    tar -xJ -f "$archive" -C "$destination" \
+        --no-same-owner --no-same-permissions --no-overwrite-dir \
+        --wildcards --no-anchored "${SILERE_FONT_FILES[@]}"
+}
+
+_shell_quote() {
+    local s="$1"
+    s="${s//\'/\'\\\'\'}"
+    printf "'%s'" "$s"
+}
+
+_shell_printf_bytes() {
+    local LC_ALL=C s="$1" out="" ch oct i
+    for ((i = 0; i < ${#s}; i++)); do
+        ch="${s:i:1}"
+        printf -v oct '%03o' "'$ch"
+        out+="\\$oct"
+    done
+    printf '%s' "$out"
+}
+
+_lua_string() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    printf '"%s"' "$s"
+}
+
+_toml_basic_string() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    printf '"%s"' "$s"
+}
+
+source "$SCRIPT_DIR/lib/qml-modules.sh"
+
+# Resolve the compositor process that owns this shell session. Prefer an ancestor
+# (Quickshell and terminals are normally descendants of their compositor), then
+# accept a same-user process only when it is the sole candidate. Never guess
+# between multiple sessions.
+_PROC_ROOT="${SILERE_PROC_ROOT:-/proc}"
+
+_proc_ppid() {
+    local pid="$1" stat rest
+    stat="$(cat "$_PROC_ROOT/$pid/stat" 2>/dev/null)" || return 1
+    rest="${stat##*) }"
+    [ "$rest" != "$stat" ] || return 1
+    rest="${rest#* }"
+    printf '%s\n' "${rest%% *}"
+}
+
+_same_user_process() {
+    [ "$(stat -c '%u' "$_PROC_ROOT/$1" 2>/dev/null)" = "$(id -u)" ]
+}
+
+_find_compositor_pid() {
+    local want="$1" pid="${SILERE_PARENT_PID:-$PPID}" parent comm candidate="" count=0
+
+    while [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ]; do
+        if _same_user_process "$pid"; then
+            comm="$(cat "$_PROC_ROOT/$pid/comm" 2>/dev/null || true)"
+            if [ "$comm" = "$want" ]; then
+                printf '%s\n' "$pid"
+                return 0
+            fi
+        fi
+        parent="$(_proc_ppid "$pid" 2>/dev/null || true)"
+        [[ "$parent" =~ ^[0-9]+$ ]] && [ "$parent" != "$pid" ] || break
+        pid="$parent"
+    done
+
+    for comm in "$_PROC_ROOT"/[0-9]*/comm; do
+        [ -r "$comm" ] || continue
+        [ "$(cat "$comm" 2>/dev/null)" = "$want" ] || continue
+        pid="${comm%/comm}"
+        pid="${pid##*/}"
+        _same_user_process "$pid" || continue
+        candidate="$pid"
+        count=$((count + 1))
+    done
+    [ "$count" -eq 1 ] || return 1
+    printf '%s\n' "$candidate"
+}
+
+_normalize_config_path() {
+    local path="$1" base="$2"
+    path="${path/#\~/$HOME}"
+    case "$path" in
+        /*) ;;
+        *) path="$base/$path" ;;
+    esac
+    readlink -m -- "$path" 2>/dev/null || printf '%s\n' "$path"
+}
+
+_compositor_config_for_pid() {
+    local pid="$1" cwd raw="" i
+    local -a args=()
+    mapfile -d '' -t args 2>/dev/null < "$_PROC_ROOT/$pid/cmdline" || return 1
+    for ((i = 0; i < ${#args[@]}; i++)); do
+        if [ "${args[i]}" = "--config" ] || [ "${args[i]}" = "-c" ]; then
+            ((i + 1 < ${#args[@]})) || return 1
+            raw="${args[i + 1]}"
+            break
+        fi
+    done
+    [ -n "$raw" ] || return 1
+    cwd="$(readlink -f -- "$_PROC_ROOT/$pid/cwd" 2>/dev/null)" || return 1
+    _normalize_config_path "$raw" "$cwd"
+}
+
+_hypr_config_path() {
+    local config pid
+    if [ -n "${SILERE_HYPR_CONFIG:-}" ]; then
+        _normalize_config_path "$SILERE_HYPR_CONFIG" "$PWD"
+        return
+    fi
+    pid="$(_find_compositor_pid Hyprland 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+        config="$(_compositor_config_for_pid "$pid" 2>/dev/null || true)"
+        if [ -n "$config" ]; then
+            printf '%s\n' "$config"
+            return
+        fi
+    fi
+    if [ -f "$CONFIG_HOME/hypr/hyprland.lua" ]; then
+        printf '%s\n' "$CONFIG_HOME/hypr/hyprland.lua"
+    elif [ -f "$CONFIG_HOME/hypr/hyprland.conf" ]; then
+        printf '%s\n' "$CONFIG_HOME/hypr/hyprland.conf"
+    fi
+}
+
+_niri_config_path() {
+    local config pid
+    if [ -n "${SILERE_NIRI_CONFIG:-}" ]; then
+        _normalize_config_path "$SILERE_NIRI_CONFIG" "$PWD"
+        return
+    fi
+    # a running niri's --config beats NIRI_CONFIG, matching niri's own precedence
+    pid="$(_find_compositor_pid niri 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+        config="$(_compositor_config_for_pid "$pid" 2>/dev/null || true)"
+        if [ -n "$config" ]; then
+            printf '%s\n' "$config"
+            return
+        fi
+    fi
+    _normalize_config_path "${NIRI_CONFIG:-$CONFIG_HOME/niri/config.kdl}" "$PWD"
+}
+
+# Side-effect-free helpers used by the runtime detector and focused tests.
+case "${1:-}" in
+    --hypr-config-path)
+        _hypr_config_path
+        exit 0
+        ;;
+    --hypr-config-kind)
+        _hypr_kind="$(_hypr_config_path)"
+        [[ "$_hypr_kind" == *.lua ]] && exit 0
+        exit 1
+        ;;
+    --niri-config-path)
+        _niri_config_path
+        exit 0
+        ;;
+esac
+_answered_yes() {
+    [[ "$1" =~ ^[Yy] ]]
+}
+
+_replace_matugen_block() {
+    local file="$1" input="$2" output="$3" target tmp
+    [ -f "$file" ] || return 1
+    target="$file"
+    if [ -L "$file" ]; then
+        target="$(readlink -f -- "$file" 2>/dev/null)" || return 1
+    fi
+    if ! awk '
+        $0 == "# silere-shell begin" { begins++; begin_line = NR }
+        $0 == "# silere-shell end"   { ends++; end_line = NR }
+        END { exit !(begins == 1 && ends == 1 && begin_line < end_line) }
+    ' "$target"; then
+        _warn "silere-shell markers are malformed or ambiguous — left config.toml unchanged"
+        return 1
+    fi
+    tmp="$(mktemp "$(dirname -- "$target")/.silere-matugen.XXXXXX")" || return 1
+    if ! awk '
+        $0 == "# silere-shell begin" { removing = 1; next }
+        $0 == "# silere-shell end"   { removing = 0; next }
+        !removing
+    ' "$target" > "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    printf '\n# silere-shell begin\n[templates.silere-shell]\ninput_path  = %s\noutput_path = %s\n# silere-shell end\n' \
+        "$input" "$output" >> "$tmp"
+    chmod --reference="$target" "$tmp" 2>/dev/null || true
+    if ! mv -- "$tmp" "$target"; then
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
+# Always read from /dev/tty so curl | bash works
+# an assumed yes never overrides a refusal: the [y/N] prompts guard an unsupported
+# compositor and an opt-in timer, so they stay no
+_assume_yes() { [ "${SILERE_ASSUME_YES:-0}" = "1" ]; }
+
+_ask() {
+    local reply
+    if _assume_yes; then
+        printf "  ${CYAN}::${R}  %s ${DIM}[Y/n]${R} yes\n" "$1"
+        return 0
+    fi
+    _need_tty
+    printf "  ${CYAN}::${R}  %s ${DIM}[Y/n]${R} " "$1"
+    read -r reply </dev/tty
+    [[ ! "$reply" =~ ^[Nn] ]]
+}
+
+_ask_no() {
+    local reply
+    if _assume_yes; then
+        printf "  ${CYAN}::${R}  %s ${DIM}[y/N]${R} no\n" "$1"
+        return 1
+    fi
+    _need_tty
+    printf "  ${CYAN}::${R}  %s ${DIM}[y/N]${R} " "$1"
+    read -r reply </dev/tty
+    _answered_yes "$reply"
+}
+
+_ask_path() {
+    local reply
+    if _assume_yes; then
+        printf '%s' "$DEFAULT_DIR"
+        return 0
+    fi
+    _need_tty
+    printf "  ${CYAN}::${R}  Use a different install path? ${DIM}[y/N]${R} " >&2
+    read -r reply </dev/tty
+    if [[ "$reply" =~ ^[Yy] ]]; then
+        printf "  ${CYAN}::${R}  Install to: " >&2
+        read -r reply </dev/tty
+        reply="${reply/#\~/$HOME}"
+        [[ "$reply" =~ ^[[:space:]]*$ ]] && reply=""
+        printf '%s' "${reply:-$DEFAULT_DIR}"
+    else
+        printf '%s' "$DEFAULT_DIR"
+    fi
+}
+
+if [ "${SILERE_SCRIPT_LIB_ONLY:-0}" = "1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+
+_usage() {
+    cat <<'EOF'
+Usage:
+  bash scripts/install.sh        Install Silere Shell (interactive)
+  bash scripts/install.sh --help Show this message
+
+  bash scripts/install.sh --repair-matugen
+        Rewire Matugen without reinstalling. Writes only Silere's own template
+        and its marked block in config.toml, and refuses an entry it does not
+        own. This is what Settings > Maintenance runs.
+
+Silere runs on Hyprland and niri only. The installer asks before it writes
+anything and backs up every file it edits.
+
+Environment:
+  SILERE_HYPR_CONFIG   Hyprland config to wire autostart into
+  SILERE_NIRI_CONFIG   niri config to wire autostart into
+  SILERE_ASSUME_YES=1  Answer the [Y/n] prompts yes and install to the default
+                       path, for dotfiles bootstraps and containers. Files are
+                       still backed up before editing, and the [y/N] prompts
+                       still answer no, so an unsupported compositor still stops
+                       the install.
+EOF
+}
+
+# Anything the helper case above recognises has already exited, so a surviving
+# argument is a typo. Left unhandled it used to start a real install, and
+# --help is the first thing a careful reader types before running a script.
+_repair_matugen=0
+case "${1:-}" in
+    "") ;;
+    -h|--help) _usage; exit 0 ;;
+    --repair-matugen) _repair_matugen=1 ;;
+    *)
+        _err "unknown option: $1"
+        _usage >&2
+        exit 2
+        ;;
+esac
+
+_backup() {
+    local file="$1"
+    if [ -f "$file" ] && [ ! -f "${file}.bak" ]; then
+        cp -p "$file" "${file}.bak"
+        _skip "backed up existing → ${file##*/}.bak"
+    fi
+}
+
+# Copy src→dst after asking; backs up an existing file first.
+# Returns 0 only when it actually writes, so callers can record the step.
+_install_file() {
+    local label="$1" src="$2" dst="$3"
+    if [ -r "$dst" ]; then
+        _skip "already at $dst"
+        _ask "Overwrite?" || return 1
+        _backup "$dst"
+        cp "$src" "$dst" || _die "could not write $dst"
+        _ok "updated"
+    else
+        _ask "Install $label?" || { _skip "skipped"; return 1; }
+        mkdir -p "${dst%/*}" || _die "could not create ${dst%/*}"
+        cp "$src" "$dst" || _die "could not write $dst"
+        _ok "installed"
+    fi
+}
+
+# ── matugen repair ───────────────────────────────────────────────────────────────
+# Reached from the shell's health card, so it cannot prompt. It takes only the
+# steps the installer would take unprompted and refuses the same configs the
+# installer refuses, which keeps one set of rules for one job.
+if [ "$_repair_matugen" = "1" ]; then
+    command -v matugen >/dev/null 2>&1 || _die "matugen is not installed"
+    ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+    MATUGEN_CFG="$CONFIG_HOME/matugen/config.toml"
+    MATUGEN_OUTPUT_TOML="$(_toml_basic_string "$CONFIG_HOME/matugen/silere-shell.json")"
+    MATUGEN_INPUT_TOML="$(_toml_basic_string "$CONFIG_HOME/matugen/templates/silere-shell/Theme.json")"
+    TMPL_SRC="$ROOT/assets/matugen-theme.json"
+    TMPL_DST="$CONFIG_HOME/matugen/templates/silere-shell/Theme.json"
+
+    [ -r "$TMPL_SRC" ] || _die "template missing at $TMPL_SRC"
+    mkdir -p "${TMPL_DST%/*}" || _die "could not create ${TMPL_DST%/*}"
+    _backup "$TMPL_DST"
+    cp "$TMPL_SRC" "$TMPL_DST" || _die "could not write $TMPL_DST"
+    _ok "template written"
+
+    if [ -f "$MATUGEN_CFG" ] && grep -q '# silere-shell begin' "$MATUGEN_CFG"; then
+        if grep -qF "input_path  = $MATUGEN_INPUT_TOML" "$MATUGEN_CFG" \
+                && grep -qF "output_path = $MATUGEN_OUTPUT_TOML" "$MATUGEN_CFG"; then
+            _ok "entry already correct"
+        else
+            _backup "$MATUGEN_CFG"
+            _replace_matugen_block "$MATUGEN_CFG" "$MATUGEN_INPUT_TOML" "$MATUGEN_OUTPUT_TOML" \
+                || _die "could not update $MATUGEN_CFG"
+            _ok "entry updated"
+        fi
+    elif _matugen_table_present "$MATUGEN_CFG"; then
+        _die "an unmanaged [templates.silere-shell] entry exists; edit $MATUGEN_CFG by hand"
+    else
+        mkdir -p "${MATUGEN_CFG%/*}" || _die "could not create ${MATUGEN_CFG%/*}"
+        if [ -f "$MATUGEN_CFG" ]; then
+            _backup "$MATUGEN_CFG"
+        else
+            printf '[config]\nversion_check = false\n' > "$MATUGEN_CFG"
+        fi
+        cat >> "$MATUGEN_CFG" <<EOF
+
+# silere-shell begin
+[templates.silere-shell]
+input_path  = $MATUGEN_INPUT_TOML
+output_path = $MATUGEN_OUTPUT_TOML
+# silere-shell end
+EOF
+        _ok "entry added"
+    fi
+    # matugen writes the palette on its next run, so colours follow the next wallpaper change
+    printf 'repaired\n'
+    exit 0
+fi
+
+# ── spinner ──────────────────────────────────────────────────────────────────────
+_spin_pid=""
+font_tmp=""
+
+spin_start() {
+    local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' msg="$1"
+    if [ ! -t 1 ]; then
+        printf "  %s\n" "$msg"
+        return
+    fi
+    ( local i=0
+      while true; do
+          printf "\r  ${CYAN}%s${R}  %s " "${chars:$((i % ${#chars})):1}" "$msg"
+          sleep 0.08
+          ((i++)) || true
+      done
+    ) &
+    _spin_pid=$!
+}
+
+spin_stop() {
+    [ -z "$_spin_pid" ] && return
+    kill "$_spin_pid" 2>/dev/null || true
+    wait "$_spin_pid" 2>/dev/null || true
+    printf "\r\033[K"
+    _spin_pid=""
+}
+
+_cleanup() {
+    spin_stop
+    [ -n "$font_tmp" ] && rm -f "$font_tmp"
+    return 0
+}
+trap '_cleanup' EXIT
+trap '_cleanup; exit 130' INT TERM
+
+# ── header ───────────────────────────────────────────────────────────────────────
+printf "\n${BOLD}:: silere-shell installer${R}\n"
+
+# ── dependencies ─────────────────────────────────────────────────────────────────
+_section "checking dependencies"
+
+command -v git >/dev/null 2>&1 || _die "git is required — install it and re-run"
+_ok "git"
+
+has_qs=true
+if command -v qs >/dev/null 2>&1; then
+    _ok "quickshell"
+else
+    _warn "quickshell not found — install it before launching silere"
+    has_qs=false
+fi
+
+qs_modules_ok=true
+if $has_qs; then
+    for module in "${SILERE_REQUIRED_QML_MODULES[@]}"; do
+        if ! _qml_module_available "$module"; then
+            _warn "required QML module missing: $module"
+            qs_modules_ok=false
+        fi
+    done
+    $qs_modules_ok || _warn "this Quickshell build cannot load Silere; install the full current package"
+fi
+
+has_matugen=true
+if command -v matugen >/dev/null 2>&1; then
+    _ok "matugen"
+else
+    _warn "matugen not found — wallpaper theming skipped, neutral theme is used"
+    has_matugen=false
+fi
+
+# ── optional tools ─────────────────────────────────────────────────────────────────
+# Each one lights up a single feature; a missing tool just hides it.
+_section "optional tools"
+
+_optdep() {
+    if command -v "$1" >/dev/null 2>&1; then
+        printf "    ${GREEN}ok${R}      %-13s ${DIM}%s${R}\n" "$1" "$2"
+    else
+        printf "    ${DIM}–       %-13s %s${R}\n" "$1" "$2"
+    fi
+}
+
+_optdep_any() {
+    local label="$1" desc="$2" tool found=""
+    shift 2
+    for tool in "$@"; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            found="$tool"
+            break
+        fi
+    done
+    if [ -n "$found" ]; then
+        printf "    ${GREEN}ok${R}      %-13s ${DIM}%s${R}\n" "$label ($found)" "$desc"
+    else
+        printf "    ${DIM}–       %-13s %s${R}\n" "$label" "$desc"
+    fi
+}
+
+if _qml_module_available Quickshell.Services.Pipewire; then
+    printf "    ${GREEN}ok${R}      %-13s ${DIM}%s${R}\n" "pipewire" "volume + sound popup"
+else
+    printf "    ${DIM}–       %-13s %s${R}\n" "pipewire" "volume + sound popup"
+fi
+_optdep brightnessctl "brightness control + popup"
+_optdep inotifywait   "screenshot flash"
+_optdep nmcli         "VPN name fallback"
+_optdep cava          "audio visualizer (auto-configured at runtime)"
+_optdep_any updates   "update count" checkupdates apt dnf zypper xbps-install
+_optdep_any "AUR helper" "AUR update count" paru yay
+_optdep busctl        "notification daemon check"
+_optdep upower        "battery percentage + warnings"
+_optdep hyprsunset    "night light toggle"
+_optdep pgrep         "optional night light external state check"
+_optdep pkill         "optional night light external stop fallback"
+_optdep powerprofilesctl "power profile selector"
+_optdep hyprlock      "lock screen"
+_optdep_any "power actions" "suspend / reboot / shutdown" systemctl loginctl
+_optdep notify-send   "low-battery + hot-CPU alerts"
+_optdep timeout       "bounded update checks"
+_optdep ssh-keygen    "signed shell updates"
+
+# ── compositor ───────────────────────────────────────────────────────────────────
+# The whole install can succeed on a session Silere cannot run on: every step
+# writes its own files, and only the autostart step notices, where it reads as a
+# missing Hyprland config rather than an unsupported compositor. A config on disk
+# counts, so installing from a TTY or over SSH before the compositor is up works.
+_section "compositor"
+
+_supported_compositor() {
+    [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && return 0
+    [ -n "${NIRI_SOCKET:-}" ] && return 0
+    _find_compositor_pid Hyprland >/dev/null 2>&1 && return 0
+    _find_compositor_pid niri >/dev/null 2>&1 && return 0
+    [ -n "$(_hypr_config_path)" ] && return 0
+    [ -f "$(_niri_config_path)" ] && return 0
+    return 1
+}
+
+if _supported_compositor; then
+    _ok "Hyprland or niri found"
+else
+    _session="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-unknown}}"
+    _warn "no Hyprland or niri found — this session reports \"$_session\""
+    _warn "Silere runs on Hyprland and niri only. It will install here, but the"
+    _warn "bar will not start and the menu will not open."
+    if ! _ask_no "Install anyway?"; then
+        printf "\n  nothing was written\n"
+        printf "  to install for a compositor you have not started yet, point the\n"
+        printf "  installer at its config: ${DIM}SILERE_HYPR_CONFIG=... scripts/install.sh${R}\n\n"
+        exit 0
+    fi
+fi
+
+# ── font ─────────────────────────────────────────────────────────────────────────
+_section "JetBrainsMono Nerd Font"
+
+_font_installed() {
+    command -v fc-list >/dev/null 2>&1 && fc-list : family 2>/dev/null | grep -qi "JetBrainsMono Nerd"
+}
+
+# pinned release, not "latest": the hash below is only meaningful against a fixed artifact
+FONT_VERSION="v3.4.0"
+FONT_SHA256="ef552a3e638f25125c6ad4c51176a6adcdce295ab1d2ffacf0db060caf8c1582"
+FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/download/$FONT_VERSION/JetBrainsMono.tar.xz"
+
+_font_download_tools_ready() {
+    local -a missing=()
+    command -v curl >/dev/null 2>&1 || missing+=("curl")
+    command -v tar  >/dev/null 2>&1 || missing+=("tar")
+    # the release artifact is .tar.xz and tar shells out to xz to read it, so a
+    # missing xz otherwise surfaces as "extract failed" after a 30 MB download
+    command -v xz   >/dev/null 2>&1 || missing+=("xz")
+    command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || missing+=("sha256sum")
+    if [ "${#missing[@]}" -eq 0 ]; then
+        return 0
+    fi
+    _warn "font auto-install needs: ${missing[*]}"
+    _warn "install those tools or install JetBrainsMono Nerd Font manually"
+    return 1
+}
+
+_font_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$1" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$1" | awk '{print $1}'
+    fi
+}
+
+did_font=false
+
+if _font_installed; then
+    _ok "already installed"
+else
+    _warn "JetBrainsMono Nerd Font not found"
+    if _font_download_tools_ready && _ask "Download and install it now?"; then
+        FONT_DIR="$HOME/.local/share/fonts/JetBrainsMono"
+        mkdir -p "$FONT_DIR"
+        font_tmp="$(mktemp "${TMPDIR:-/tmp}/silere-font.XXXXXX.tar.xz")"
+        spin_start "downloading..."
+        if ! curl -fsSL --proto '=https' --tlsv1.2 -o "$font_tmp" "$FONT_URL"; then
+            spin_stop
+            rm -f "$font_tmp"
+            _warn "download failed — install JetBrainsMono Nerd Font manually"
+        elif [ "$(_font_sha256 "$font_tmp")" != "$FONT_SHA256" ]; then
+            spin_stop
+            rm -f "$font_tmp"
+            # fail closed: a hash mismatch means the artifact is not the reviewed one
+            _warn "checksum mismatch on the font download — refusing to install it"
+            _warn "expected $FONT_SHA256"
+            _warn "install JetBrainsMono Nerd Font manually, or report this if it persists"
+        elif _extract_silere_fonts "$font_tmp" "$FONT_DIR" 2>/dev/null; then
+            spin_stop
+            rm -f "$font_tmp"
+            fc-cache -f "$FONT_DIR" 2>/dev/null || true
+            _ok "installed $FONT_VERSION to $FONT_DIR"
+            did_font=true
+        else
+            spin_stop
+            rm -f "$font_tmp"
+            _warn "extract failed — install JetBrainsMono Nerd Font manually"
+        fi
+    else
+        _skip "skipped — install a Nerd Font manually before launching silere"
+    fi
+fi
+
+# ── clone ────────────────────────────────────────────────────────────────────────
+_section "silere-shell"
+
+printf "  ${CYAN}::${R}  Install to: ${CYAN}%s${R}\n" "$DEFAULT_DIR"
+INSTALL_DIR="$(_ask_path)"
+INSTALL_DIR="$(_normalized_install_path "$INSTALL_DIR")"
+fresh_clone=false
+
+if [ "$INSTALL_DIR" = "$DEFAULT_DIR" ]; then
+    # -m with -p only applies to the deepest directory, so any parent this
+    # creates would land at the umask default; clamp it for the whole path.
+    (umask 077 && mkdir -p "$CONFIG_HOME") || _die "could not create $CONFIG_HOME"
+    chmod 0700 "$CONFIG_HOME" || _die "could not secure $CONFIG_HOME"
+fi
+
+if [ -d "$INSTALL_DIR/.git" ]; then
+    _is_silere_checkout "$INSTALL_DIR" \
+        || _die "$INSTALL_DIR is a Git repository but not a Silere checkout — choose another path"
+    _ok "already cloned at $INSTALL_DIR"
+    install_has_changes=false
+    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=normal)" ]; then
+        install_has_changes=true
+        _warn "local Silere edits detected; the installer will not remove them"
+        [ -x "$INSTALL_DIR/scripts/repair.sh" ] \
+            && _warn "preview a safe restore with: bash $INSTALL_DIR/scripts/repair.sh"
+    fi
+    if _ask "Install the latest signed release?"; then
+        spin_start "checking release..."
+        if ! GIT_TERMINAL_PROMPT=0 bash "$INSTALL_DIR/scripts/update.sh" >/dev/null \
+                || ! GIT_TERMINAL_PROMPT=0 bash "$INSTALL_DIR/scripts/update.sh" --apply >/dev/null; then
+            spin_stop
+            if $install_has_changes; then
+                _die "the signed update could not preserve the local edits — repair or stash them, then retry"
+            fi
+            _die "signed release update failed — check the connection or update manually"
+        fi
+        spin_stop; _ok "up to date"
+    else
+        _skip "using existing clone"
+    fi
+elif [ -e "$INSTALL_DIR" ] || [ -L "$INSTALL_DIR" ]; then
+    if _ask "Path exists but is not a git repo. Move it aside and clone fresh?"; then
+        install_backup="$(_move_aside_path "$INSTALL_DIR")" \
+            || _die "could not preserve existing path: $INSTALL_DIR"
+        _ok "preserved existing path at $install_backup"
+        spin_start "cloning..."
+        if ! GIT_TERMINAL_PROMPT=0 git clone --single-branch --quiet "$REPO_URL" "$INSTALL_DIR"; then
+            spin_stop
+            if [ ! -e "$INSTALL_DIR" ] && [ ! -L "$INSTALL_DIR" ] \
+                    && mv -- "$install_backup" "$INSTALL_DIR"; then
+                _warn "clone failed; restored the original path"
+            else
+                _warn "clone failed; the original remains at $install_backup"
+            fi
+            _die "git clone failed — check your connection"
+        fi
+        fresh_clone=true
+        spin_stop; _ok "cloned to $INSTALL_DIR"
+    else
+        _die "$INSTALL_DIR exists but is not a git repo — pick a different path or clean it up manually"
+    fi
+else
+    spin_start "cloning..."
+    if ! GIT_TERMINAL_PROMPT=0 git clone --single-branch --quiet "$REPO_URL" "$INSTALL_DIR"; then
+        spin_stop; _die "git clone failed — check your connection"
+    fi
+    fresh_clone=true
+    spin_stop; _ok "cloned to $INSTALL_DIR"
+fi
+
+if $fresh_clone; then
+    _secure_fresh_default_install "$INSTALL_DIR"
+fi
+
+ROOT="$INSTALL_DIR"
+did_tmpl=false did_toml=false did_autostart=false did_update=false
+autostart_ready=false
+ROOT_PRINTF_BYTES="$(_shell_quote "$(_shell_printf_bytes "$ROOT")")"
+MATUGEN_OUTPUT_TOML="$(_toml_basic_string "$CONFIG_HOME/matugen/silere-shell.json")"
+MATUGEN_INPUT_TOML="$(_toml_basic_string "$CONFIG_HOME/matugen/templates/silere-shell/Theme.json")"
+
+# ── matugen template ─────────────────────────────────────────────────────────────
+_section "matugen template"
+TMPL_SRC="$ROOT/assets/matugen-theme.json"
+TMPL_DST="$CONFIG_HOME/matugen/templates/silere-shell/Theme.json"
+if ! $has_matugen; then
+    _skip "matugen not installed"
+elif _install_file "matugen template" "$TMPL_SRC" "$TMPL_DST"; then
+    did_tmpl=true
+fi
+
+# ── matugen config.toml ──────────────────────────────────────────────────────────
+_section "matugen config.toml"
+MATUGEN_CFG="$CONFIG_HOME/matugen/config.toml"
+
+if ! $has_matugen; then
+    _skip "matugen not installed"
+elif [ -f "$MATUGEN_CFG" ] && grep -q '# silere-shell begin' "$MATUGEN_CFG"; then
+    if grep -qF "input_path  = $MATUGEN_INPUT_TOML" "$MATUGEN_CFG" \
+            && grep -qF "output_path = $MATUGEN_OUTPUT_TOML" "$MATUGEN_CFG"; then
+        _ok "entry already present"
+    elif _ask "Update the existing Silere entry for this install?"; then
+        _backup "$MATUGEN_CFG"
+        if _replace_matugen_block "$MATUGEN_CFG" "$MATUGEN_INPUT_TOML" "$MATUGEN_OUTPUT_TOML"; then
+            _ok "entry updated"; did_toml=true
+        else
+            _warn "could not update $MATUGEN_CFG"
+        fi
+    else
+        _skip "existing entry left unchanged"
+    fi
+elif _matugen_table_present "$MATUGEN_CFG"; then
+    _warn "an unmanaged [templates.silere-shell] entry already exists"
+    _skip "left $MATUGEN_CFG unchanged"
+else
+    if _ask "Add entry to $MATUGEN_CFG?"; then
+        cfg_existed=false
+        [ -f "$MATUGEN_CFG" ] && cfg_existed=true
+        mkdir -p "${MATUGEN_CFG%/*}"
+        [ ! -f "$MATUGEN_CFG" ] && printf '[config]\nversion_check = false\n' > "$MATUGEN_CFG"
+        $cfg_existed && _backup "$MATUGEN_CFG"
+        cat >> "$MATUGEN_CFG" <<EOF
+
+# silere-shell begin
+[templates.silere-shell]
+input_path  = $MATUGEN_INPUT_TOML
+output_path = $MATUGEN_OUTPUT_TOML
+# silere-shell end
+EOF
+        _ok "entry added"; did_toml=true
+    else
+        _skip "skipped"
+    fi
+fi
+
+# ── Hyprland autostart ───────────────────────────────────────────────────────────
+_section "autostart"
+HYPR_CONF="$CONFIG_HOME/hypr/hyprland.conf"
+HYPR_LUA="$CONFIG_HOME/hypr/hyprland.lua"
+
+# A compositor launched with `Hyprland --config /custom/path` does not expose
+# that choice through XDG_CONFIG_HOME. Prefer an explicit installer override,
+# then inspect the current same-user Hyprland session, and only then use the
+# standard roots. Relative process arguments are resolved via /proc/PID/cwd.
+HYPR_CONFIG="$(_hypr_config_path)"
+if [ -n "$HYPR_CONFIG" ]; then
+    _reject_unsafe_path "$HYPR_CONFIG"
+    # warn rather than die, the way the niri branch already does: the clone, font and
+    # matugen wiring are done by now, so a bad SILERE_HYPR_CONFIG must drop to the
+    # manual-autostart path instead of aborting on top of a half-finished install
+    if [ ! -f "$HYPR_CONFIG" ]; then
+        _warn "Hyprland config not found: $HYPR_CONFIG"
+        HYPR_CONFIG=""
+    else
+        case "$HYPR_CONFIG" in
+            *.lua|*.conf) ;;
+            *) _warn "Hyprland config must end in .lua or .conf: $HYPR_CONFIG"
+               HYPR_CONFIG="" ;;
+        esac
+    fi
+fi
+# Quickshell links jemalloc, which defaults to 4×nCPU arenas and no purge thread,
+# so memory freed after a spike (menu close, wifi scan, notification burst) is
+# retained rather than returned to the OS — RSS only ever climbs. Fewer arenas
+# plus a background decay thread hand it back. ~50 MB reclaimed per spike here;
+# Override (or explicitly clear) this by exporting MALLOC_CONF before launch.
+MALLOC_TUNE="narenas:2,background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0"
+
+# Qt Quick keeps a CPU-side copy of every image it uploads to the GPU (album art,
+# notification images, app icons). Transient mode frees the copy after upload;
+# worst case is a re-decode if the texture is ever lost, which never happens on
+# a long-lived desktop session.
+QSG_TUNE="1"
+
+# On hybrid GPUs that render on the iGPU, libglvnd still loads the nvidia EGL
+# vendor into every GL process (~33 MB unused). Pin to mesa to skip it — but only
+# when the active renderer isn't nvidia, or we'd force llvmpipe and break GPU
+# rendering. No glxinfo / NVIDIA-only / iGPU-only: leave it unset.
+EGL_PIN=""
+_mesa_egl="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+_nv_egl="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
+if [ -f "$_mesa_egl" ] && [ -f "$_nv_egl" ] && command -v glxinfo >/dev/null 2>&1; then
+    _renderer="$(glxinfo -B 2>/dev/null | grep -i 'OpenGL renderer' || true)"
+    if [ -n "$_renderer" ] && ! printf '%s\n' "$_renderer" | grep -qi nvidia; then
+        EGL_PIN="__EGL_VENDOR_LIBRARY_FILENAMES=$_mesa_egl "
+        _ok "EGL pinned to mesa (skips unused nvidia driver, ~33 MB)"
+    fi
+fi
+# sleep 1: at Hyprland start the Wayland socket may not be ready yet; without the
+# delay Qt's platform plugin aborts with SIGABRT in createEventDispatcher. Braces
+# group delay+launch so || short-circuits correctly in exec_unless_running.
+MALLOC_ENV_ARG='MALLOC_CONF="${MALLOC_CONF-'"$MALLOC_TUNE"'}" '
+QSG_ENV_ARG='QSG_TRANSIENT_IMAGES="${QSG_TRANSIENT_IMAGES-'"$QSG_TUNE"'}" '
+EGL_ENV_ARG=""
+[ -n "$EGL_PIN" ] && EGL_ENV_ARG='__EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES-'"$_mesa_egl"'}" '
+LAUNCH_CMD="{ umask 077; sleep 1; env ${MALLOC_ENV_ARG}${QSG_ENV_ARG}${EGL_ENV_ARG}qs -p \"\$(printf '%b' $ROOT_PRINTF_BYTES)/shell.qml\"; }"
+LAUNCH_CMD_LUA="$(_lua_string "$LAUNCH_CMD")"
+
+_already_present() { grep -qF 'silere-shell begin' "$1" 2>/dev/null; }
+
+# autostart targets sit several levels deep and there can be more than one
+# execs.lua candidate, so every prompt below names the file it will append to
+_tilde() {
+    case "$1" in
+        "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# niri documents NIRI_CONFIG as its own config override; SILERE_NIRI_CONFIG wins over it
+NIRI_CONFIG_OVERRIDE="${SILERE_NIRI_CONFIG:-${NIRI_CONFIG:-}}"
+NIRI_CONFIG="$(_niri_config_path)"
+_autostart_done=false
+
+# niri session wins; fall back to a niri config only when no Hyprland session is live
+if [ -n "${NIRI_SOCKET:-}" ] || [ "${XDG_CURRENT_DESKTOP:-}" = "niri" ] \
+    || [ -n "$NIRI_CONFIG_OVERRIDE" ] \
+    || { [ -z "$HYPR_CONFIG" ] && [ -f "$NIRI_CONFIG" ]; }; then
+    NIRI_SPAWN="spawn-at-startup \"sh\" \"-c\" $(_lua_string "$LAUNCH_CMD")"
+    if [ ! -f "$NIRI_CONFIG" ]; then
+        _warn "no niri config at $(_tilde "$NIRI_CONFIG")"
+        _warn "add manually: $NIRI_SPAWN"
+    else
+        _ok "found niri config at $(_tilde "$NIRI_CONFIG")"
+        if _already_present "$NIRI_CONFIG"; then
+            _ok "already present in $(_tilde "$NIRI_CONFIG")"; autostart_ready=true
+        elif _ask "Add spawn-at-startup to $(_tilde "$NIRI_CONFIG")?"; then
+            _reject_unsafe_path "$NIRI_CONFIG"
+            _backup "$NIRI_CONFIG"
+            printf '\n// silere-shell begin\n%s\n// silere-shell end\n' "$NIRI_SPAWN" >> "$NIRI_CONFIG"
+            _ok "added to $(_tilde "$NIRI_CONFIG")"; did_autostart=true autostart_ready=true
+        else
+            _skip "skipped — add manually: $NIRI_SPAWN"
+        fi
+    fi
+    _autostart_done=true
+fi
+
+if ! $_autostart_done; then
+HYPR_DIR="$(dirname -- "${HYPR_CONFIG:-$CONFIG_HOME/hypr/hyprland.conf}")"
+
+if [ "$HYPR_CONFIG" = "$HYPR_LUA" ] && [ -f "$HYPR_CONF" ]; then
+    _warn "both hyprland.lua and hyprland.conf found; Lua takes priority"
+fi
+
+if [[ "$HYPR_CONFIG" == *.lua ]]; then
+    LUA_EXEC_FILE=""
+    for candidate in \
+        "$HYPR_DIR/custom/execs.lua" \
+        "$HYPR_DIR/hyprland/execs.lua" \
+        "$HYPR_DIR/execs.lua"
+    do
+        [ -f "$candidate" ] && { LUA_EXEC_FILE="$candidate"; break; }
+    done
+
+    _ok "found Hyprland Lua config at $(_tilde "$HYPR_CONFIG")"
+
+    if [ -n "$LUA_EXEC_FILE" ] && _already_present "$LUA_EXEC_FILE"; then
+        _ok "already present in $(_tilde "$LUA_EXEC_FILE")"; autostart_ready=true
+    elif [ -n "$LUA_EXEC_FILE" ]; then
+        if _ask "Add autostart to $(_tilde "$LUA_EXEC_FILE")?"; then
+            _backup "$LUA_EXEC_FILE"
+            cat >> "$LUA_EXEC_FILE" <<EOF
+
+-- silere-shell begin
+hl.on("hyprland.start", function()
+    hl.exec_cmd($LAUNCH_CMD_LUA)
+end)
+-- silere-shell end
+EOF
+            _ok "added to $(_tilde "$LUA_EXEC_FILE")"; did_autostart=true autostart_ready=true
+        else
+            _skip "skipped — add manually: hl.exec_cmd($LAUNCH_CMD_LUA)"
+        fi
+    else
+        # appending to hyprland.lua itself is not safe: Lua requires `return` to end
+        # a block, so a snippet after it is a syntax error that breaks the whole config
+        _warn "Lua config detected but no execs.lua found — looked in:"
+        _warn "  $(_tilde "$HYPR_DIR")/{custom,hyprland}/execs.lua and $(_tilde "$HYPR_DIR")/execs.lua"
+        _warn "create one of those and re-run, or add manually:"
+        _warn "  hl.on(\"hyprland.start\", function() hl.exec_cmd($LAUNCH_CMD_LUA) end)"
+    fi
+
+elif [[ "$HYPR_CONFIG" == *.conf ]]; then
+    _ok "found Hyprland config at $(_tilde "$HYPR_CONFIG")"
+    if _already_present "$HYPR_CONFIG"; then
+        _ok "already present in $(_tilde "$HYPR_CONFIG")"; autostart_ready=true
+    else
+        if _ask "Add exec-once to $(_tilde "$HYPR_CONFIG")?"; then
+            _backup "$HYPR_CONFIG"
+            cat >> "$HYPR_CONFIG" <<EOF
+
+# silere-shell begin
+exec-once = $LAUNCH_CMD
+# silere-shell end
+EOF
+            _ok "added"; did_autostart=true autostart_ready=true
+        else
+            _skip "skipped — add manually: exec-once = $LAUNCH_CMD"
+        fi
+    fi
+else
+    _warn "no Hyprland config found"
+    _warn "add manually: exec-once = $LAUNCH_CMD"
+fi
+fi
+
+# ── update-check timer ──────────────────────────────────────────────────────────────
+_section "update-check timer"
+
+if ! command -v systemctl >/dev/null 2>&1; then
+    _skip "systemctl not found"
+elif _ask_no "Install daily update-check timer (flags pending updates in the bar)?"; then
+    if "$ROOT/scripts/update.sh" --timer-enable 2>/dev/null; then
+        _ok "enabled — checks for Silere updates and shows a bar badge when one is ready"
+        did_update=true
+    else
+        _warn "units installed but enable failed — run: systemctl --user enable --now silere-update.timer"
+    fi
+else
+    _skip "skipped — enable later with: $ROOT/scripts/update.sh --timer-enable"
+fi
+
+# ── summary ──────────────────────────────────────────────────────────────────────
+printf "\n${BOLD}==> done${R}\n"
+printf "    ${GREEN}ok${R}      installed at %s\n" "$ROOT"
+$did_font      && printf "    ${GREEN}ok${R}      JetBrainsMono Nerd Font\n" || printf "    ${DIM}skip${R}    JetBrainsMono Nerd Font\n"
+$did_tmpl      && printf "    ${GREEN}ok${R}      matugen template\n" || printf "    ${DIM}skip${R}    matugen template\n"
+$did_toml      && printf "    ${GREEN}ok${R}      matugen toml\n"     || printf "    ${DIM}skip${R}    matugen toml\n"
+$did_autostart && printf "    ${GREEN}ok${R}      autostart\n"        || printf "    ${DIM}skip${R}    autostart\n"
+$did_update    && printf "    ${GREEN}ok${R}      update-check timer\n" || printf "    ${DIM}skip${R}    update-check timer\n"
+# a missing runtime and an unwired autostart are independent, so report them
+# separately — chaining them tells a user to restart into a shell nothing launches
+printf '\n'
+if ! $has_qs; then
+    printf "  ${YELLOW}install Quickshell${R}\n"
+elif ! $qs_modules_ok; then
+    printf "  ${YELLOW}install a complete current Quickshell build${R}\n"
+fi
+if $autostart_ready; then
+    printf "  restart your compositor to launch silere\n"
+else
+    printf "  ${YELLOW}autostart is not set up${R} — silere will not start on its own\n"
+    printf "  add the line above to your Hyprland or niri config, or run it now:\n"
+    printf "    ${DIM}qs -p %s/shell.qml${R}\n" "$ROOT"
+fi
+printf "  click the active workspace diamond to open the menu and settings\n"
+printf "  or bind it: ${DIM}qs ipc -p %s/shell.qml call menu toggle${R}\n" "$ROOT"
+# a packaged install ships no uninstall.sh: pointing at it there sends the user
+# to a path that does not exist and would fight their package manager if it did
+if [ -f "$ROOT/scripts/uninstall.sh" ]; then
+    printf "  to uninstall: ${DIM}%s/scripts/uninstall.sh${R}\n" "$ROOT"
+fi
+printf "\n"

@@ -1,0 +1,87 @@
+pragma Singleton
+
+import QtQuick
+import Quickshell
+
+Singleton {
+    id: root
+
+    readonly property ShellScreen overlayScreen: {
+        const screens = Quickshell.screens
+        if (!screens || screens.length === 0) return null
+
+        const pin = ShellSettings.overlayMonitor
+        if (pin && pin.length > 0) {
+            for (let i = 0; i < screens.length; i++)
+                if (screens[i].name === pin) return screens[i]
+        }
+
+        const focused = Compositor.focusedMonitor
+        if (focused && focused.length > 0) {
+            for (let i = 0; i < screens.length; i++)
+                if (screens[i].name === focused) return screens[i]
+        }
+        return screens[0]
+    }
+
+    readonly property string activeName: overlayScreen ? overlayScreen.name : ""
+
+    // bar content only, so this resolves against the bar-hosting screen: the overlay screen
+    // can be one with no bar, and that must not freeze the sole bar the user is looking at
+    function isActive(screen): bool {
+        return !screen || overlayBarName === screen.name
+    }
+
+    function _configuredBarEnabled(screen): bool {
+        if (!screen) return false
+        const off = ShellSettings.barDisabledMonitors
+        if (!off || off.length === 0) return true
+        return ("," + off + ",").indexOf("," + screen.name + ",") < 0
+    }
+
+    function barEnabled(screen): bool {
+        if (!screen) return false
+        if (_configuredBarEnabled(screen)) return true
+
+        const screens = Quickshell.screens || []
+        for (let i = 0; i < screens.length; i++)
+            if (_configuredBarEnabled(screens[i])) return false
+
+        const fallback = overlayScreen || screens[0]
+        return !!fallback && fallback.name === screen.name
+    }
+
+    readonly property int liveBarCount: {
+        const screens = Quickshell.screens || []
+        let n = 0
+        for (let i = 0; i < screens.length; i++) if (barEnabled(screens[i])) n++
+        return n
+    }
+
+    readonly property ShellScreen overlayBarScreen: {
+        const preferred = overlayScreen
+        if (barEnabled(preferred)) return preferred
+
+        const screens = Quickshell.screens || []
+        for (let i = 0; i < screens.length; i++)
+            if (barEnabled(screens[i])) return screens[i]
+        return null
+    }
+    readonly property string overlayBarName: overlayBarScreen ? overlayBarScreen.name : ""
+
+    function setBarEnabled(name: string, on: bool): void {
+        if (!name || name.length === 0) return
+        const parts = (ShellSettings.barDisabledMonitors || "").split(",").filter(s => s.length > 0)
+        const idx = parts.indexOf(name)
+        if (on) {
+            if (idx < 0) return
+            parts.splice(idx, 1)
+        } else {
+            if (idx >= 0) return
+            // never turn off the last live bar — the menu opens from it
+            if (root.liveBarCount <= 1) return
+            parts.push(name)
+        }
+        ShellSettings.barDisabledMonitors = parts.join(",")
+    }
+}

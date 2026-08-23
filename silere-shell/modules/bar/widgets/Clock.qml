@@ -1,0 +1,139 @@
+import QtQuick
+import "../../../config"
+import "../../../services"
+import "../../common"
+
+Row {
+    id: root
+    spacing: 0
+    leftPadding: Metrics.pillPadFor(compact)
+    rightPadding: Metrics.pillPadFor(compact)
+
+    property var screen: null
+    property bool compact: ShellSettings.barCompact
+    property real menuAnchorX: 0
+
+    // a keybind opens with no trigger widget, so the state's fallback x has to stay fresh
+    readonly property bool _anchorFallbackBar: !!root.screen && root.screen.name === Monitors.overlayBarName
+
+    function _syncMenuAnchor(): void {
+        const pt = root.mapToItem(null, root.width / 2, 0)
+        if (!isFinite(pt.x)) return
+        root.menuAnchorX = pt.x
+        if (root._anchorFallbackBar) CalendarState.anchorX = pt.x
+    }
+    on_AnchorFallbackBarChanged: root._syncMenuAnchor()
+    Connections {
+        target: CalendarState
+        // mapToItem sees no ancestor geometry, so the cached x is a stale layout pass by now
+        function onOpenChanged() {
+            if (CalendarState.open && CalendarState.anchorSource === null) root._syncMenuAnchor()
+        }
+    }
+
+    onXChanged: root._syncMenuAnchor()
+    onYChanged: root._syncMenuAnchor()
+    onWidthChanged: root._syncMenuAnchor()
+    Component.onCompleted: root._syncMenuAnchor()
+
+    readonly property bool mirrored: ShellSettings.barWidgetOrderLeftKeys.indexOf("clock") !== -1
+    layoutDirection: mirrored ? Qt.RightToLeft : Qt.LeftToRight
+
+    readonly property bool show: ShellSettings.barShowClock
+    visible: show
+
+    readonly property bool  _hov:    (_hover.hovered && ShellSettings.barHoverHighlight)
+    readonly property color _cSub:   _hov ? Theme.mix(Theme.subtext, Theme.accent, 0.30) : Theme.subtext
+    readonly property color _cText:  _hov ? Theme.mix(Theme.text,    Theme.accent, 0.30) : Theme.text
+    readonly property color _cFaint: _hov ? Theme.mix(Theme.withAlpha(Theme.text, 0.65), Theme.accent, 0.30)
+                                          : Theme.withAlpha(Theme.text, 0.65)
+    readonly property color _cSec:   _hov ? Theme.mix(Theme.accent, Theme.text, 0.22)
+                                          : Theme.withAlpha(Theme.accent, 0.82)
+
+    HoverHandler { id: _hover; cursorShape: Qt.PointingHandCursor }
+
+    function _openCalendar(): void {
+        root._syncMenuAnchor()
+        CalendarState.toggleAt(root.menuAnchorX, root.screen, root)
+    }
+
+    Item {
+        id: _dateSectionClip
+        anchors.verticalCenter: parent.verticalCenter
+        height:  _dateRow.implicitHeight
+        width:   ShellSettings.clockShowDate ? _dateRow.implicitWidth + Metrics.clockDateGapFor(root.compact) : 0
+        opacity: ShellSettings.clockShowDate ? 1.0 : 0.0
+        visible: ShellSettings.clockShowDate || opacity > 0.001
+        clip:    true
+
+        MotionBehavior on width   {NumberAnimation { duration: Motion.width; easing.type: Easing.OutCubic } }
+        MotionBehavior on opacity {NumberAnimation { duration: Motion.width; easing.type: Easing.OutCubic } }
+
+        Row {
+            id: _dateRow
+            anchors.verticalCenter: parent.verticalCenter
+            x: root.mirrored ? parent.width - width : 0
+            spacing: 0
+
+            CollapsingText {
+                text:     DateTime.cachedDayName
+                color:    root._cSub
+                expanded: !ShellSettings.compactDate && !root.compact
+            }
+            RollingText {
+                text:  DateTime.cachedDateCore
+                color: root._cSub
+            }
+        }
+    }
+
+    Row {
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 0
+
+        RollingText {
+            text:  DateTime.cachedHour
+            color: root._cText
+        }
+        RollingText { text: ":"; color: root._cText }
+        RollingText {
+            text:  DateTime.cachedMinute
+            color: root._cText
+        }
+        CollapsingText {
+            text:     DateTime.cachedSeconds
+            color:    root._cSec
+            expanded: ShellSettings.showSeconds
+            reserveText: ":00"
+        }
+        CollapsingText {
+            text:     DateTime.cachedAmPm ? " " + DateTime.cachedAmPm : ""
+            color:    root._cFaint
+            expanded: ShellSettings.clock12h
+        }
+    }
+
+    Accessible.role: Accessible.Button
+    Accessible.name: "Clock, " + DateTime.cachedHour + ":" + DateTime.cachedMinute
+        + (DateTime.cachedAmPm.length > 0 ? " " + DateTime.cachedAmPm : "")
+    Accessible.focusable: true
+    Accessible.onPressAction: root._openCalendar()
+
+    TapHandler {
+        id: _calTap
+        acceptedButtons: Qt.LeftButton
+        onTapped: root._openCalendar()
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.MiddleButton
+        onTapped: ShellSettings.batch(() => {
+            const s = ShellSettings.showSeconds
+            const d = ShellSettings.clockShowDate
+            if (!s && !d)     { ShellSettings.showSeconds = true }
+            else if (s && !d) { ShellSettings.showSeconds = false; ShellSettings.clockShowDate = true }
+            else if (!s && d) { ShellSettings.showSeconds = true }
+            else              { ShellSettings.showSeconds = false; ShellSettings.clockShowDate = false }
+        })
+    }
+}

@@ -1,0 +1,320 @@
+pragma Singleton
+
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+Singleton {
+    id: root
+
+    property bool enabled:        false
+    property string lastError:    ""
+    property bool _stopping:      false
+    property bool _pendingEnable: false
+    readonly property bool toolAvailable: SystemTools.hasHyprsunset
+    readonly property int  temperature: ShellSettings.nightLightTemp
+
+    property bool _geoResolved: false
+    property real _autoLat: 0
+    property real _autoLon: 0
+    readonly property real _useLat: _geoResolved ? _autoLat : 45.0
+    readonly property real _useLon: _geoResolved ? _autoLon
+                                                 : -(new Date().getTimezoneOffset()) / 4
+    readonly property string locationLabel:
+        Math.abs(_useLat).toFixed(0) + "°" + (_useLat >= 0 ? "N" : "S")
+
+    property int _solarTick: 0
+    readonly property real _declRad: {
+        root._solarTick
+        const d = new Date()
+        const n = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000)
+        return 23.44 * Math.sin(2 * Math.PI * (n - 81) / 365) * Math.PI / 180
+    }
+    readonly property real _elevation: {
+        root._solarTick
+        const d    = new Date()
+        const decl = root._declRad
+        const h    = ((d.getUTCHours() + d.getUTCMinutes() / 60 + root._useLon / 15 - 12) * 15) * Math.PI / 180
+        const phi  = root._useLat * Math.PI / 180
+        return Math.asin(Math.sin(phi) * Math.sin(decl) +
+                         Math.cos(phi) * Math.cos(decl) * Math.cos(h)) * 180 / Math.PI
+    }
+    readonly property int suggestedTemp: {
+        const elev = root._elevation
+        if (elev >= 6)  return 6500
+        if (elev <= -6) return 3000
+        return Math.round((3000 + 3500 * (elev + 6) / 12) / 100) * 100
+    }
+
+    readonly property real _solarNoon: {
+        root._solarTick
+        return 12 - root._useLon / 15 - (new Date()).getTimezoneOffset() / 60
+    }
+    readonly property real _halfDay: {
+        const c = Math.max(-1, Math.min(1, -Math.tan(root._useLat * Math.PI / 180) * Math.tan(root._declRad)))
+        return Math.acos(c) * 180 / Math.PI / 15
+    }
+    readonly property real sunriseHour: _solarNoon - _halfDay
+    readonly property real sunsetHour:  _solarNoon + _halfDay
+    readonly property real _nowHour: { root._solarTick; const d = new Date(); return d.getHours() + d.getMinutes() / 60 }
+    readonly property bool isDaytime: _halfDay > 0 && _nowHour >= sunriseHour && _nowHour <= sunsetHour
+    readonly property real dayProgress:
+        _halfDay <= 0 ? -1 : Math.max(0, Math.min(1, (_nowHour - sunriseHour) / (sunsetHour - sunriseHour)))
+    readonly property real nightProgress: {
+        if (_halfDay <= 0) return 0
+        const nightDur = 24 - (sunsetHour - sunriseHour)
+        if (nightDur <= 0) return 0
+        const afterSunset = (_nowHour - sunsetHour + 24) % 24
+        return Math.max(0, Math.min(1, afterSunset / nightDur))
+    }
+
+    function _fmtHour(h: real): string {
+        if (!isFinite(h)) return "--:--"
+        let hh = Math.floor(((h % 24) + 24) % 24)
+        let mm = Math.round((h - Math.floor(h)) * 60)
+        if (mm >= 60) { mm -= 60; hh = (hh + 1) % 24 }
+        return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm
+    }
+    readonly property string sunriseLabel: _halfDay <= 0 ? "--:--" : _fmtHour(sunriseHour)
+    readonly property string sunsetLabel:  _halfDay <= 0 ? "--:--" : _fmtHour(sunsetHour)
+
+    function _dur(mins: real): string {
+        const m = Math.max(0, Math.round(mins))
+        const hh = Math.floor(m / 60), mm = m % 60
+        return hh > 0 ? (hh + "h " + (mm < 10 ? "0" : "") + mm + "m") : (mm + "m")
+    }
+    readonly property string phaseLabel: {
+        root._solarTick
+        if (_halfDay <= 0)  return "polar night"
+        if (_halfDay >= 12) return "midnight sun"
+        if (isDaytime)            return _dur((sunsetHour - _nowHour) * 60) + " of daylight"
+        if (_nowHour < sunriseHour) return "sunrise in " + _dur((sunriseHour - _nowHour) * 60)
+        return "sunrise in " + _dur((24 - _nowHour + sunriseHour) * 60)
+    }
+
+    readonly property bool recommended: _elevation < 0
+    readonly property string recommendLabel: {
+        // this lands in the same row slot as "Not connected" and "Quiet hours", which are
+        // sentence case; phaseLabel is a caption inside the arc and stays lowercase
+        if (_halfDay >= 12)  return ""
+        if (recommended)     return "Recommended"
+        if (_elevation < 12) return "From " + sunsetLabel
+        return ""
+    }
+
+    function _parseCoord(s: string): void {
+        const m = /^([+-]\d{2})(\d{2})(\d{2})?([+-]\d{3})(\d{2})(\d{2})?$/.exec((s || "").trim())
+        if (!m) return
+        const latSign = m[1].charAt(0) === "-" ? -1 : 1
+        const lonSign = m[4].charAt(0) === "-" ? -1 : 1
+        root._autoLat = latSign * (Math.abs(Number(m[1])) + Number(m[2]) / 60 + (m[3] ? Number(m[3]) : 0) / 3600)
+        root._autoLon = lonSign * (Math.abs(Number(m[4])) + Number(m[5]) / 60 + (m[6] ? Number(m[6]) : 0) / 3600)
+        root._geoResolved = true
+    }
+
+    BoundedProcess {
+        id: _geoProc
+        running: false
+        timeoutMs: 5000
+        command: ["bash", "-c",
+            "tz=\"$(timedatectl show -p Timezone --value 2>/dev/null)\"; " +
+            "[ -z \"$tz\" ] && tz=\"$(readlink -f /etc/localtime 2>/dev/null | sed -n 's#.*/zoneinfo/##p')\"; " +
+            "[ -z \"$tz\" ] && [ -r /etc/timezone ] && tz=\"$(cat /etc/timezone)\"; " +
+            "[ -z \"$tz\" ] && exit 0; " +
+            "for f in /usr/share/zoneinfo/zone1970.tab /usr/share/zoneinfo/zone.tab; do " +
+            "  [ -r \"$f\" ] || continue; " +
+            "  c=\"$(awk -v z=\"$tz\" 'BEGIN{FS=\"\\t\"} $0 !~ /^#/ && $3==z {print $2; exit}' \"$f\")\"; " +
+            "  [ -n \"$c\" ] && { printf '%s\\n' \"$c\"; break; }; " +
+            "done"]
+        stdout: StdioCollector { id: _geoOut }
+        onExited: root._parseCoord(_geoOut.text)
+    }
+
+    Timer {
+        interval: 60000; repeat: true
+        running: root.toolAvailable && ShellSettings.nightLightAuto && root.enabled && !Idle.isIdle
+        onTriggered: root._solarTick++
+    }
+    Connections {
+        target: MenuState
+        function onOpenChanged() { if (MenuState.open) root._solarTick++ }
+    }
+    Connections {
+        target: Idle
+        function onIsIdleChanged() {
+            if (!Idle.isIdle && ShellSettings.nightLightAuto && root.enabled) root._solarTick++
+        }
+    }
+
+    onSuggestedTempChanged: {
+        if (ShellSettings.nightLightAuto && root.enabled) ShellSettings.nightLightTemp = root.suggestedTemp
+    }
+    Connections {
+        target: ShellSettings
+        function onNightLightAutoChanged() {
+            if (ShellSettings.nightLightAuto && root.enabled) {
+                root._solarTick++
+                ShellSettings.nightLightTemp = root.suggestedTemp
+            }
+        }
+    }
+
+    function _startSunset(): void {
+        root.lastError = ""
+        _sunsetProc.command = ["hyprsunset", "-t", String(temperature)]
+        _sunsetProc.running = true
+        enabled = true
+    }
+
+    onTemperatureChanged: {
+        if (!root.enabled || !root.toolAvailable) return
+        _pendingEnable = true
+        if (_sunsetProc.running || _stopping) {
+            _stopping = true
+            if (_sunsetProc.running) _sunsetProc.running = false
+        } else if (SystemTools.hasPkill && !_killProc.running) {
+            _killProc.exec(["pkill", "-x", "hyprsunset"])
+        } else if (!_killProc.running) {
+            _pendingEnable = false
+            root.lastError = "Install pkill to change an external night light"
+        }
+    }
+
+    function toggle(): void {
+        if (!toolAvailable) return
+        if (enabled) {
+            _pendingEnable = false
+            if (_killProc.running) { enabled = false; return }
+            if (_sunsetProc.running || _stopping) {
+                _stopping = true
+                if (_sunsetProc.running) _sunsetProc.running = false
+            } else if (SystemTools.hasPkill) {
+                _killProc.exec(["pkill", "-x", "hyprsunset"])
+            } else {
+                root.lastError = "Install pkill to stop an external night light"
+                return
+            }
+            enabled = false
+        } else {
+            if (_sunsetProc.running || _stopping) { _pendingEnable = true; return }
+            // don't spawn while a fallback pkill is in flight — it matches hyprsunset by name and would kill the new instance; queue instead
+            if (_killProc.running) { _pendingEnable = true; return }
+            if (ShellSettings.nightLightAuto) {
+                root._solarTick++
+                ShellSettings.nightLightTemp = root.suggestedTemp
+            }
+            _startSunset()
+        }
+    }
+
+    // the menu is what instantiates this singleton, so _startGeo's opening edge is already spent by first load
+    Component.onCompleted: { _init(); _startGeo() }
+
+    property bool _geoStarted: false
+    readonly property bool _geoWanted: toolAvailable && (ShellSettings.nightLightAuto || MenuState.open)
+    function _startGeo(): void {
+        if (_geoStarted || !_geoWanted) return
+        _geoStarted = true
+        _geoProc.running = true
+    }
+
+    function _init(): void {
+        if (!SystemTools.ready) return
+        if (!toolAvailable) { enabled = false; return }
+        if (!SystemTools.hasPgrep) { enabled = _sunsetProc.running; return }
+        if (!_sunsetProc.running) enabled = false
+        if (!_checkProc.running) _checkProc.exec(["pgrep", "-x", "hyprsunset"])
+    }
+
+    function _syncToolAvailability(): void {
+        if (!SystemTools.ready) return
+        if (!root.toolAvailable) {
+            root._pendingEnable = false
+            root.enabled = false
+            root.lastError = ""
+            if (_checkProc.running) _checkProc.running = false
+            if (_killProc.running) _killProc.running = false
+            if (_sunsetProc.running) {
+                root._stopping = true
+                _sunsetProc.running = false
+            } else {
+                root._stopping = false
+            }
+            return
+        }
+        root._init()
+        root._startGeo()
+    }
+
+    Connections {
+        target: SystemTools
+        function onReadyChanged() { root._syncToolAvailability() }
+        function onScanRevisionChanged() { root._syncToolAvailability() }
+    }
+    Connections {
+        target: ShellSettings
+        function onNightLightAutoChanged() { root._startGeo() }
+    }
+    Connections {
+        target: MenuState
+        function onOpenChanged() { root._startGeo() }
+    }
+
+    BoundedProcess {
+        id: _checkProc
+        timeoutMs: 5000
+        stdout: SplitParser { onRead: root.enabled = true }
+        // pgrep answers "no match" with 1, so only 2+ or a timeout means the probe never ran
+        onExited: (code) => {
+            if (!root.toolAvailable) return
+            if (_checkProc.timedOut || code > 1) {
+                root.lastError = "could not check for a running hyprsunset"
+                return
+            }
+            if (code === 0) root.enabled = true
+        }
+    }
+
+    Process {
+        id: _sunsetProc
+        running: false
+        stderr: StdioCollector { id: _sunsetErr }
+        onExited: (code) => {
+            if (root._stopping) {
+                root._stopping = false
+                if (root._pendingEnable) {
+                    root._pendingEnable = false
+                    root._startSunset()
+                }
+                return
+            }
+            // not a deliberate stop: hyprsunset quit on its own, and enabled was set
+            // optimistically at launch, so without this the toggle just flips back unexplained
+            if (code !== 0)
+                root.lastError = _sunsetErr.text.trim().split("\n").pop() || "hyprsunset stopped unexpectedly"
+            if (root.enabled) root.enabled = false
+        }
+    }
+
+    Process {
+        id: _killProc
+        onExited: (code) => {
+            if (!root.toolAvailable) {
+                root._pendingEnable = false
+                root.lastError = ""
+                return
+            }
+            if (code !== 0) {
+                root._pendingEnable = false
+                root.lastError = "Could not stop the external night light"
+                root._init()
+                return
+            }
+            root.lastError = ""
+            if (root._pendingEnable) {
+                root._pendingEnable = false
+                root._startSunset()
+            }
+        }
+    }
+}
