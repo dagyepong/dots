@@ -5,7 +5,7 @@ set -euo pipefail
 # Hardening Script for Arch Linux / Artix Linux
 # Copyright (C) 2019 Nana Oware
 # Copyright (C) 2025-2026 Nana Oware
-# Refined and enhanced with native systemd-boot support.
+# Refined and enhanced with native systemd-boot and NVIDIA hardened support.
 
 log() { printf '%s [INFO] [OK] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 warn() { printf '%s [WARN] [WARN] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
@@ -81,7 +81,7 @@ svc_mask() {
         rm -f "/run/runit/service/$svc" "/var/service/$svc" 2>/dev/null
         ;;
     "$INIT_S6")
-        s6-rc -d change "$svc" 2>/dev/null
+        s6-rc-d change "$svc" 2>/dev/null
         s6-rc-bundle delete default "$svc" 2>/dev/null || true
         ;;
     "$INIT_DINIT")
@@ -193,7 +193,6 @@ EOF
         elif [ "${use_syslinux}" = "y" ]; then
             sed -i '/MENU LABEL Arch Linux/,/^$/ { /APPEND/ s|$| '"${kernel_params}"'| }' /boot/syslinux/syslinux.cfg
         elif [ "${use_systemd_boot}" = "y" ]; then
-            # Append parameters to all existing entries in systemd-boot
             for entry in /boot/loader/entries/*.conf; do
                 if [ -f "$entry" ] && ! grep -q "slab_nomerge" "$entry"; then
                     sed -i "s|^options \(.*\)$|options \1 ${kernel_params}|" "$entry"
@@ -209,19 +208,57 @@ install_linux_hardened() {
     if [ "${linux_hardened_ans}" = "y" ]; then
         pacman -S --noconfirm -q linux-hardened linux-hardened-headers
 
-        # Automatically generate a systemd-boot entry if using systemd-boot
         if [ "${use_systemd_boot}" = "y" ]; then
             log "Generating systemd-boot entry for linux-hardened..."
             local stock_entry
             stock_entry=$(ls -t /boot/loader/entries/*.conf | grep -v 'hardened' | head -n 1)
             
             if [ -n "$stock_entry" ] && [ -f "$stock_entry" ]; then
-                sed 's/Arch Linux (linux)/Arch Linux (Hardened)/; s|/vmlinuz-linux|/vmlinuz-linux-hardened|; s|/initramfs-linux.img|/initramfs-linux-hardened.img|' "$stock_entry" > /boot/loader/entries/linux-hardened.conf
+                sed 's/Arch Linux (linux)/Arch Linux (Hardened)/; s|/vmlinuz-linux|/vmlinuz-linux-hardened|; s|/initramfs-linux.img|/initramfs-linux-hardened.img|; s|/initramfs-linux-fallback.img|/initramfs-linux-hardened-fallback.img|' "$stock_entry" > /boot/loader/entries/linux-hardened.conf
+                
+                # Force compilation of the initramfs images
+                mkinitcpio -p linux-hardened
+                
+                # Set linux-hardened as the default boot option in loader.conf
+                if [ -f /boot/loader/loader.conf ]; then
+                    sed -i '/^default/d' /boot/loader/loader.conf
+                    echo "default linux-hardened.conf" >> /boot/loader/loader.conf
+                    log "Set linux-hardened.conf as the default systemd-boot entry."
+                fi
+
+                # Validate systemd-boot entries
+                log "Verifying systemd-boot entries via bootctl..."
+                bootctl update
+                bootctl list
+                
                 log "Successfully created /boot/loader/entries/linux-hardened.conf"
             else
-                warn "Could not find a stock entry to clone from. You may need to create /boot/loader/entries/linux-hardened.conf manually."
+                warn "Could not find a stock entry to clone from. Create /boot/loader/entries/linux-hardened.conf manually."
             fi
         fi
+    fi
+}
+
+nvidia_hardened_support() {
+    read -r -p "Install NVIDIA proprietary drivers (DKMS) for linux-hardened? (y/n) " nvidia_ans
+    if [ "${nvidia_ans}" = "y" ]; then
+        log "Installing NVIDIA DKMS drivers and utilities..."
+        pacman -S --noconfirm --needed nvidia-dkms nvidia-utils lib32-nvidia-utils
+
+        log "Configuring early KMS hooks for NVIDIA in mkinitcpio..."
+        if grep -q "^HOOKS=" /etc/mkinitcpio.conf; then
+            # Ensure nvidia modules are loaded early in the HOOKS or MODULES line if applicable
+            # Standard approach for mkinitcpio with nvidia: add nvidia nvidia_uvm nvidia_drm nvidia_modeset to MODULES
+            if grep -q "^MODULES=" /etc/mkinitcpio.conf; then
+                if ! grep -q "nvidia_modeset" /etc/mkinitcpio.conf; then
+                    sed -i 's/^MODULES=(/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm /' /etc/mkinitcpio.conf
+                fi
+            fi
+        fi
+
+        log "Rebuilding initramfs for linux-hardened with NVIDIA support..."
+        mkinitcpio -p linux-hardened
+        log "NVIDIA setup completed successfully!"
     fi
 }
 
@@ -325,8 +362,9 @@ main() {
     log "Starting hardening script..."
     update_system
     sysctl_hardening
-    boot_parameter_hardening
-    install_linux_hardened
+    install_linux_hardened     # Generates entry, compiles initramfs, sets as default
+    nvidia_hardened_support    # Installs nvidia-dkms and handles early KMS module injection
+    boot_parameter_hardening   # Safely applies flags to all active entries including hardened
     apparmor
     firewall
     restrict_root
