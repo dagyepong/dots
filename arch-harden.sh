@@ -5,7 +5,7 @@ set -euo pipefail
 # Hardening Script for Arch Linux / Artix Linux
 # Copyright (C) 2019 Nana Oware
 # Copyright (C) 2025-2026 Nana Oware
-# Refined and enhanced with native systemd-boot and NVIDIA hardened support.
+# Refined and enhanced with native systemd-boot, NVIDIA DKMS, and advanced security layers.
 
 log() { printf '%s [INFO] [OK] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 warn() { printf '%s [WARN] [WARN] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
@@ -246,19 +246,49 @@ nvidia_hardened_support() {
         pacman -S --noconfirm --needed nvidia-dkms nvidia-utils lib32-nvidia-utils
 
         log "Configuring early KMS hooks for NVIDIA in mkinitcpio..."
-        if grep -q "^HOOKS=" /etc/mkinitcpio.conf; then
-            # Ensure nvidia modules are loaded early in the HOOKS or MODULES line if applicable
-            # Standard approach for mkinitcpio with nvidia: add nvidia nvidia_uvm nvidia_drm nvidia_modeset to MODULES
-            if grep -q "^MODULES=" /etc/mkinitcpio.conf; then
-                if ! grep -q "nvidia_modeset" /etc/mkinitcpio.conf; then
-                    sed -i 's/^MODULES=(/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm /' /etc/mkinitcpio.conf
-                fi
+        if grep -q "^MODULES=" /etc/mkinitcpio.conf; then
+            if ! grep -q "nvidia_modeset" /etc/mkinitcpio.conf; then
+                sed -i 's/^MODULES=(/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm /' /etc/mkinitcpio.conf
             fi
         fi
 
         log "Rebuilding initramfs for linux-hardened with NVIDIA support..."
         mkinitcpio -p linux-hardened
         log "NVIDIA setup completed successfully!"
+    fi
+}
+
+kernel_module_blacklisting() {
+    read -r -p "Blacklist uncommon network protocols and legacy filesystems? (y/n) " blacklist_ans
+    if [ "${blacklist_ans}" = "y" ]; then
+        log "Blacklisting uncommon protocols and filesystems..."
+        cat <<'EOF' >/etc/modprobe.d/harden-blacklist.conf
+# Uncommon network protocols
+install dccp /bin/false
+install sctp /bin/false
+install rds /bin/false
+install tipc /bin/false
+
+# Uncommon or legacy filesystems
+install cramfs /bin/false
+install freevxfs /bin/false
+install jffs2 /bin/false
+install hfs /bin/false
+install hfsplus /bin/false
+install udf /bin/false
+EOF
+        log "Module blacklisting rules written to /etc/modprobe.d/harden-blacklist.conf"
+    fi
+}
+
+core_dump_hardening() {
+    read -r -p "Disable core dumps for unprivileged processes? (y/n) " coredump_ans
+    if [ "${coredump_ans}" = "y" ]; then
+        log "Hardening core dump configurations..."
+        echo "* hard core 0" > /etc/security/limits.d/50-coredumps.conf
+        echo "fs.suid_dumpable = 0" > /etc/sysctl.d/50-suid_dumpable.conf
+        sysctl -w fs.suid_dumpable=0 >/dev/null 2>&1 || true
+        log "Core dumps restricted successfully."
     fi
 }
 
@@ -365,6 +395,8 @@ main() {
     install_linux_hardened     # Generates entry, compiles initramfs, sets as default
     nvidia_hardened_support    # Installs nvidia-dkms and handles early KMS module injection
     boot_parameter_hardening   # Safely applies flags to all active entries including hardened
+    kernel_module_blacklisting # Disables rare attack surface protocols/filesystems
+    core_dump_hardening        # Restricts core memory dumps
     apparmor
     firewall
     restrict_root
