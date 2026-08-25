@@ -206,7 +206,8 @@ EOF
 install_linux_hardened() {
     read -r -p "Install linux-hardened? (y/n) " linux_hardened_ans
     if [ "${linux_hardened_ans}" = "y" ]; then
-        pacman -S --noconfirm -q linux-hardened linux-hardened-headers
+        log "Installing linux-hardened, headers, and systemd-sysvcompat..."
+        pacman -S --noconfirm --needed linux-hardened linux-hardened-headers systemd-sysvcompat
 
         if [ "${use_systemd_boot}" = "y" ]; then
             log "Generating systemd-boot entry for linux-hardened..."
@@ -416,7 +417,7 @@ main() {
     log "Starting hardening script..."
     update_system
     sysctl_hardening
-    install_linux_hardened     # Generates entry, compiles initramfs, sets as default
+    install_linux_hardened     # Generates entry, compiles initramfs, ensures sysvcompat, sets as default
     nvidia_hardened_support    # Installs nvidia-dkms and handles early KMS module injection
     boot_parameter_hardening   # Safely applies flags to all active entries including hardened
     kernel_module_blacklisting # Disables rare attack surface protocols/filesystems
