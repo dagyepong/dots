@@ -210,31 +210,55 @@ install_linux_hardened() {
 
         if [ "${use_systemd_boot}" = "y" ]; then
             log "Generating systemd-boot entry for linux-hardened..."
+            
+            # Ensure the entries directory exists
+            mkdir -p /boot/loader/entries
+
             local stock_entry
-            stock_entry=$(ls -t /boot/loader/entries/*.conf | grep -v 'hardened' | head -n 1)
+            stock_entry=$(ls -t /boot/loader/entries/*.conf 2>/dev/null | grep -v 'hardened' | head -n 1 || true)
             
             if [ -n "$stock_entry" ] && [ -f "$stock_entry" ]; then
                 sed 's/Arch Linux (linux)/Arch Linux (Hardened)/; s|/vmlinuz-linux|/vmlinuz-linux-hardened|; s|/initramfs-linux.img|/initramfs-linux-hardened.img|; s|/initramfs-linux-fallback.img|/initramfs-linux-hardened-fallback.img|' "$stock_entry" > /boot/loader/entries/linux-hardened.conf
-                
-                # Force compilation of the initramfs images
-                mkinitcpio -p linux-hardened
-                
-                # Set linux-hardened as the default boot option in loader.conf
-                if [ -f /boot/loader/loader.conf ]; then
-                    sed -i '/^default/d' /boot/loader/loader.conf
-                    echo "default linux-hardened.conf" >> /boot/loader/loader.conf
-                    log "Set linux-hardened.conf as the default systemd-boot entry."
-                fi
-
-                # Validate systemd-boot entries
-                log "Verifying systemd-boot entries via bootctl..."
-                bootctl update
-                bootctl list
-                
-                log "Successfully created /boot/loader/entries/linux-hardened.conf"
             else
-                warn "Could not find a stock entry to clone from. Create /boot/loader/entries/linux-hardened.conf manually."
+                warn "No existing stock entry found. Generating entry from scratch..."
+                local root_uuid
+                root_uuid=$(findmnt -o UUID -n / || blkid -s UUID -o value "$(findmnt -n -o SOURCE /)")
+                
+                if [ -z "$root_uuid" ]; then
+                    error "Could not automatically determine root partition UUID. Please configure /boot/loader/entries/linux-hardened.conf manually."
+                else
+                    cat <<EOF > /boot/loader/entries/linux-hardened.conf
+title   Arch Linux (Hardened)
+linux   /vmlinuz-linux-hardened
+initrd  /initramfs-linux-hardened.img
+options root=UUID=${root_uuid} rw
+EOF
+                fi
             fi
+            
+            # Force compilation of the initramfs images
+            mkinitcpio -p linux-hardened
+            
+            # Set linux-hardened as the default boot option in loader.conf
+            if [ -f /boot/loader/loader.conf ]; then
+                sed -i '/^default/d' /boot/loader/loader.conf
+                echo "default linux-hardened.conf" >> /boot/loader/loader.conf
+                
+                # Ensure a visible timeout so user can see boot menu
+                if ! grep -q "^timeout" /boot/loader/loader.conf; then
+                    echo "timeout 5" >> /boot/loader/loader.conf
+                else
+                    sed -i 's/^timeout.*/timeout 5/' /boot/loader/loader.conf
+                fi
+                log "Set linux-hardened.conf as the default systemd-boot entry."
+            fi
+
+            # Validate systemd-boot entries
+            log "Verifying systemd-boot entries via bootctl..."
+            bootctl update
+            bootctl list
+            
+            log "Successfully created /boot/loader/entries/linux-hardened.conf"
         fi
     fi
 }
