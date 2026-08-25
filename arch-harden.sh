@@ -5,7 +5,7 @@ set -euo pipefail
 # Hardening Script for Arch Linux / Artix Linux
 # Copyright (C) 2019 madaidan
 # Copyright (C) 2025-2026 David Uhden Collado
-# Refined and corrected version.
+# Refined and enhanced with native systemd-boot support.
 
 log() { printf '%s [INFO] [OK] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 warn() { printf '%s [WARN] [WARN] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
@@ -90,16 +90,6 @@ svc_mask() {
         ;;
     *) warn "Cannot mask service '$svc' on $init_system; best-effort disable" ;;
     esac
-}
-
-set_hostname_cmd() {
-    local name="$1"
-    if [ "$init_system" = "$INIT_SYSTEMD" ]; then
-        hostnamectl set-hostname "$name"
-    else
-        echo "$name" >/etc/hostname
-        command -v hostname >/dev/null 2>&1 && hostname "$name" || true
-    fi
 }
 
 disable_ntp_system() {
@@ -203,7 +193,12 @@ EOF
         elif [ "${use_syslinux}" = "y" ]; then
             sed -i '/MENU LABEL Arch Linux/,/^$/ { /APPEND/ s|$| '"${kernel_params}"'| }' /boot/syslinux/syslinux.cfg
         elif [ "${use_systemd_boot}" = "y" ]; then
-            sed -i "s|^options .*|& ${kernel_params}|" /boot/loader/entries/*.conf
+            # Append parameters to all existing entries in systemd-boot
+            for entry in /boot/loader/entries/*.conf; do
+                if [ -f "$entry" ] && ! grep -q "slab_nomerge" "$entry"; then
+                    sed -i "s|^options \(.*\)$|options \1 ${kernel_params}|" "$entry"
+                fi
+            done
             bootctl update
         fi
     fi
@@ -213,6 +208,20 @@ install_linux_hardened() {
     read -r -p "Install linux-hardened? (y/n) " linux_hardened_ans
     if [ "${linux_hardened_ans}" = "y" ]; then
         pacman -S --noconfirm -q linux-hardened linux-hardened-headers
+
+        # Automatically generate a systemd-boot entry if using systemd-boot
+        if [ "${use_systemd_boot}" = "y" ]; then
+            log "Generating systemd-boot entry for linux-hardened..."
+            local stock_entry
+            stock_entry=$(ls -t /boot/loader/entries/*.conf | grep -v 'hardened' | head -n 1)
+            
+            if [ -n "$stock_entry" ] && [ -f "$stock_entry" ]; then
+                sed 's/Arch Linux (linux)/Arch Linux (Hardened)/; s|/vmlinuz-linux|/vmlinuz-linux-hardened|; s|/initramfs-linux.img|/initramfs-linux-hardened.img|' "$stock_entry" > /boot/loader/entries/linux-hardened.conf
+                log "Successfully created /boot/loader/entries/linux-hardened.conf"
+            else
+                warn "Could not find a stock entry to clone from. You may need to create /boot/loader/entries/linux-hardened.conf manually."
+            fi
+        fi
     fi
 }
 
@@ -233,7 +242,11 @@ EOF
         elif [ "${use_syslinux}" = "y" ]; then
             sed -i '/MENU LABEL Arch Linux/,/^$/ { /APPEND/ s|$| '"${apparmor_params}"'| }' /boot/syslinux/syslinux.cfg
         elif [ "${use_systemd_boot}" = "y" ]; then
-            sed -i "s|^options .*|& ${apparmor_params}|" /boot/loader/entries/*.conf
+            for entry in /boot/loader/entries/*.conf; do
+                if [ -f "$entry" ] && ! grep -q "apparmor=1" "$entry"; then
+                    sed -i "s|^options \(.*\)$|options \1 ${apparmor_params}|" "$entry"
+                fi
+            done
             bootctl update
         fi
     fi
