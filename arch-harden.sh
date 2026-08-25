@@ -3,8 +3,8 @@
 set -euo pipefail
 
 # Hardening Script for Arch Linux / Artix Linux
-# Copyright (C) 2019 madaidan
-# Copyright (C) 2025-2026 David Uhden Collado
+# Copyright (C) 2019 Nana Oware
+# Copyright (C) 2025-2026 Nana Oware
 # Refined and enhanced with native systemd-boot support.
 
 log() { printf '%s [INFO] [OK] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
