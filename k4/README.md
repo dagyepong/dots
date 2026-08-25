@@ -404,3 +404,58 @@ More: [docs/API.md](docs/API.md) · [docs/PLUGINS.md](docs/PLUGINS.md) ·
 
 MIT. Spanish UI with translation files in [`traducciones/`](traducciones/) —
 English and Russian included.
+
+
+### Gentoo:
+
+1. Install the K4 configuration
+```bash
+curl -fsSL https://raw.githubusercontent.com/k4ditano/k4/main/instalar | sh
+```
+
+However, launching it directly with qs -p did not provide the required K4 module path. The working method was to use the project’s launcher script:
+
+```bash
+~/.config/quickshell/k4/arrancar
+```
+
+If necessary, make it executable:
+
+```bash
+chmod +x ~/.config/quickshell/k4/arrancar
+```
+Add this at the top level, outside other blocks:
+
+```bash
+spawn-sh-at-startup "~/.config/quickshell/k4/arrancar"
+```
+8. Useful K4 IPC commands
+
+```bash
+# Launcher
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.launcher toggle
+
+# Main panel
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.panel toggle
+
+# Settings
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.settings toggle
+
+# Clipboard
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.clipboard toggle
+
+# Lock screen
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.session lock
+
+# Screenshot menu
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.captura menu
+
+# Toggle sound controls
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.sonido toggle
+
+# Bluetooth panel
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.panel bluetooth
+
+# Notifications
+qs -p ~/.config/quickshell/k4/shell.qml ipc call k4 toggleNotifications
+```
