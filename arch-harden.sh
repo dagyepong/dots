@@ -3,7 +3,9 @@
 set -euo pipefail
 
 # Hardening Script for Arch Linux / Artix Linux
-# Refined and modernized version.
+# Copyright (C) 2019 madaidan
+# Copyright (C) 2025-2026 David Uhden Collado
+# Refined and corrected version.
 
 log() { printf '%s [INFO] [OK] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 warn() { printf '%s [WARN] [WARN] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
@@ -106,7 +108,7 @@ disable_ntp_system() {
     fi
 }
 
-# ---- Script options & validation ----
+# ---- End init system abstraction ----
 
 set_script_options() {
     disable_checks=0
@@ -118,8 +120,32 @@ set_script_options() {
 
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        error "This script must be run as root. Use 'sudo'."
+        error "This script must be run as root. Please run with 'sudo'."
         exit 1
+    fi
+}
+
+update_system() {
+    read -r -p "Update the system (pacman -Syu) before hardening? (y/n) " update_system_prompt
+    if [ "${update_system_prompt}" = "y" ]; then
+        log "Updating the system..."
+        pacman -Syu --noconfirm --needed
+    fi
+}
+
+create_grub_directory() {
+    if ! [ -d /etc/default/grub.d ]; then
+        mkdir -m 755 /etc/default/grub.d
+    fi
+
+    if ! grep -qF '/etc/default/grub.d/*.cfg' /etc/default/grub 2>/dev/null; then
+        cat >>/etc/default/grub <<'EOF'
+for i in /etc/default/grub.d/*.cfg ; do
+if [ -e "${i}" ]; then
+    . "${i}"
+fi
+done
+EOF
     fi
 }
 
@@ -132,41 +158,21 @@ script_checks() {
 
     if [ -d /boot/grub ]; then
         use_grub="y"
-        if ! [ -d /etc/default/grub.d ]; then
-            mkdir -m 755 /etc/default/grub.d
-        fi
-        if ! grep -qF '/etc/default/grub.d/*.cfg' /etc/default/grub 2>/dev/null; then
-            cat >>/etc/default/grub <<'EOF'
-for i in /etc/default/grub.d/*.cfg ; do
-if [ -e "${i}" ]; then
-    . "${i}"
-fi
-done
-EOF
-        fi
+        create_grub_directory
     elif [ -d /boot/syslinux ]; then
         use_syslinux="y"
     elif [ -d /boot/loader ]; then
         use_systemd_boot="y"
     else
-        error "Supported bootloader (GRUB, syslinux, systemd-boot) not detected."
+        error "This script can only be used with GRUB, syslinux, or systemd-boot."
         exit 1
     fi
 }
 
-# ---- Hardening Modules ----
-
-update_system() {
-    read -r -p "Update the system (pacman -Syu) before hardening? (y/n) " ans
-    if [ "$ans" = "y" ]; then
-        pacman -Syu --noconfirm --needed
-    fi
-}
-
 sysctl_hardening() {
-    read -r -p "Harden the kernel with sysctl? (y/n) " ans
-    if [ "$ans" = "y" ]; then
-        log "Applying sysctl hardening rules..."
+    read -r -p "Harden the kernel with sysctl? (y/n) " sysctl_ans
+    if [ "${sysctl_ans}" = "y" ]; then
+        log "Applying sysctl hardening..."
         echo "kernel.kptr_restrict=2" >/etc/sysctl.d/kptr_restrict.conf
         echo "kernel.dmesg_restrict=1" >/etc/sysctl.d/dmesg_restrict.conf
         echo "kernel.printk=3 3 3 3" >/etc/sysctl.d/printk.conf
@@ -180,29 +186,23 @@ sysctl_hardening() {
         echo "vm.mmap_rnd_bits=32\nvm.mmap_rnd_compat_bits=16" >/etc/sysctl.d/mmap_aslr.conf
         echo "fs.protected_symlinks=1\nfs.protected_hardlinks=1" >/etc/sysctl.d/protected_links.conf
         echo "fs.protected_fifos=2\nfs.protected_regular=2" >/etc/sysctl.d/protected_files.conf
-        
-        # NOTE: Unprivileged user namespaces are commented out by default because 
-        # they break containers (Docker/Podman), Flatpak, and browser sandboxes.
-        # Uncomment below if you are building a strict server environment:
-        # echo "kernel.unprivileged_userns_clone=0" >/etc/sysctl.d/unprivileged_userns.conf
-
         sysctl --system >/dev/null 2>&1 || true
     fi
 }
 
 boot_parameter_hardening() {
-    read -r -p "Harden the kernel through boot parameters? (y/n) " ans
-    if [ "$ans" = "y" ]; then
+    read -r -p "Harden the kernel through boot parameters? (y/n) " bootparams
+    if [ "${bootparams}" = "y" ]; then
         local kernel_params="slab_nomerge init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 pti=on randomize_kstack_offset=on vsyscall=none debugfs=off oops=panic module.sig_enforce=1 lockdown=confidentiality quiet loglevel=0 spectre_v2=on spec_store_bypass_disable=on tsx=off tsx_async_abort=full,nosmt mds=full,nosmt mmio_stale_data=full,nosmt l1tf=full,force nosmt=force kvm.nx_huge_pages=force retbleed=auto,nosmt"
 
-        if [ "$use_grub" = "y" ]; then
+        if [ "${use_grub}" = "y" ]; then
             cat >/etc/default/grub.d/40_kernel_hardening.cfg <<EOF
 GRUB_CMDLINE_LINUX="\$GRUB_CMDLINE_LINUX ${kernel_params}"
 EOF
             grub-mkconfig -o /boot/grub/grub.cfg
-        elif [ "$use_syslinux" = "y" ]; then
+        elif [ "${use_syslinux}" = "y" ]; then
             sed -i '/MENU LABEL Arch Linux/,/^$/ { /APPEND/ s|$| '"${kernel_params}"'| }' /boot/syslinux/syslinux.cfg
-        elif [ "$use_systemd_boot" = "y" ]; then
+        elif [ "${use_systemd_boot}" = "y" ]; then
             sed -i "s|^options .*|& ${kernel_params}|" /boot/loader/entries/*.conf
             bootctl update
         fi
@@ -210,42 +210,50 @@ EOF
 }
 
 install_linux_hardened() {
-    read -r -p "Install linux-hardened kernel? (y/n) " ans
-    if [ "$ans" = "y" ]; then
+    read -r -p "Install linux-hardened? (y/n) " linux_hardened_ans
+    if [ "${linux_hardened_ans}" = "y" ]; then
         pacman -S --noconfirm -q linux-hardened linux-hardened-headers
-        # (Bootloader entry configuration omitted for brevity; use standard Arch guides if needed)
     fi
 }
 
 apparmor() {
-    read -r -p "Enable AppArmor? (y/n) " ans
-    if [ "$ans" = "y" ]; then
+    read -r -p "Enable apparmor? (y/n) " enable_apparmor
+    if [ "${enable_apparmor}" = "y" ]; then
         if ! pacman -Qq apparmor &>/dev/null; then
             pacman -S --noconfirm -q apparmor
         fi
         svc_enable apparmor.service
-        
+
         local apparmor_params="apparmor=1 security=apparmor audit=1"
-        if [ "$use_grub" = "y" ]; then
+        if [ "${use_grub}" = "y" ]; then
             cat >/etc/default/grub.d/40_enable_apparmor.cfg <<EOF
 GRUB_CMDLINE_LINUX="\$GRUB_CMDLINE_LINUX ${apparmor_params}"
 EOF
             grub-mkconfig -o /boot/grub/grub.cfg
-        elif [ "$use_syslinux" = "y" ]; then
+        elif [ "${use_syslinux}" = "y" ]; then
             sed -i '/MENU LABEL Arch Linux/,/^$/ { /APPEND/ s|$| '"${apparmor_params}"'| }' /boot/syslinux/syslinux.cfg
-        elif [ "$use_systemd_boot" = "y" ]; then
+        elif [ "${use_systemd_boot}" = "y" ]; then
             sed -i "s|^options .*|& ${apparmor_params}|" /boot/loader/entries/*.conf
             bootctl update
         fi
     fi
 }
 
+restrict_root() {
+    read -r -p "Restrict su to users in the wheel group? (y/n) " restrict_su
+    if [ "${restrict_su}" = "y" ]; then
+        sed -i 's/#auth\s\+required\s\+pam_wheel.so use_uid/auth\t\trequired\t\tpam_wheel.so use_uid/' /etc/pam.d/su
+        sed -i 's/#auth\s\+required\s\+pam_wheel.so use_uid/auth\t\trequired\t\tpam_wheel.so use_uid/' /etc/pam.d/su-l
+    fi
+}
+
 firewall() {
-    read -r -p "Install and configure nftables firewall? (y/n) " ans
-    if [ "$ans" = "y" ]; then
+    read -r -p "Install and configure nftables firewall? (y/n) " install_nftables
+    if [ "${install_nftables}" = "y" ]; then
         if ! pacman -Qq nftables &>/dev/null; then
             pacman -S --noconfirm -q nftables
-        }
+        fi
+
         cat <<'NFTEOF' >/etc/nftables.conf
 #!/usr/bin/nft -f
 flush ruleset
@@ -271,28 +279,37 @@ NFTEOF
     fi
 }
 
-restrict_root() {
-    read -r -p "Restrict su to users in the wheel group? (y/n) " ans
-    if [ "$ans" = "y" ]; then
-        sed -i 's/#auth\s\+required\s\+pam_wheel.so use_uid/auth\t\trequired\t\tpam_wheel.so use_uid/' /etc/pam.d/su
-        sed -i 's/#auth\s\+required\s\+pam_wheel.so use_uid/auth\t\trequired\t\tpam_wheel.so use_uid/' /etc/pam.d/su-l
-    fi
-}
-
 configure_umask() {
-    read -r -p "Set a more restrictive umask (0077)? (y/n) " ans
-    if [ "$ans" = "y" ]; then
+    read -r -p "Set a more restrictive umask? (y/n) " umask_ans
+    if [ "${umask_ans}" = "y" ]; then
         echo "umask 0077" >/etc/profile.d/umask.sh
     fi
 }
 
-# ---- Main Execution ----
+disable_ntp() {
+    read -r -p "Disable NTP? (y/n) " ntp
+    if [ "${ntp}" = "y" ]; then
+        for ntp_client in ntp openntpd ntpclient; do
+            if pacman -Qq "${ntp_client}" &>/dev/null; then
+                pacman -Rn --noconfirm ${ntp_client}
+            fi
+        done
+
+        disable_ntp_system
+        if [ "$init_system" = "$INIT_SYSTEMD" ]; then
+            svc_mask systemd-timesyncd.service
+        else
+            svc_mask ntpd 2>/dev/null || true
+        fi
+    fi
+}
 
 main() {
+    set_script_options
     check_root
     script_checks
 
-    log "Starting interactive Arch hardening..."
+    log "Starting hardening script..."
     update_system
     sysctl_hardening
     boot_parameter_hardening
@@ -301,8 +318,9 @@ main() {
     firewall
     restrict_root
     configure_umask
+    disable_ntp
 
-    log "Hardening process completed successfully!"
+    log "Hardening script completed successfully!"
 }
 
 main "$@"
