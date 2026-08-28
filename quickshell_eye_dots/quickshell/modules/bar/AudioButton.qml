@@ -35,17 +35,56 @@ ExpandingButton {
   }
   buttonLabel: muted ? mutedIcon : getSinkIcon(AudioData.sink)
 
+  Connections {
+    target: AudioData
+    function onVolumeChanged() {
+      if (AudioData.ready) {
+        root.active = true
+        timer.restart()
+      }
+    }
+  }
+
+  Timer {
+    id: timer
+    running: false
+    interval: 1000 * 10
+    onTriggered: {
+      root.active = false
+    }
+  }
+
+  property var openAudioMenu: () => {
+    const i = Config.outputs.findIndex(o => o.sink === AudioData.sink.name)
+    GlobalState.openLauncher({
+      id: root.monitorId,
+      mode: "audio",
+      direction: Qt.RightToLeft,
+      index: i > -1 ? i : 0
+    })
+  }
+
+  onRightClick: openAudioMenu
+
+  wheelHandler: (event) => {
+    if (event.angleDelta.y > 0) {
+      AudioData.incrementVolume()
+    } else if (event.angleDelta.y < 0) {
+      AudioData.decrementVolume()
+    }
+  }
+
   BorderRect {
     id: srcBtn
     visible: root.active
     implicitWidth: srcBtnText.implicitWidth
     implicitHeight: srcBtnText.implicitHeight
-    color: Appearance.srcery.black
+    color: Style.srcery.black
     states: [
       State {
         name: "hovered"
         when: srcMouse.containsMouse
-        PropertyChanges { srcBtnText.color: Appearance.srcery.brightWhite }
+        PropertyChanges { srcBtnText.color: Style.srcery.brightWhite }
         PropertyChanges { srcMouse.cursorShape: Qt.PointingHandCursor }
       }
     ]
@@ -53,33 +92,25 @@ ExpandingButton {
       id: srcMouse
       hoverEnabled: true
       anchors.fill: parent
-      onClicked: {
-        const i = Config.outputs.findIndex(o => o.sink === AudioData.sink.name)
-        GlobalState.openLauncher({
-          id: root.monitorId,
-          mode: "audio",
-          direction: Qt.RightToLeft,
-          index: i > -1 ? i : 0
-        })
-      }
+      onClicked: root.openAudioMenu()
     }
 
     transitions: [
       Transition {
         ColorAnimation {
-          duration: Appearance.durations.small
+          duration: Style.durations.small
           easing.type: Easing.OutQuad
         }
       }
     ]
     Text {
       anchors.centerIn: parent
-      color: Appearance.srcery.white
+      color: Style.srcery.white
       id: srcBtnText
       text: root.buttonLabel
       font {
-        family: Appearance.font.light
-        pixelSize: Appearance.font.size3
+        family: Style.font.light
+        pixelSize: Style.font.size3
       }
     }
   }
@@ -88,10 +119,10 @@ ExpandingButton {
     visible: root.active
     implicitWidth: inputBtnText.implicitWidth
     implicitHeight: inputBtnText.implicitHeight
-    color: Appearance.srcery.black
+    color: Style.srcery.black
     Text {
       anchors.centerIn: parent
-      color: Appearance.srcery.white
+      color: Style.srcery.white
       id: inputBtnText
       text: {
         if (AudioData.source?.audio?.muted) {
@@ -101,8 +132,8 @@ ExpandingButton {
         }
       }
       font {
-        family: Appearance.font.light
-        pixelSize: Appearance.font.size3
+        family: Style.font.light
+        pixelSize: Style.font.size3
       }
     }
   }
@@ -110,7 +141,7 @@ ExpandingButton {
   Slider {
     id: volumeSlider
     visible: root.active
-    implicitWidth: Appearance.bar.sliderWidth
+    implicitWidth: Style.bar.sliderWidth
     from: 0.0
     value: AudioData.sink?.audio.volume ?? 0
     onMoved: AudioData.sink.audio.volume = value
@@ -122,29 +153,29 @@ ExpandingButton {
       x: volumeSlider.leftPadding
       y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
       implicitWidth: 200
-      implicitHeight: Appearance.spacing.p3
+      implicitHeight: Style.spacing.p3
       width: volumeSlider.availableWidth
       height: implicitHeight
-      color: Appearance.srcery.gray3
+      color: Style.srcery.gray3
 
       Rectangle {
         width: volumeSlider.visualPosition * parent.width
         height: parent.height
         gradient: Gradient {
           orientation: Gradient.Horizontal
-          GradientStop { position: 1; color: Appearance.srcery.magenta }
-          GradientStop { position: 0; color: Appearance.srcery.blue }
+          GradientStop { position: 1; color: Style.srcery.magenta }
+          GradientStop { position: 0; color: Style.srcery.blue }
         }
       }
     }
     handle: Rectangle {
       x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
       y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
-      implicitWidth: Appearance.spacing.p4
-      implicitHeight: Appearance.spacing.p3
+      implicitWidth: Style.spacing.p4
+      implicitHeight: Style.spacing.p3
       radius: 0
-      color: volumeSlider.pressed ? Appearance.srcery.brightMagenta : Appearance.srcery.magenta
-      // border.color: Appearance.srcery.magenta
+      color: volumeSlider.pressed ? Style.srcery.brightMagenta : Style.srcery.magenta
+      // border.color: Style.srcery.magenta
     }
   }
 }

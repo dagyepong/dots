@@ -4,9 +4,9 @@
 // │█▀▀▀▀▀▀▀▀█░░░▀░▀░▀▀▀░░▀░░▀▀▀░▀░▀░▀▀▀░░░▀▀▀░▀░▀░▀▀▀░▀▀▀░▀▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀──────────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
 // ├┤ Author  : Daniel Berg <mail@roosta.sh>                             ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                       ││
-// ││ Site    : https://www.roosta.sh                                    ││
-// ├┤ License : GNU General Public License v3                            ├┤
+// ││ Repo    : https://github.com/roosta/dotfiles                        ││
+// ││ Site    : https://www.roosta.sh                                     ││
+// ├┤ License : GNU General Public License v3                             ├┤
 // ┆└────────────────────────────────────────────────────────────────────┘┆
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 //@ pragma UseQApplication
@@ -29,14 +29,20 @@ import qs
 ShellRoot {
   Variants {
     model: Quickshell.screens
-    Scope {
+    delegate: Scope {
       id: scope
       required property ShellScreen modelData
       property string monitorId: modelData?.name ?? ""
+      readonly property HyprlandMonitor monitor: Hyprland
+        .monitorFor(modelData)
+      readonly property int activeWorkspaceId: monitor?.activeWorkspace?.id ?? 1
+      property var windows: HyprlandData.windowsByWorkspace[activeWorkspaceId] ?? []
 
       NamedPanel {
         id: wallpaper
         WlrLayershell.layer: WlrLayer.Background
+        // Constant geometry: the compositor must not resize us when the
+        // exclusive zone changes. Wallpaper.qml offsets its content itself.
         exclusionMode: ExclusionMode.Ignore
         name: "wallpaper"
         screen: scope.modelData
@@ -55,13 +61,12 @@ ShellRoot {
         anchors.bottom: true
         anchors.left: true
         anchors.right: true
-        property int hcalc: {
-          if (GlobalState.launcherOpen && GlobalState.launcherMonitorId === scope.monitorId) {
-            return Appearance.bar.height + Appearance.launcher.height
-          }
-          return Appearance.bar.height
-        }
-        exclusiveZone: hcalc
+
+        // One commit on open, one on close — Hyprland animates the windows.
+        // Animating this would relayout every window on the monitor per frame.
+        exclusiveZone: GlobalState.launcherOpen && GlobalState.launcherMonitorId === scope.monitorId
+          ? Style.bar.height + Style.launcher.height
+          : Style.bar.height
       }
 
       NamedPanel {
@@ -142,11 +147,7 @@ ShellRoot {
         Rectangle {
           id: content
           color: "transparent"
-          anchors.top: parent.top
-          anchors.left: parent.left
-          implicitWidth: parent.width
-          implicitHeight: parent.height - Appearance.bar.height - launcher.launcherHeight
-
+          anchors.fill: parent
           transitions: [
             Transition {
               ColorAnimation {
@@ -160,12 +161,13 @@ ShellRoot {
             onClicked: {
               if (GlobalState.launcherOpen) { GlobalState.closeLauncher() }
               if (GlobalState.trayMenuOpen) { GlobalState.closeTrayMenu() }
+              if (GlobalState.batteryPopupOpen) { GlobalState.toggleBatteryPopup(scope.monitorId) }
             }
           }
           states: [
             State {
               name: "open"
-              when: GlobalState.overlayOpen
+              when: GlobalState.overlayOpen && scope.windows.length > 0
               PropertyChanges { content.color: Functions.transparentize("#000", 0.7) }
             }
           ]
@@ -174,6 +176,14 @@ ShellRoot {
         Bar {
           id: bar
           monitorId: scope.monitorId
+          onDecrementCurrentIndex: launcher.decrementCurrentIndex()
+          onIncrementCurrentIndex: launcher.incrementCurrentIndex()
+          onOpenDrawer: launcher.openDrawer()
+          onCloseDrawer: launcher.closeDrawer()
+          onDrawerNext: launcher.drawerNext()
+          onDrawerPrev: launcher.drawerPrev()
+          onDrawerActivate: launcher.drawerActivate()
+          onAccepted: launcher.accepted()
         }
 
         Launcher {
@@ -198,6 +208,16 @@ ShellRoot {
             trayItemMenuHandle: GlobalState.activeMenu
             onMenuOpened: (window) => {};
             onMenuClosed: GlobalState.closeTrayMenu()
+            monitorId: scope.monitorId
+          }
+        }
+
+        Loader {
+          id: batteryPopupLoader
+          anchors.fill: parent
+          active: GlobalState.batteryPopupOpen && GlobalState.batteryMonitorId === scope.monitorId
+
+          sourceComponent: BatteryPopup {
             monitorId: scope.monitorId
           }
         }

@@ -23,10 +23,10 @@ pragma ComponentBehavior: Bound
 
 BorderRect {
   id: root
-  leftBorder: Appearance.bar.borderWidth
-  rightBorder: Appearance.bar.borderWidth
-  borderColor: Appearance.srcery.gray3
-  color: Appearance.srcery.black
+  leftBorder: Style.bar.borderWidth
+  rightBorder: Style.bar.borderWidth
+  borderColor: Style.srcery.gray3
+  color: Style.srcery.black
   required property string monitorId
   property var workspaces: HyprlandData.workspacesByMonitor[monitorId] ?? []
   readonly property var occupied: workspaces.reduce((acc, ws) => {
@@ -40,34 +40,38 @@ BorderRect {
 
   Behavior on implicitWidth {
     NumberAnimation {
-      duration: Appearance.durations.small
+      duration: Style.durations.small
       easing.type: Easing.InOutCubic
     }
   }
-  implicitWidth: layout.implicitWidth + Appearance.spacing.p3 + Appearance.bar.borderWidth * 2
-  implicitHeight: Appearance.bar.height - Appearance.bar.borderWidth
-  Layout.topMargin: Appearance.bar.borderWidth
-  radius: Appearance.bar.radius
+  implicitWidth: layout.implicitWidth + Style.spacing.p3 + Style.bar.borderWidth * 2
+  implicitHeight: Style.bar.height - Style.bar.borderWidth
+  Layout.topMargin: Style.bar.borderWidth
+  radius: Style.bar.radius
 
   Item {
     id: inner
     anchors.fill: parent
 
     // Moving active workspace indicator rectangle
-    Rectangle {
+    GradientRect {
       id: activeIndicator
       z: 3
-      // radius: (parent.height - Appearance.spacing.p3) / 2
-      color: "transparent"
-      border.color: Appearance.srcery.gray4
-      border.width: Appearance.bar.borderWidth
-      height: parent.height - Appearance.spacing.p1 * 2
-
+      height: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
+      property Gradient activeGradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 1; color: Style.srcery.magenta }
+        GradientStop { position: 0; color: Style.srcery.blue }
+      }
+      gradientAngle: 45
+      borderColor: Style.srcery.brightBlack
+      gradient: activeGradient
+      gradientActive: (root.monitor?.focused ?? false) && !HyprlandData.specialActive
       property real targetX: 0
       property real targetWidth: 0
 
       function updateIndicator() {
-        let x = Appearance.spacing.p1 + Appearance.bar.borderWidth
+        let x = Style.spacing.p1 + Style.bar.borderWidth
         let targetIdx = root.workspaces.findIndex(w => {
           return w.id === root.activeWorkspaceId
         });
@@ -89,20 +93,20 @@ BorderRect {
 
       Behavior on x {
         NumberAnimation {
-          duration: Appearance.animationCurves
+          duration: Style.animationCurves
             .expressiveDefaultSpatialDuration
           easing.type: Easing.BezierSpline
-          easing.bezierCurve: Appearance.animationCurves
+          easing.bezierCurve: Style.animationCurves
             .expressiveDefaultSpatial
         }
       }
 
       Behavior on width {
         NumberAnimation {
-          duration: Appearance.animationCurves
+          duration: Style.animationCurves
             .expressiveDefaultSpatialDuration
           easing.type: Easing.BezierSpline
-          easing.bezierCurve: Appearance.animationCurves
+          easing.bezierCurve: Style.animationCurves
             .expressiveDefaultSpatial
         }
       }
@@ -113,7 +117,7 @@ BorderRect {
     }
     RowLayout {
       id: layout
-      spacing: Appearance.spacing.p1
+      spacing: Style.spacing.p1
       z: 2
       anchors.centerIn: parent
       Repeater {
@@ -121,7 +125,8 @@ BorderRect {
         id: workspaceRepeater
 
         Workspace {
-          occupied: root.occupied
+          monitorId: root.monitorId
+          isOccupied: root.occupied[modelData?.id] ?? false
           activeWorkspaceId: root.activeWorkspaceId;
           workspaceId: modelData?.id;
           onCalculatedWidthChanged: activeIndicator.updateIndicator()

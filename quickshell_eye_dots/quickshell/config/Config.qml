@@ -56,13 +56,13 @@ Singleton {
     {
       code: "no",
       label: "Norwegian",
-      color: Appearance.srcery.yellow,
+      color: Style.srcery.yellow,
       default: false
     },
     {
       code: "en",
       label: "English (US)",
-      color: Appearance.srcery.white,
+      color: Style.srcery.white,
       default: true
     }
   ]
@@ -79,22 +79,13 @@ Singleton {
       iconId: "applications-all"
     },
     {
-      id: "ritual-mode-notifications",
-      name: "Notifications",
-      comment: "Notification control menu",
-      mode: "notifications",
+      id: "ritual-mode-utils",
+      name: "Utilities",
+      comment: "Various handy utilities, normally launches a script stored in ~/scripts",
+      mode: "utils",
       genericName: "Menu",
-      categories: ["System"],
-      iconId: "notifications"
-    },
-    {
-      id: "ritual-mode-display",
-      name: "Display",
-      comment: "Switch display layouts between predefined presets",
-      mode: "display",
-      genericName: "Menu",
-      categories: ["Display", "Configuration"],
-      iconId: "preferences-desktop-display"
+      categories: ["Utility", "FileTools"],
+      iconId: "applications-utilities"
     },
     {
       id: "ritual-mode-audio",
@@ -103,7 +94,100 @@ Singleton {
       mode: "audio",
       genericName: "Menu",
       categories: ["Audio", "Configuration"],
-      iconId: "audio-x-generic"
+      iconId: "audio-x-generic",
+      actions: [
+        {
+          "id": "ASP",
+          "name": "Speakers",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-audio.sh speakers`,
+          "command": [
+            `${Paths.home}/scripts/switch-audio.sh`,
+            "speakers"
+          ]
+        },
+        {
+          "id": "AHP",
+          "name": "Headphones",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-audio.sh headphones`,
+          "command": [
+            `${Paths.home}/scripts/switch-audio.sh`,
+            "headphones"
+          ]
+        },
+        {
+          "id": "ATV",
+          "name": "Television",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-audio.sh tv`,
+          "command": [
+            `${Paths.home}/scripts/switch-audio.sh`,
+            "tv"
+          ]
+        }
+      ]
+    },
+    {
+      id: "ritual-mode-display",
+      name: "Display",
+      comment: "Switch display layouts between predefined presets",
+      mode: "display",
+      genericName: "Menu",
+      categories: ["Display", "Configuration"],
+      iconId: "preferences-desktop-display",
+      actions: [
+        {
+          "id": "DDSK",
+          "name": "Desk",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-display.sh desk`,
+          "command": [
+            `${Paths.home}/scripts/switch-display.sh`,
+            "desk"
+          ]
+        },
+        {
+          "id": "DTV",
+          "name": "Television",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-display.sh tv`,
+          "command": [
+            `${Paths.home}/scripts/switch-display.sh`,
+            "tv"
+          ]
+        },
+        {
+          "id": "DMI",
+          "name": "Mirror",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-display.sh mirror`,
+          "command": [
+            `${Paths.home}/scripts/switch-display.sh`,
+            "mirror"
+          ]
+        },
+        {
+          "id": "DALL",
+          "name": "All",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-display.sh all`,
+          "command": [
+            `${Paths.home}/scripts/switch-display.sh`,
+            "all"
+          ]
+        },
+        {
+          "id": "DX",
+          "name": "Exclusive",
+          "icon": "",
+          "execString": `${Paths.home}/scripts/switch-display.sh exclusive`,
+          "command": [
+            `${Paths.home}/scripts/switch-display.sh`,
+            "exclusive"
+          ]
+        }
+      ]
     },
     {
       id: "ritual-mode-power",
@@ -115,14 +199,14 @@ Singleton {
       iconId: "preferences-system"
     },
     {
-      id: "ritual-mode-utils",
-      name: "Utilities",
-      comment: "Various handy utilities, normally launches a script stored in ~/scripts",
-      mode: "utils",
+      id: "ritual-mode-notifications",
+      name: "Notifications",
+      comment: "Notification control menu",
+      mode: "notifications",
       genericName: "Menu",
-      categories: ["Utility", "FileTools"],
-      iconId: "applications-utilities"
-    }
+      categories: ["System"],
+      iconId: "notifications"
+    },
   ]
 
   // Power scripts (shutdown, logout, reboot etc), see ~/scripts for each option
@@ -257,7 +341,7 @@ Singleton {
       genericName: "Display",
       categories: ["Display", "Exclusive"],
       comment: "Disable all but center monitor (desk), setting a single exclusive display",
-      script: [`${Paths.home}/scripts/switch-display.sh`, "single"],
+      script: [`${Paths.home}/scripts/switch-display.sh`, "exclusive"],
       iconId: "cs-display"
     }
   ]
@@ -325,12 +409,15 @@ Singleton {
   // in cases where there isn't a good icon match
   readonly property var aliases: [
     [/.*spotify.*/i, "spotify"],
-    [/menu.kando.kando/i, "input-mouse"],
+    [/.*kando.*$/i, "input-mouse"],
+    [/aseprite/i, "libresprite"],
     [/minecraft.*/i, "minecraft"],
     [/^steam_app_(\d+)$/, "steam_icon_$1"],
     [/kitty/i, "terminal"],
     [/.*pavucontrol.*/, "gnome-volume-control"],
-    [/.*gpick.*/i, "preferences-color"]
+    [/.*gpick.*/i, "preferences-color"],
+    [/pake-open-webui/i, "web-browser"],
+    [/org.satty.satty/i, "image"]
   ]
 
   // Move to something interactive via the menu, but this'll do for now
@@ -344,6 +431,7 @@ Singleton {
     "org.mozilla.Thunderbird",
     "com.discordapp.Discord",
     "kitty",
-    "menu.kando.Kando"
+    "kando",
+    "virt-manager"
   ]
 }

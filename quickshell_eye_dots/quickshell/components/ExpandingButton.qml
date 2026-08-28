@@ -9,6 +9,13 @@
 // ├┤ License : GNU General Public License v3                    ├┤
 // ┆└────────────────────────────────────────────────────────────┘┆
 
+// Description: Its a button that is placed on the Bar, and it expands when
+// left clicking, showing detailed content. For example, in AudioButton.qml I
+// keep the volume bar and input indicator collapsed, only visible when this is
+// expanded.
+//
+// Requires a monitorId and a button label, and you can optionally implement the click handlers
+
 pragma ComponentBehavior: Bound
 import qs.config
 // import qs.services
@@ -21,26 +28,47 @@ import QtQuick.Controls
 
 BorderRect {
   id: root
-  color: Appearance.srcery.black
-  borderColor: Appearance.srcery.gray3
-  borderWidth: Appearance.bar.borderWidth
-  Layout.topMargin: Appearance.bar.borderWidth
+  clip: true
+  color: Style.srcery.black
+  borderColor: Style.srcery.gray3
+  borderWidth: Style.bar.borderWidth
+  Layout.topMargin: Style.bar.borderWidth
 
   default property alias contents: layout.data
   required property string monitorId
   required property string buttonLabel
   property bool isEmpty: false;
 
+  property var onRightClick: () => {
+    // console.log("right click")
+  }
+
+  property var onLeftClick: () => {
+    if (!root.isEmpty) {
+      root.active = !root.active
+    }
+  }
+
+  property var wheelHandler: (event) => {
+    // console.log("rotation", event.angleDelta.y, "scaled", rotation, "@", wheel.point.position, "=>", parent.rotation)
+  }
+
+  WheelHandler {
+    id: wheel
+    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+    onWheel: (event) => root.wheelHandler(event)
+  }
+
   implicitWidth: {
     if (root.active) {
-      return layout.implicitWidth + Appearance.spacing.p1 * 2
+      return layout.implicitWidth + Style.spacing.p1 * 2
 
     } else {
       return layout.implicitWidth
     }
   }
 
-  implicitHeight: Appearance.bar.height - Appearance.bar.borderWidth - Appearance.spacing.p1 * 2
+  implicitHeight: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
   property bool active: false
   property bool preventAutoClose: false
 
@@ -76,7 +104,7 @@ BorderRect {
   }
   Behavior on implicitWidth {
     NumberAnimation {
-      duration: Appearance.durations.small
+      duration: Style.durations.small
       easing.type: Easing.InOutCubic
     }
   }
@@ -85,58 +113,63 @@ BorderRect {
       name: "default"
       when: !root.active && !button.hovered
       PropertyChanges { indicator.text: root.buttonLabel }
-      PropertyChanges { buttonBg.borderColor: Appearance.srcery.gray3 }
+      PropertyChanges { buttonBg.borderColor: Style.srcery.gray3 }
     },
     State {
       name: "hovered"
       when: !root.active && button.hovered
       PropertyChanges { indicator.text: root.buttonLabel }
-      PropertyChanges { buttonBg.borderColor: Appearance.srcery.gray6 }
+      PropertyChanges { buttonBg.borderColor: Style.srcery.gray6 }
     },
     State {
       name: "active"
       when: root.active && !button.hovered
       PropertyChanges { indicator.text: "❯" }
-      PropertyChanges { buttonBg.borderColor: Appearance.srcery.gray3 }
+      PropertyChanges { buttonBg.borderColor: Style.srcery.gray3 }
     },
     State {
       name: "activeHovered"
       when: root.active && button.hovered
-      PropertyChanges { root.borderColor: Appearance.srcery.gray6 }
+      PropertyChanges { root.borderColor: Style.srcery.gray6 }
       PropertyChanges { indicator.text: "❯" }
-      PropertyChanges { buttonBg.borderColor: Appearance.srcery.gray6 }
+      PropertyChanges { buttonBg.borderColor: Style.srcery.gray6 }
     }
   ]
 
   RowLayout {
     id: layout
-    spacing: Appearance.spacing.p3
+    spacing: Style.spacing.p3
     Button {
       id: button
       implicitHeight: root.height
-      implicitWidth: root.height
-      onPressed: {
-        if (!root.isEmpty) {
-          root.active = !root.active
+
+      MouseArea {
+        id: mouseArea
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        hoverEnabled: true
+        onClicked: (mouse) => {
+          if (mouse.button === Qt.RightButton) {
+            root.onRightClick()
+          } else if (mouse.button === Qt.LeftButton) {
+            root.onLeftClick()
+          }
         }
       }
-
-      HoverHandler {
-        id: hover
-        cursorShape: Qt.PointingHandCursor
-      }
+      implicitWidth: root.height
       background: BorderRect {
         id: buttonBg
-        color: Appearance.srcery.black
-        borderWidth: Appearance.bar.borderWidth
-        borderColor: Appearance.srcery.gray3
+        color: Style.srcery.black
+        borderWidth: Style.bar.borderWidth
+        borderColor: Style.srcery.gray3
         Text {
           anchors.centerIn: parent
           id: indicator
-          color: Appearance.srcery.white
+          color: Style.srcery.white
           font {
-            family: Appearance.font.light
-            pixelSize: Appearance.font.size3
+            family: Style.font.light
+            pixelSize: Style.font.size3
           }
         }
       }

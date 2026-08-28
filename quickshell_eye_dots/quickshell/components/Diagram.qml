@@ -13,6 +13,7 @@ import QtQuick
 import qs.config
 import qs.services
 import QtQuick.Layouts
+import qs
 
 Item {
   id: root
@@ -20,17 +21,53 @@ Item {
   property int size: 36
   Rectangle {
     anchors.fill: parent
-    border.width: Appearance.bar.borderWidth
+    border.width: Style.bar.borderWidth
     rotation: 45
-    border.color: Appearance.srcery.gray4
+    border.color: Style.srcery.gray4
     color: "transparent"
+
+    Quad {
+      width: 58
+      height: 58
+      fillColor: "transparent"
+      strokeColor: Style.srcery.gray3
+      anchors.top: parent.top
+      anchors.right: parent.right
+      anchors.rightMargin: Style.spacing.p2
+      anchors.topMargin: Style.spacing.p2
+      rotation: -90
+      topLeft:  Qt.point(1, 0)
+      topRight: Qt.point(1, 0)
+    }
+
+    Quad {
+      width: 58
+      height: 58
+      fillColor: "transparent"
+      rotation: 90
+      topLeft:  Qt.point(1, 0)
+      topRight: Qt.point(1, 0)
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: Style.spacing.p2
+      anchors.left: parent.left
+      anchors.leftMargin: Style.spacing.p2
+
+    }
   }
 
   Rectangle {
     anchors.fill: parent
-    border.color: Appearance.srcery.black
+    border.color: GlobalState.overlayOpen ? Style.srcery.hardBlack : Style.srcery.black
     color: "transparent"
     border.width: root.size / 2
+
+    Behavior on border.color {
+      ColorAnimation {
+        duration: 300
+        easing.type: Easing.OutQuad
+      }
+    }
+
   }
 
   FlexboxLayout {
@@ -43,22 +80,22 @@ Item {
     property int dotSize: 5
     id: artist
     Item {
-      Layout.preferredWidth: parent.width - Appearance.spacing.p2 * 2
+      Layout.preferredWidth: parent.width - Style.spacing.p2 * 2
       Layout.preferredHeight: 15
 
       Rectangle {
         id: tldot
         radius: artist.dotSize / 2
-        color: Appearance.srcery.gray6
+        color: Style.srcery.gray6
         width: artist.dotSize
         height: artist.dotSize
         anchors.verticalCenter: parent.verticalCenter
         x: AudioData.activePlayer?.isPlaying
-          ? (artistText.x - width - Appearance.spacing.p2)
+          ? (artistText.x - width - Style.spacing.p2)
           : 0
         Behavior on x {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
@@ -69,38 +106,38 @@ Item {
         anchors.centerIn: parent
         width: {
           if (text.length > 38) {
-            return parent.width - artist.dotSize * 2 - Appearance.spacing.p2 * 2
+            return parent.width - artist.dotSize * 2 - Style.spacing.p2 * 2
           }
         }
         elide: Text.ElideRight
         text: AudioData.activePlayer?.trackArtist ?? ""
         Behavior on opacity {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
         opacity: AudioData.activePlayer?.isPlaying ? 1 : 0
         font {
-          family: Appearance.font.light
-          pointSize: Appearance.font.small
+          family: Style.font.light
+          pointSize: Style.font.small
         }
-        color: Appearance.srcery.brightBlack
+        color: Style.srcery.brightBlack
       }
 
       Rectangle {
         id: trdot
         radius: artist.dotSize / 2
-        color: Appearance.srcery.gray6
+        color: Style.srcery.gray6
         width: artist.dotSize
         height: artist.dotSize
         anchors.verticalCenter: parent.verticalCenter
         x: AudioData.activePlayer?.isPlaying
-          ? (artistText.x + artistText.width + Appearance.spacing.p2)
+          ? (artistText.x + artistText.width + Style.spacing.p2)
           : (parent.width - width)
         Behavior on x {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
@@ -108,22 +145,22 @@ Item {
     }
 
     Item {
-      Layout.preferredWidth: parent.width - Appearance.spacing.p2 * 2
+      Layout.preferredWidth: parent.width - Style.spacing.p2 * 2
       Layout.preferredHeight: 15
 
       Rectangle {
         id: bldot
         radius: artist.dotSize / 2
-        color: Appearance.srcery.gray6
+        color: Style.srcery.gray6
         width: artist.dotSize
         height: artist.dotSize
         anchors.verticalCenter: parent.verticalCenter
         x: AudioData.activePlayer?.isPlaying
-          ? (trackText.x - width - Appearance.spacing.p2)
+          ? (trackText.x - width - Style.spacing.p2)
           : 0
         Behavior on x {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
@@ -134,38 +171,38 @@ Item {
         anchors.centerIn: parent
         width: {
           if (text.length > 38) {
-            return parent.width - artist.dotSize * 2 - Appearance.spacing.p2 * 2
+            return parent.width - artist.dotSize * 2 - Style.spacing.p2 * 2
           }
         }
         elide: Text.ElideRight
         text: AudioData.activePlayer?.trackTitle ?? ""
         Behavior on opacity {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
         opacity: AudioData.activePlayer?.isPlaying ? 1 : 0
         font {
-          family: Appearance.font.light
-          pointSize: Appearance.font.small
+          family: Style.font.light
+          pointSize: Style.font.small
         }
-        color: Appearance.srcery.brightBlack
+        color: Style.srcery.brightBlack
       }
 
       Rectangle {
         id: brdot
         radius: artist.dotSize / 2
-        color: Appearance.srcery.gray6
+        color: Style.srcery.gray6
         width: artist.dotSize
         height: artist.dotSize
         anchors.verticalCenter: parent.verticalCenter
         x: AudioData.activePlayer?.isPlaying
-          ? (trackText.x + trackText.width + Appearance.spacing.p2)
+          ? (trackText.x + trackText.width + Style.spacing.p2)
           : (parent.width - width)
         Behavior on x {
           NumberAnimation {
-            duration: Appearance.durations.normal
+            duration: Style.durations.normal
             easing.type: Easing.InOutCubic
           }
         }
@@ -174,8 +211,8 @@ Item {
   }
   Rectangle {
     anchors.centerIn: parent
-    border.color: Appearance.srcery.gray4
-    border.width: Appearance.bar.borderWidth
+    border.color: Style.srcery.gray4
+    border.width: Style.bar.borderWidth
     implicitWidth: parent.implicitWidth - root.size
     implicitHeight: parent.implicitHeight - root.size
     color: "transparent"
@@ -183,8 +220,8 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    border.width: Appearance.bar.borderWidth
-    border.color: Appearance.srcery.gray4
+    border.width: Style.bar.borderWidth
+    border.color: Style.srcery.gray4
     color: "transparent"
   }
 }

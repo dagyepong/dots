@@ -46,6 +46,7 @@ Singleton {
     readonly property string darkRed: "#4F2321"
     readonly property string darkGreen: "#294229"
     readonly property string darkBlue: "#1E5181"
+    readonly property string hardBlack: "#0E0D0C"
   }
   readonly property Srcery srcery: Srcery {}
 
@@ -69,7 +70,7 @@ Singleton {
   readonly property Bar bar: Bar {}
 
   component Launcher: QtObject {
-    readonly property int height: 256
+    readonly property int height: 300
   }
   readonly property Launcher launcher: Launcher { }
 
@@ -105,6 +106,7 @@ Singleton {
 
   component Durations: QtObject {
     readonly property int slow: 800
+    readonly property int large: 500
     readonly property int normal: 400
     readonly property int medium: 300
     readonly property int small: 200

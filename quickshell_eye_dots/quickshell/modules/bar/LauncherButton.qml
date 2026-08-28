@@ -9,9 +9,10 @@
 // ├┤ License : GNU General Public License v3              ├┤
 // ┆└──────────────────────────────────────────────────────┘┆
 
+pragma ComponentBehavior: Bound
 // import qs.services
 import qs.config
-// import qs.utils
+import qs.utils
 import qs.components
 import qs
 import QtQuick
@@ -22,83 +23,441 @@ import QtQuick.Layouts
 // import Quickshell.Wayland
 // import Quickshell.Widgets
 
-Button {
+Item {
+  required property string monitorId
   id: root
 
-  // color: Appearance.srcery.brightWhite
-  required property string monitorId
-  Layout.topMargin: Appearance.bar.borderWidth
-  implicitWidth: Appearance.bar.height - Appearance.spacing.p3
-  implicitHeight: Appearance.bar.height - Appearance.bar.borderWidth
-    - Appearance.spacing.p1 * 2
+  signal decrementCurrentIndex()
+  signal incrementCurrentIndex()
+  signal openDrawer()
+  signal drawerNext()
+  signal drawerPrev()
+  signal drawerActivate()
+  signal closeDrawer()
+  signal accepted()
 
   property bool active: GlobalState.launcherOpen
-    && GlobalState.launcherMonitorId === root.monitorId
-    && GlobalState.launcherMode !== "notifications"
+  && GlobalState.launcherMonitorId === root.monitorId
 
-  onPressed: {
-    GlobalState.toggleLauncher({id: root.monitorId })
+  Layout.leftMargin: (monitorId === Config.displays.center || monitorId === Config.displays.tv) ? Style.spacing.p1 : 0
+  Layout.rightMargin: monitorId === Config.displays.left ? Style.spacing.p1 : 0
+  Loader {
+    active: root.active
+    sourceComponent: fieldComponent
+    anchors.fill: parent
+    id: fieldLoader
   }
 
-  HoverHandler {
-    id: hover
-    cursorShape: Qt.PointingHandCursor
+  Loader {
+    active: !root.active
+    sourceComponent: buttonComponent
+    anchors.fill: parent
+    id: buttonLoader
   }
 
-  background: BorderRect {
-    id: outerRect
-    color: Appearance.srcery.black
-    borderColor: Appearance.srcery.gray3
-    borderWidth: Appearance.bar.borderWidth
-    BorderRect {
-      id: innerRect
-      anchors.centerIn: parent
-      implicitWidth: parent.width * 0.5
-      implicitHeight: parent.height * 0.5
-      borderWidth: Appearance.bar.borderWidth
-      color: Appearance.srcery.black
-      rotation: 45
-      borderColor: Appearance.srcery.gray3
+  Layout.topMargin: Style.bar.borderWidth
+  implicitWidth: root.active ? 300 : implicitHeight
+  implicitHeight: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
+
+  Behavior on implicitWidth {
+    NumberAnimation {
+      duration: Style.durations.small
+      easing.type: Easing.OutCubic
     }
   }
 
-  states: [
+  Component {
+    id: buttonComponent
+    Button {
+      property bool visualActive: false
+      opacity: visualActive ? 1 : 0
+      id: button
+      Component.onCompleted: visualActive = true
+      Connections {
+        target: root
+        function onActiveChanged() { button.visualActive = !root.active }
+      }
+      anchors.fill: parent
+      MouseArea {
+        id: mouseArea
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        z: 99
+        cursorShape: Qt.PointingHandCursor
+        // anchors.fill: parent
+        hoverEnabled: true
+        x: -Style.spacing.p1
+        y: -Style.spacing.p1
+        implicitWidth: parent.width + (Style.spacing.p1 * 2) + Style.bar.borderWidth
+        implicitHeight: parent.height + (Style.spacing.p1 * 2)  + Style.bar.borderWidth
 
-    State {
-      name: "active"
-      when: root.active && !hover.hovered
-      PropertyChanges { innerRect.rotation: 0 }
-      PropertyChanges { outerRect.borderColor: Appearance.srcery.brightBlack }
-      PropertyChanges { innerRect.borderColor: Appearance.srcery.brightWhite }
-    },
+        // Rectangle {
+        //   anchors.fill: parent
+        //   color: Functions.transparentize("red", 0.7)
+        // }
 
-    State {
-      name: "hovered"
-      when: hover.hovered && !root.active
-      PropertyChanges { outerRect.borderColor: Appearance.srcery.gray6 }
-      PropertyChanges { innerRect.borderColor: Appearance.srcery.brightWhite }
-    },
+        onClicked: (mouse) => {
+          if (mouse.button === Qt.RightButton) {
+            GlobalState.toggleLauncher({id: root.monitorId, mode: "menu"})
+          } else if (mouse.button === Qt.LeftButton) {
+            GlobalState.toggleLauncher({id: root.monitorId })
+          }
+        }
+      }
 
-    State {
-      name: "activeHovered"
-      when: hover.hovered && root.active
-      PropertyChanges { outerRect.borderColor: Appearance.srcery.brightWhite }
-      PropertyChanges { innerRect.borderColor: Appearance.srcery.brightWhite }
-      PropertyChanges { innerRect.rotation: 0 }
-    }
-  ]
+      background: BorderRect {
+        id: outerRect
+        anchors.fill: parent
+        borderColor: Style.srcery.gray3
+        borderWidth: Style.bar.borderWidth
+        GradientRect {
+          id: innerRect
 
-  transitions: [
-    Transition {
+          implicitWidth: button.visualActive ? parent.height - Style.spacing.p1 * 2 : Style.spacing.p1
+          implicitHeight: parent.height - Style.spacing.p1 * 2
+          // implicitWidth: parent.height - Style.spacing.p1 * 2
+          // implicitHeight: parent.height - Style.spacing.p1 * 2
+
+          Behavior on rotation {
+            NumberAnimation {
+              duration: Style.durations.medium
+              easing.type: Easing.InOutCubic
+            }
+          }
+          Behavior on implicitWidth {
+            NumberAnimation {
+              duration: Style.durations.medium
+              easing.type: Easing.Linear
+            }
+          }
+          Behavior on implicitHeight {
+            NumberAnimation {
+              duration: Style.durations.medium
+              easing.type: Easing.Linear
+            }
+          }
+          gradientAngle: 45
+          rotation: button.visualActive ? 45 : 0
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 1; color: Style.srcery.green }
+            GradientStop { position: 0; color: Style.srcery.blue }
+          }
+          Rectangle {
+            implicitWidth: button.visualActive ? 4 : parent.implicitWidth
+            implicitHeight: button.visualActive ? 4 : parent.implicitHeight
+            anchors.centerIn: parent
+            radius: 4
+            color: Style.srcery.brightWhite
+
+            Behavior on implicitWidth {
+              NumberAnimation {
+                duration: Style.durations.medium
+                easing.type: Easing.Linear
+              }
+            }
+            Behavior on implicitHeight {
+              NumberAnimation {
+                duration: Style.durations.medium
+                easing.type: Easing.Linear
+              }
+            }
+          }
+          anchors.margins: Style.spacing.p1
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          borderWidth: Style.bar.borderWidth
+          color: Style.srcery.black
+          // rotation: 45
+          borderColor: Style.srcery.white
+        }
+      }
+
       NumberAnimation {
-        properties: "rotation"
-        duration: Appearance.durations.normal
-        easing.type: Easing.OutCubic
+        target: innerRect
+        running: mouseArea.containsMouse && !root.active
+        property: "gradientAngle"
+        duration: 1000
+        to: 405
+        loops: Animation.Infinite;
+        easing.type: Easing.Linear
       }
-      ColorAnimation {
-        duration: Appearance.durations.small
-        easing.type: Easing.OutQuad
-      }
+
+      states: [
+
+        // State {
+        //   name: "active"
+        //   when: root.active && !hover.hovered
+        //   PropertyChanges {
+        //     // innerRect.rotation: 0
+        //     innerRect.implicitWidth: Style.spacing.p1
+        //     innerRect.color: Style.srcery.brightWhite
+        //     innerRect.borderColor: Style.srcery.brightWhite
+        //   }
+        //   // PropertyChanges { outerRect.borderColor: Style.srcery.brightBlack }
+        //   // PropertyChanges { innerRect.borderColor: Style.srcery.brightWhite }
+        // },
+
+        State {
+          name: "hovered"
+          when: mouseArea.containsMouse && !root.active
+          PropertyChanges { outerRect.borderColor: Style.srcery.brightBlack }
+          PropertyChanges { innerRect.gradientAngle: 360 }
+        },
+
+        // State {
+        //   name: "activeHovered"
+        //   when: hover.hovered && root.active
+        //   PropertyChanges { outerRect.borderColor: Style.srcery.brightWhite }
+        //   PropertyChanges { innerRect.borderColor: Style.srcery.brightWhite }
+        //   // PropertyChanges { innerRect.rotation: 0 }
+        // }
+      ]
+
+      transitions: [
+        Transition {
+          NumberAnimation {
+            properties: "implicitWidth,implicitHeight"
+            duration: Style.durations.small
+            easing.type: Easing.OutCubic
+          }
+          ColorAnimation {
+            duration: Style.durations.medium
+            easing.type: Easing.OutCubic
+          }
+        }
+      ]
+
     }
-  ]
+  }
+  Component {
+    id: fieldComponent
+    TextField {
+
+      Connections {
+        target: GlobalState
+
+        function onLauncherOpenChanged() {
+          if (GlobalState.launcherOpen && GlobalState.launcherMonitorId === root.monitorId) {
+            field.forceActiveFocus();
+          }
+        }
+      }
+
+      color: Style.srcery.brightWhite
+      id: field
+      leftPadding: Style.spacing.p1
+      renderType: TextField.NativeRendering
+      cursorVisible: !readOnly
+      implicitWidth: 200
+      placeholderTextColor: Style.srcery.gray6
+      font.family: Style.font.light
+      font.pointSize: Style.font.normal
+      placeholderText: "  Search (/ for modes)"
+      text: GlobalState.searchQuery
+      onTextChanged: {
+        if (text === Config.menuPrefix) {
+          GlobalState.launcherMode = "menu"
+        }
+        const m = Config.launcherMenus.find(m => {
+          return text.startsWith(`${Config.menuPrefix}/${m.mode}`)
+        })
+        if (m) {
+          GlobalState.launcherMode = m[0]
+          GlobalState.searchQuery = ""
+        }
+        GlobalState.searchQuery = text
+      }
+      background: Rectangle {
+        color: "transparent"
+        border.color: Style.srcery.gray3
+      }
+
+      function goPrevious() {
+        if (GlobalState.itemDrawerActive) {
+          root.drawerPrev()
+        } else if (GlobalState.menuDirection === Qt.LeftToRight) {
+          return root.decrementCurrentIndex()
+        } else if (GlobalState.menuDirection === Qt.RightToLeft) {
+          return root.incrementCurrentIndex()
+        }
+      }
+
+      function goNext() {
+        if (GlobalState.itemDrawerActive) {
+          root.drawerNext()
+        } else if (GlobalState.menuDirection === Qt.LeftToRight) {
+          return root.incrementCurrentIndex()
+        } else if (GlobalState.menuDirection === Qt.RightToLeft) {
+          return root.decrementCurrentIndex()
+        }
+      }
+
+      Keys.onEscapePressed: GlobalState.closeLauncher()
+      Keys.onRightPressed: goNext()
+      Keys.onLeftPressed: goPrevious()
+      Keys.onUpPressed: root.openDrawer()
+      Keys.onDownPressed: root.closeDrawer()
+      Component.onCompleted: forceActiveFocus()
+      onAccepted: GlobalState.itemDrawerActive ? root.drawerActivate() : root.accepted()
+
+      // https://github.com/caelestia-dots/shell/blob/fe4ebb79b6162d7e5e4e9a00d8a39ff10876fb8c/modules/launcher/Content.qml#L109
+      Keys.onPressed: event => {
+        if (event.modifiers & Qt.ControlModifier) {
+          if (event.key === Qt.Key_L) {
+            goNext();
+            event.accepted = true;
+          } else if (event.key === Qt.Key_H) {
+            goPrevious()
+            event.accepted = true;
+          } else if (event.key === Qt.Key_K) {
+            root.openDrawer()
+            event.accepted = true;
+          } else if (event.key === Qt.Key_J) {
+            root.closeDrawer()
+            event.accepted = true;
+          }
+        } else if (event.key === Qt.Key_Tab && GlobalState.matchCount === 1) {
+          root.accepted()
+          event.accepted = true;
+        } else if (event.key === Qt.Key_Tab) {
+          root.incrementCurrentIndex();
+          event.accepted = true;
+        } else if (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+          root.decrementCurrentIndex();
+          event.accepted = true;
+        } else if (event.key == Qt.Key_Backspace && text === "" && GlobalState.launcherMode !== Config.defaultMode) {
+          GlobalState.launcherMode = Config.defaultMode
+          event.accepted = true
+        } else if (event.key == Qt.Key_Backspace && text === "/" && GlobalState.launcherMode === "menu") {
+          GlobalState.launcherMode = Config.defaultMode
+          field.text = ""
+          event.accepted = true
+        }
+      }
+
+      cursorDelegate: GradientRect {
+        id: cursor
+        property bool disableBlink
+        property bool visualActive: false
+
+        gradientAngle: 45
+        rotation: visualActive ? 0 : 45
+
+        property Gradient activeGradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 1; color: Style.srcery.green }
+          GradientStop { position: 0; color: Style.srcery.blue }
+        }
+
+        property Gradient cursorGradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 1; color: Style.srcery.brightWhite }
+        }
+        gradient: visualActive ? cursorGradient : activeGradient
+        implicitWidth: visualActive ? Style.spacing.p1 : parent.height - Style.spacing.p1 * 2
+        implicitHeight: parent.height - Style.spacing.p1 * 2
+
+        Rectangle {
+          implicitWidth: cursor.visualActive ? parent.implicitWidth : 4
+          implicitHeight: cursor.visualActive ? parent.implicitHeight : 4
+          // opacity: cursor.visualActive ? 0 : 1
+          anchors.centerIn: parent
+          radius: cursor.visualActive ? 0 : 4
+          color: Style.srcery.brightWhite
+
+          Behavior on implicitWidth {
+            NumberAnimation {
+              duration: Style.durations.medium
+              easing.type: Easing.Linear
+            }
+          }
+          Behavior on implicitHeight {
+            NumberAnimation {
+              duration: Style.durations.medium
+              easing.type: Easing.Linear
+            }
+          }
+        }
+        Component.onCompleted: visualActive = true
+
+        Connections {
+          target: root
+          function onActiveChanged() { cursor.visualActive = root.active }
+        }
+
+        Connections {
+          target: field
+
+          function onCursorPositionChanged(): void {
+            if (field.activeFocus && field.cursorVisible) {
+              cursor.opacity = 1;
+              cursor.disableBlink = true;
+              enableBlink.restart();
+            }
+          }
+        }
+
+        Timer {
+          running: field.activeFocus && field.cursorVisible && !cursor.disableBlink
+          repeat: true
+          triggeredOnStart: true
+          interval: 500
+          onTriggered: parent.opacity = parent.opacity === 1 ? 0 : 1
+        }
+        Binding {
+          when: !field.activeFocus || !field.cursorVisible
+          cursor.opacity: 0
+        }
+        Timer {
+          id: enableBlink
+
+          interval: 100
+          onTriggered: cursor.disableBlink = false
+        }
+
+        Behavior on opacity {
+          NumberAnimation {
+            duration: Style.durations.medium
+            easing.type: Easing.InOutCubic
+          }
+        }
+        Behavior on implicitWidth {
+          NumberAnimation {
+            duration: Style.durations.medium
+            easing.type: Easing.InOutCubic
+          }
+        }
+
+        Behavior on rotation {
+          NumberAnimation {
+            duration: Style.durations.medium
+            easing.type: Easing.InOutCubic
+          }
+        }
+
+        Behavior on color {
+          ColorAnimation {
+            duration: 500
+            easing.type: Easing.OutQuad
+          }
+        }
+      }
+
+      Behavior on color {
+        ColorAnimation {
+          duration: 50
+          easing.type: Easing.OutQuad
+        }
+      }
+      Behavior on placeholderTextColor {
+        ColorAnimation {
+          duration: 50
+          easing.type: Easing.OutQuad
+        }
+      }
+
+    }
+  }
+
 }

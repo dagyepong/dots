@@ -27,33 +27,40 @@ import qs.utils
 
 Button {
   id: root
-  required property var occupied
+  required property bool isOccupied
   required property int workspaceId
   required property int activeWorkspaceId
-  readonly property bool isOccupied: occupied[workspaceId] ?? false
   readonly property bool isWorkspace: true
   required property var modelData
+  required property string monitorId
   property bool active: activeWorkspaceId === workspaceId
   property bool urgent: {
     return HyprlandData.urgentWindows.some(win => {
       return win.workspace.id === root.workspaceId
     })
   }
-
+  property var specialIds: HyprlandData.special.map(w => w.id)
+  property bool isSpecial: HyprlandData.special.length > 0
+    && specialIds.includes(root.workspaceId)
+  property bool specialActive: HyprlandData.specialEventData.includes(monitorId)
+    && HyprlandData.specialEventData.includes(modelData.name)
 
   property int buttonSize: 26 * Config.scale
   property int iconSize: 16 * Config.scale
   property int calculatedWidth: {
     if (root.isOccupied) {
       let iconCount = Icons.getWsIcons(workspaceId).length ?? 0;
-      return iconCount * (root.iconSize + Appearance.spacing.p3);
+      return iconCount * (root.iconSize + Style.spacing.p3);
     } else {
-      return root.iconSize + Appearance.spacing.p3;
+      return root.iconSize + Style.spacing.p3;
     }
   }
 
   onPressed: {
-    if (workspaceId !== activeWorkspaceId) {
+    if (isSpecial) {
+      const n = modelData.name.split(":")[1]
+      Hyprland.dispatch(`hl.dsp.workspace.toggle_special("${n}")`)
+    } else if (workspaceId !== activeWorkspaceId) {
       Hyprland.dispatch(`hl.dsp.focus({ workspace = ${workspaceId} })`)
     }
   }
@@ -62,13 +69,37 @@ Button {
     cursorShape: root.active ? Qt.ArrowCursor : Qt.PointingHandCursor
   }
 
-  background: BorderRect {
+  background: GradientRect {
     id: wsBackground
     implicitWidth: root.calculatedWidth
     implicitHeight: childrenRect.height
-    radius: Appearance.bar.radius
-    color: Appearance.srcery.black
-    borderColor: Appearance.srcery.gray4
+    radius: Style.bar.radius
+    color: "transparent"
+    borderColor: {
+      if (!root.isOccupied)
+        return Style.srcery.black
+      if (root.urgent)
+        return (hover.hovered && !root.active) ? Style.srcery.gray6 : Style.srcery.gray2
+      return (root.active || hover.hovered) ? Style.srcery.brightBlack : Style.srcery.gray2
+    }
+
+    // gradientAngle: 45
+    property Gradient activeGradient: Gradient {
+      orientation: Gradient.Horizontal
+      GradientStop { position: 1; color: Style.srcery.cyan }
+      GradientStop { position: 0; color: Style.srcery.white }
+    }
+    gradient: activeGradient
+    gradientActive: root.isSpecial && root.specialActive
+    dashed: root.isSpecial
+    borderWidth: Style.bar.borderWidth
+
+    Behavior on borderColor {
+      ColorAnimation {
+        duration: Style.durations.normal
+        easing.type: Easing.OutCubic
+      }
+    }
 
     Loader {
       active: !root.isOccupied
@@ -77,55 +108,23 @@ Button {
     Component {
       id: indicator
       Item {
-        implicitWidth: root.iconSize + Appearance.spacing.p3
-        implicitHeight: root.iconSize + Appearance.spacing.p3
+        implicitWidth: root.iconSize + Style.spacing.p3
+        implicitHeight: Style.bar.height - Style.bar.borderWidth
+        - Style.spacing.p1 * 2
 
-        states: [
-          State {
-            name: "hover"
-            when: root.hovered && !root.active
-            PropertyChanges {
-              circle.color: Appearance.srcery.brightWhite
-            }
-          },
-          State {
-            name: "active"
-            when: !root.hovered && root.active
-            PropertyChanges {
-              circle.color: Appearance.srcery.brightWhite
-            }
-          },
-
-          State {
-            name: "hoveredActive"
-            when: root.hovered && root.active
-            PropertyChanges {
-              circle.color: Appearance.srcery.brightWhite
-            }
-          },
-          State {
-            name: "normal"
-            when: !root.hovered && !root.active
-            PropertyChanges {
-              circle.color: Appearance.srcery.gray6
-            }
-          }
-        ]
-        transitions: [
-          Transition {
-            ColorAnimation {
-              duration: Appearance.durations.small
-              easing.type: Easing.OutQuad
-            }
-          }
-        ]
         Rectangle {
           id: circle
           anchors.centerIn: parent
           width: root.buttonSize * 0.25
-          color: Appearance.srcery.gray6
           height: width
           radius: width / 2
+          color: (root.hovered || root.active) ? Style.srcery.brightWhite : Style.srcery.gray6
+          Behavior on color {
+            ColorAnimation {
+              duration: Style.durations.small
+              easing.type: Easing.OutQuad
+            }
+          }
         }
       }
     }
@@ -149,80 +148,21 @@ Button {
             }
 
             id: appIcon
-            Layout.preferredWidth: root.iconSize + Appearance.spacing.p3
-            Layout.preferredHeight: root.iconSize + Appearance.spacing.p3
+            Layout.preferredWidth: root.iconSize + Style.spacing.p3
+            Layout.preferredHeight: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
 
-            onUrgentChanged: {
-              if (!urgent) {
-                blinkAnimation.running = false
-                desaturatedIcon.opacity = 1.0
-              }
-            }
-            states: [
-              State {
-                name: "urgent_active"
-                when: appIcon.urgent && root.active && !hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: true
-                  desaturatedIcon.saturation: 0.0
-                }
-              },
-              State {
-                name: "urgent"
-                when: appIcon.urgent && !root.active && !hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: true
-                  desaturatedIcon.saturation: -0.8
-                }
-              },
-              State {
-                name: "hovered"
-                when: !appIcon.urgent && !root.active && hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: false
-                  desaturatedIcon.opacity: 1.0
-                  desaturatedIcon.saturation: 0.0
-                }
-              },
-              State {
-                name: "UrgentHovered"
-                when: appIcon.urgent && !root.active && hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: true
-                  desaturatedIcon.saturation: 0.0
-                }
-              },
-              State {
-                name: "active"
-                when: !appIcon.urgent && root.active  && !hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: false
-                  desaturatedIcon.opacity: 1.0
-                  desaturatedIcon.saturation: 0.0
-                }
-              },
-              State {
-                name: "normal"
-                when: !appIcon.urgent && !root.active && !hover.hovered
-                PropertyChanges {
-                  blinkAnimation.running: false
-                  desaturatedIcon.opacity: 1.0
-                  desaturatedIcon.saturation: -0.8
-                }
-              }
-
-            ]
             SequentialAnimation {
               id: blinkAnimation
-              running: false
+              running: appIcon.urgent
               loops: Animation.Infinite
+              onRunningChanged: if (!running) desaturatedIcon.opacity = 1.0
 
               PropertyAnimation {
                 target: desaturatedIcon
                 property: "opacity"
                 from: 1.0
                 to: 0.3
-                duration: Appearance.durations.normal
+                duration: Style.durations.normal
                 easing.type: Easing.InOutQuad
               }
               PropertyAnimation {
@@ -230,9 +170,17 @@ Button {
                 property: "opacity"
                 from: 0.3
                 to: 1.0
-                duration: Appearance.durations.normal
+                duration: Style.durations.normal
                 easing.type: Easing.InOutQuad
               }
+              // PropertyAnimation {
+              //   target: desaturatedIcon
+              //   property: "opacity"
+              //   from: 0.3
+              //   to: 1.0
+              //   duration: Style.durations.normal
+              //   easing.type: Easing.InOutQuad
+              // }
             }
 
             MultiEffect {
@@ -241,10 +189,12 @@ Button {
               implicitHeight: root.iconSize
               anchors.centerIn: parent
 
+              // grayscale scratch icons unless the scratch is active
+              saturation: (root.isSpecial && !root.specialActive) ? -1.0 : 0.0
+
               Behavior on saturation {
                 NumberAnimation {
-                  properties: "saturation"
-                  duration: Appearance.durations.small
+                  duration: Style.durations.small
                   easing.type: Easing.OutCubic
                 }
               }

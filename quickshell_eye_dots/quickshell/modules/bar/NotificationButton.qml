@@ -18,7 +18,7 @@ import qs
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Shapes
+// import QtQuick.Shapes
 // import Quickshell
 // import Quickshell.Hyprland
 // import Quickshell.Wayland
@@ -26,72 +26,116 @@ import QtQuick.Shapes
 
 Button {
   id: root
-  Layout.topMargin: Appearance.bar.borderWidth
-  implicitWidth: Appearance.bar.height - Appearance.spacing.p3
-  implicitHeight: Appearance.bar.height - Appearance.bar.borderWidth - Appearance.spacing.p1 * 2
+  Layout.topMargin: Style.bar.borderWidth
+  implicitWidth: implicitHeight
+  implicitHeight: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
 
+  Layout.rightMargin: Style.spacing.p1
   property bool active: Notifications?.list.length > 0 ?? false
   property bool menuOpen: GlobalState.launcherOpen
     && GlobalState.launcherMode === "notifications"
   required property string monitorId
 
-  HoverHandler {
-    id: hover
+  MouseArea {
+    id: mouseArea
+    acceptedButtons: Qt.LeftButton | Qt.RightButton
     cursorShape: Qt.PointingHandCursor
-  }
+    // anchors.fill: parent
+    hoverEnabled: true
 
-  onPressed: {
-    GlobalState.toggleLauncher({id: root.monitorId, mode: "notifications"})
+    x: -Style.spacing.p1
+    y: -Style.spacing.p1
+    implicitWidth: parent.width + (Style.spacing.p1 * 2) + Style.bar.borderWidth
+    implicitHeight: parent.height + (Style.spacing.p1 * 2)  + Style.bar.borderWidth
+
+    onClicked: (mouse) => {
+      if (mouse.button === Qt.RightButton) {
+        // GlobalState.toggleLauncher({id: root.monitorId })
+      } else if (mouse.button === Qt.LeftButton) {
+        GlobalState.toggleLauncher({
+          id: root.monitorId, mode: "notifications",
+          direction: Qt.RightToLeft,
+        })
+      }
+    }
   }
   states: [
     State {
       name: "open"
-      when: root.menuOpen && !root.hovered && !root.active
-      PropertyChanges { shape.rotation: 90 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
-      PropertyChanges { rect.borderColor: Appearance.srcery.brightBlack }
+      when: root.menuOpen && !mouseArea.containsMouse && !root.active
+      PropertyChanges {
+        rect.borderColor: Style.srcery.brightBlack
+      }
 
     },
     State {
       name: "openActive"
-      when: root.menuOpen && !root.hovered && root.active
-      PropertyChanges { shape.rotation: 90 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
-      PropertyChanges { rect.borderColor: Appearance.srcery.brightBlack }
+      when: root.menuOpen && !mouseArea.containsMouse && root.active
+      PropertyChanges {
+        quad.bottomLeft:  Qt.point(0.5, 1)
+        quad.bottomRight: Qt.point(0.5, 1)
+        quad.topLeft:     Qt.point(0, 0)
+        quad.topRight:    Qt.point(1, 0)
+        quad.gradientEnabled: true
+        dot.y: 5
+      }
+      PropertyChanges { rect.borderColor: Style.srcery.brightBlack }
     },
     State {
       name: "openActiveHovered"
-      when: root.menuOpen && root.hovered && root.active
-      PropertyChanges { shape.rotation: 90 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
-      PropertyChanges { rect.borderColor: Appearance.srcery.brightWhite }
+      when: root.menuOpen && mouseArea.containsMouse && root.active
+      PropertyChanges {
+        // quad.rotation: 180
+        quad.gradientEnabled: true
+
+        quad.bottomLeft:  Qt.point(0.5, 1)
+        quad.bottomRight: Qt.point(0.5, 1)
+        quad.topLeft:     Qt.point(0, 0)
+        quad.topRight:    Qt.point(1, 0)
+        dot.y: 5
+      }
+      PropertyChanges { rect.borderColor: Style.srcery.brightWhite }
     },
     State {
       name: "openHovered"
-      when: root.menuOpen && root.hovered && !root.active
-      PropertyChanges { shape.rotation: 90 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
-      PropertyChanges { rect.borderColor: Appearance.srcery.brightWhite }
+      when: root.menuOpen && mouseArea.containsMouse && !root.active
+      PropertyChanges {
+        rect.borderColor: Style.srcery.brightWhite
+      }
     },
     State {
       name: "active"
-      when: root.active && !root.hovered && !root.menuOpen
-      PropertyChanges { shape.rotation: 180 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.white }
-      PropertyChanges { rect.borderColor: Appearance.srcery.gray5 }
+      when: root.active && !mouseArea.containsMouse && !root.menuOpen
+      PropertyChanges {
+        // quad.rotation: 180
+        // quad.gradientEnabled: true
+      }
+      PropertyChanges {
+        rect.borderColor: Style.srcery.gray5
+        quad.bottomLeft:  Qt.point(0.5, 1)
+        quad.bottomRight: Qt.point(0.5, 1)
+        quad.topLeft:     Qt.point(0, 0)
+        quad.topRight:    Qt.point(1, 0)
+        dot.y: 5
+      }
     },
     State {
       name: "activeHovered"
-      when: root.active && root.hovered && !root.menuOpen
-      PropertyChanges { shape.rotation: 180 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
-      PropertyChanges { rect.borderColor: Appearance.srcery.brightBlack }
+      when: root.active && mouseArea.containsMouse && !root.menuOpen
+      PropertyChanges {
+        quad.gradientEnabled: true
+        quad.bottomLeft:  Qt.point(0.5, 1)
+        quad.bottomRight: Qt.point(0.5, 1)
+        quad.topLeft:     Qt.point(0, 0)
+        quad.topRight:    Qt.point(1, 0)
+        dot.y: 5
+      }
+      PropertyChanges { rect.borderColor: Style.srcery.brightBlack }
     },
     State {
       name: "hovered"
-      when: hover.hovered && !root.active && !root.menuOpen
-      PropertyChanges { rect.borderColor: Appearance.srcery.gray6 }
-      PropertyChanges { path.strokeColor: Appearance.srcery.brightWhite }
+      when: mouseArea.containsMouse && !root.active && !root.menuOpen
+      PropertyChanges { rect.borderColor: Style.srcery.gray6 }
 
     }
   ]
@@ -99,38 +143,85 @@ Button {
   transitions: [
     Transition {
       NumberAnimation {
-        properties: "rotation"
-        duration: Appearance.durations.normal
+        properties: "y"
+        duration: Style.durations.normal
         easing.type: Easing.OutCubic
       }
       ColorAnimation {
-        duration: Appearance.durations.small
+        duration: Style.durations.small
         easing.type: Easing.OutQuad
       }
     }
   ]
-  background: BorderRect {
+  background: GradientRect {
     id: rect
-    color: Appearance.srcery.black
-    borderColor: Appearance.srcery.gray3
-    borderWidth: Appearance.bar.borderWidth
+    color: Style.srcery.black
+    borderColor: Style.srcery.gray3
+    borderWidth: Style.bar.borderWidth
     anchors.fill: parent
 
-    Shape {
-      id: shape
+    Quad {
+      id: quad
+      width: 20
+      height: 18
+      topLeft:  Qt.point(0.5, 0)
+      topRight: Qt.point(0.5, 0)
       anchors.centerIn: parent
-      width: Appearance.bar.iconSize
-      height: Appearance.bar.iconSize
-      ShapePath {
-        strokeWidth: 1
-        id: path
-        strokeColor: Appearance.srcery.gray3
-        fillColor: Appearance.srcery.black
-        PathSvg {
-          id: svg
-          path: "M 10 1.7 L 18.3 16.3 L 1.7 16.3 Z"
+      gradientEnabled: true
+      strokeColor: Style.srcery.brightBlack
+      gradientStart: Style.srcery.yellow
+      gradientEnd: Style.srcery.cyan
+      gradientRotation: 90
+      // quad.gradientEnabled: true
+      Behavior on bottomLeft  { PropertyAnimation { duration: Style.durations.small; easing.type: Easing.InOutQuad } }
+      Behavior on bottomRight { PropertyAnimation { duration: Style.durations.small; easing.type: Easing.InOutQuad } }
+      Behavior on topLeft  { PropertyAnimation { duration: Style.durations.small; easing.type: Easing.InOutQuad } }
+      Behavior on topRight { PropertyAnimation { duration: Style.durations.small; easing.type: Easing.InOutQuad } }
+      Rectangle {
+        id: dot
+        width: 4
+        height: 4
+        radius: 4
+        y: 10
+        SequentialAnimation on color {
+          loops: Animation.Infinite
+          running: root.active
+          ColorAnimation {
+            from: Style.srcery.brightWhite
+            to: Style.srcery.gray3
+            duration: Style.durations.slow
+            easing.type: Easing.Linear
+          }
+          ColorAnimation {
+            from: Style.srcery.gray3
+            to: Style.srcery.brightWhite
+            easing.type: Easing.Linear
+            duration: Style.durations.slow
+          }
         }
+        // anchors.bottom: parent.bottom
+        // anchors.bottomMargin: 4
+        color: Style.srcery.brightBlack
+        // anchors.centerIn: parent
+        // anchors.topMargin: 4
+        anchors.horizontalCenter: parent.horizontalCenter
       }
     }
+    // Shape {
+    //   id: shape
+    //   anchors.centerIn: parent
+    //   width: Style.bar.iconSize
+    //   height: Style.bar.iconSize
+    //   ShapePath {
+    //     strokeWidth: 1
+    //     id: path
+    //     strokeColor: Style.srcery.gray3
+    //     fillColor: Style.srcery.black
+    //     PathSvg {
+    //       id: svg
+    //       path: "M 10 1.7 L 18.3 16.3 L 1.7 16.3 Z"
+    //     }
+    //   }
+    // }
   }
 }

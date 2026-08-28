@@ -14,7 +14,7 @@ Item {
     property bool hasBattery: batteryDevice && batteryDevice.percentage !== undefined
 
     visible: hasBattery
-    implicitHeight: Appearance.bar.height
+    implicitHeight: Style.bar.height
     implicitWidth: visible ? mainLayout.implicitWidth : 0
 
     // Low frequency clock to shift matrix elements safely
@@ -38,7 +38,7 @@ Item {
                 pixelSize: 10
                 weight: Font.DemiBold
             }
-            color: root.charging ? Appearance.srcery.cyan : Appearance.srcery.gray4
+            color: root.charging ? Style.srcery.cyan : Style.srcery.gray4
             Layout.alignment: Qt.AlignVCenter
 
             // Custom procedural formatting logic

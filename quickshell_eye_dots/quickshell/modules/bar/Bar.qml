@@ -1,19 +1,19 @@
-// ~/.config/quickshell/modules/bar/Bar.qml
 // ┌───────────────────────────────────────────────┐
 // │█▀▀▀▀▀▀▀▀█░░░░░░░░█▀▄░█▀█░█▀▄░░░░░░░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░░░░░░█▀▄░█▀█░█▀▄░░░░░░░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░░░░░░▀▀░░▀░▀░▀░▀░░░░░░░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀───────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>      ├┤
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>     ├┤
 // ││ Repo    : https://github.com/roosta/dotfiles││
 // ││ Site    : https://www.roosta.sh             ││
-// ├┤ License : GNU General Public License v3      ├┤
+// ├┤ License : GNU General Public License v3     ││
 // ┆└─────────────────────────────────────────────┘┆
 
 import QtQuick
-import QtQuick.Layouts
 import qs.components
 import qs.services
+import QtQuick.Controls
+import QtQuick.Layouts
 import qs.config
 pragma ComponentBehavior: Bound
 
@@ -22,7 +22,16 @@ Item {
   required property string monitorId
 
   z: 1
-  implicitHeight: Appearance.bar.height
+  implicitHeight: Style.bar.height
+
+  signal decrementCurrentIndex()
+  signal incrementCurrentIndex()
+  signal drawerNext()
+  signal drawerPrev()
+  signal accepted()
+  signal openDrawer()
+  signal closeDrawer()
+  signal drawerActivate()
 
   anchors {
     bottom: parent.bottom
@@ -32,8 +41,8 @@ Item {
 
   BorderRect {
     id: barContent
-    color: Appearance.srcery.black
-    borderColor: Appearance.srcery.gray3
+    color: Style.srcery.black
+    borderColor: Style.srcery.gray3
     topBorder: 1
     anchors {
       right: parent.right
@@ -63,7 +72,6 @@ Item {
     }
   }
 
-  // --- PRIMARY DISPLAY BAR ---
   Component {
     id: primaryBar
     Rectangle {
@@ -79,18 +87,28 @@ Item {
           Layout.fillHeight: true
           color: "transparent"
           RowLayout {
-            spacing: Appearance.spacing.p1
+            spacing: Style.spacing.p1
             anchors.left: parent.left
-            anchors.leftMargin: Appearance.spacing.p1
             anchors.fill: parent
-            AlertsIndicator { monitorId: root.monitorId }
-            KeyboardButton { monitorId: root.monitorId }
+            LauncherButton {
+              monitorId: root.monitorId
+              onDecrementCurrentIndex: root.decrementCurrentIndex()
+              onIncrementCurrentIndex: root.incrementCurrentIndex()
+              onOpenDrawer: root.openDrawer()
+              onCloseDrawer: root.closeDrawer()
+              onDrawerNext: root.drawerNext()
+              onDrawerActivate: root.drawerActivate()
+              onDrawerPrev: root.drawerPrev()
+              onAccepted: root.accepted()
+            }
+            Separator {}
             Loader {
               Layout.fillHeight: true
               Layout.fillWidth: true
               active: LauncherData.appsData.length > 0
               sourceComponent: Context { }
             }
+
           }
         }
         Rectangle {
@@ -99,11 +117,11 @@ Item {
           Layout.fillHeight: true
           Layout.fillWidth: true
           RowLayout {
-            spacing: Appearance.spacing.p1
+            spacing: Style.spacing.p1
             anchors.centerIn: parent
-            LauncherButton { monitorId: root.monitorId }
+            ShiftButton { direction: -1; monitorId: root.monitorId }
             Workspaces { monitorId: root.monitorId }
-            NotificationButton { monitorId: root.monitorId }
+            ShiftButton { direction: 1; monitorId: root.monitorId }
           }
         }
         Rectangle {
@@ -112,108 +130,148 @@ Item {
           Layout.fillWidth: true
           color: "transparent"
           RowLayout {
-            spacing: Appearance.spacing.p1
+            spacing: Style.spacing.p1
             anchors.right: parent.right
-            anchors.rightMargin: Appearance.spacing.p1
             Clock { }
-            TrayButton { monitorId: root.monitorId }
-            AudioButton { monitorId: root.monitorId }
+            Separator {}
             Battery { monitorId: root.monitorId }
+            AlertsIndicator { monitorId: root.monitorId }
+            KeyboardButton { monitorId: root.monitorId }
+            AudioButton { monitorId: root.monitorId }
+            TrayButton { monitorId: root.monitorId }
+            Separator {}
+            NotificationButton { monitorId: root.monitorId }
           }
         }
       }
     }
   }
 
-  // --- RIGHT MONITOR DISPLAY BAR ---
   Component {
     id: rightBar
     Rectangle {
       color: "transparent"
-      RowLayout {
-        anchors.fill: parent
-        
-        RowLayout {
-          id: leftSecRightBar
-          spacing: Appearance.spacing.p1
-          Layout.leftMargin: Appearance.spacing.p1
-          LauncherButton { monitorId: root.monitorId }
-          Workspaces { monitorId: root.monitorId }
-        }
-        
-        Item { Layout.fillWidth: true } // Clean spacer pusher
 
+      RowLayout {
+        anchors {
+          top: parent.top
+          left: parent.left
+          bottom: parent.bottom
+          right: parent.right
+        }
         RowLayout {
-          id: rightSecRightBar
-          spacing: Appearance.spacing.p1
-          Layout.rightMargin: Appearance.spacing.p1
-          Layout.alignment: Qt.AlignVCenter
-          Battery { monitorId: root.monitorId }
+          id: leftSection
+          spacing: Style.spacing.p1
+          Layout.leftMargin: Style.spacing.p1
+
+          LauncherButton {
+            monitorId: root.monitorId
+            onDecrementCurrentIndex: root.decrementCurrentIndex()
+            onIncrementCurrentIndex: root.incrementCurrentIndex()
+            onOpenDrawer: root.openDrawer()
+            onCloseDrawer: root.closeDrawer()
+            onAccepted: root.accepted()
+          }
+
+          Workspaces {
+            monitorId: root.monitorId
+          }
+
+        }
+        RowLayout {
+          id: centerSection
+          spacing: Style.spacing.p1
+
+        }
+        RowLayout {
+          id: rightSection
         }
       }
     }
   }
 
-  // --- LEFT MONITOR DISPLAY BAR ---
   Component {
     id: leftBar
     Rectangle {
       color: "transparent"
+
       RowLayout {
-        anchors.fill: parent
-        
+        anchors {
+          top: parent.top
+          left: parent.left
+          bottom: parent.bottom
+          right: parent.right
+        }
         RowLayout {
-          id: leftSecLeftBar
+          id: leftSection
+          Layout.fillWidth: true
           Layout.fillHeight: true
         }
-        
-        Item { Layout.fillWidth: true } // Clean spacer pusher
-
         RowLayout {
-          id: rightSecLeftBar
-          spacing: Appearance.spacing.p1
-          Layout.rightMargin: Appearance.spacing.p1
-          Layout.alignment: Qt.AlignVCenter
-          Workspaces { monitorId: root.monitorId }
-          LauncherButton { monitorId: root.monitorId }
-          Battery { monitorId: root.monitorId }
+          id: centerSection
+          spacing: Style.spacing.p1
+        }
+        RowLayout {
+          id: rightSection
+          spacing: Style.spacing.p1
+          Workspaces {
+            monitorId: root.monitorId
+          }
+          LauncherButton {
+            monitorId: root.monitorId
+            onDecrementCurrentIndex: root.decrementCurrentIndex()
+            onIncrementCurrentIndex: root.incrementCurrentIndex()
+            onOpenDrawer: root.openDrawer()
+            onCloseDrawer: root.closeDrawer()
+            onAccepted: root.accepted()
+          }
         }
       }
     }
   }
 
-  // --- TOP MONITOR DISPLAY BAR ---
   Component {
     id: topBar
     Rectangle {
       color: "transparent"
       anchors.fill: parent
+
       RowLayout {
         anchors.fill: parent
         spacing: 0
         Rectangle {
-          id: leftSecTopBar
+          id: leftSection
           Layout.fillWidth: true
           Layout.fillHeight: true
           color: "transparent"
+          RowLayout {
+            spacing: Style.spacing.p1
+            anchors.left: parent.left
+            anchors.leftMargin: Style.spacing.p1
+            anchors.fill: parent
+          }
         }
         Rectangle {
-          id: centerSecTopBar
+          id: centerSection
           color: "transparent"
           Layout.fillHeight: true
           Layout.fillWidth: true
           RowLayout {
-            spacing: Appearance.spacing.p1
+            spacing: Style.spacing.p1
             anchors.centerIn: parent
             Workspaces { monitorId: root.monitorId }
-            Battery { monitorId: root.monitorId }
           }
         }
         Rectangle {
-          id: rightSecTopBar
-          Layout.fillWidth: true
+          id: rightSection
           Layout.fillHeight: true
+          Layout.fillWidth: true
           color: "transparent"
+          RowLayout {
+            spacing: Style.spacing.p1
+            anchors.right: parent.right
+            anchors.rightMargin: Style.spacing.p1
+          }
         }
       }
     }

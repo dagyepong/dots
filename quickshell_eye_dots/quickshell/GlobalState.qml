@@ -1,12 +1,12 @@
 // ┌──────────────────────────────────────────────────────────────────────┐
-// │█▀▀▀▀▀▀▀▀█░░░█▀▀░█░░░█▀█░█▀▄░█▀█░█░░░░░█▀▀░▀█▀░█▀█░▀█▀░█▀▀░░█▀▀▀▀▀▀▀▀█│
+// │█▀▀▀▀▀▀▀▀█░░░█▀▀█░░░█▀█░█▀▄░█▀█░█░░░░░█▀▀░▀█▀░█▀█░▀█▀░█▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░█░█░█░░░█░█░█▀▄░█▀█░█░░░░░▀▀█░░█░░█▀█░░█░░█▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀▀▀░▀▀▀░▀▀▀░▀▀░░▀░▀░▀▀▀░░░▀▀▀░░▀░░▀░▀░░▀░░▀▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀──────────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
 // ├┤ Author  : Daniel Berg <mail@roosta.sh>                             ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                       ││
-// ││ Site    : https://www.roosta.sh                                    ││
-// ├┤ License : GNU General Public License v3                            ├┤
+// ││ Repo    : https://github.com/roosta/dotfiles                        ││
+// ││ Site    : https://www.roosta.sh                                     ││
+// ├┤ License : GNU General Public License v3                             ├┤
 // ┆└────────────────────────────────────────────────────────────────────┘┆
 
 pragma Singleton
@@ -26,20 +26,28 @@ Singleton {
   property string launcherMonitorId: ""
   property string trayMonitorId: ""
   property string launcherMode: Config.defaultMode
-  property bool overlayOpen: root.launcherOpen || root.trayMenuOpen
+  property bool overlayOpen: root.launcherOpen || root.trayMenuOpen || root.batteryPopupOpen
   property QsMenuHandle activeMenu: null
   property bool trayMenuOpen: false
   property int menuDirection: Qt.LeftToRight
   property int menuIndex: 0
+  property string searchQuery: ""
+  property int matchCount: 0
+  property bool itemDrawerActive: false
+
+  // Added Battery Popup properties
+  property bool batteryPopupOpen: false
+  property string batteryMonitorId: ""
 
   Timer {
     id: timer
-    interval: Appearance.durations.small
+    interval: Style.durations.small
     onTriggered: {
       root.launcherMonitorId = ""
       root.launcherMode = Config.defaultMode
       root.menuDirection = Qt.LeftToRight
       root.menuIndex = 0
+      root.searchQuery = ""
     }
   }
 
@@ -87,6 +95,17 @@ Singleton {
       closeLauncher()
     } else {
       openLauncher({ id, mode, direction, index })
+    }
+  }
+
+  // Added Battery Popup toggle function
+  function toggleBatteryPopup(monitorId = Config.primaryDisplay) {
+    if (batteryPopupOpen && batteryMonitorId === monitorId) {
+      batteryPopupOpen = false
+      batteryMonitorId = ""
+    } else {
+      batteryPopupOpen = true
+      batteryMonitorId = monitorId
     }
   }
 }

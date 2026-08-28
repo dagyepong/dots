@@ -27,47 +27,49 @@ Item {
   RowLayout {
     id: rowLayout
     anchors.fill: parent
-    spacing: 0
+    spacing: Style.spacing.p1
     BorderRect {
-      implicitWidth: Appearance.bar.height
-      implicitHeight: Appearance.bar.height - Appearance.bar.borderWidth
-      Layout.topMargin: Appearance.bar.borderWidth
-      color: Appearance.srcery.black
-      // rightBorder: Appearance.bar.borderWidth
-      leftBorder: Appearance.bar.borderWidth
-      borderColor: Appearance.srcery.gray3
+      color: "transparent"
+      borderColor: Style.srcery.gray3
+      borderWidth: Style.bar.borderWidth
+      implicitHeight: Style.bar.height - Style.bar.borderWidth - Style.spacing.p1 * 2
+      implicitWidth: implicitHeight
       IconImage {
         id: windowIcon
+        anchors.fill: parent
         anchors.centerIn: parent
+        anchors.margins: 4
+        // anchors.centerIn: parent
         source: ContextData.data.icon
-        implicitSize: parent.height - Appearance.spacing.p3
+        // implicitSize: parent.height - Style.spacing.p3
+        // anchors.margins: Style.spacing.p0
       }
     }
     ColumnLayout {
       id: colLayout
       Layout.fillWidth: true
-      spacing: -4
+      spacing: -2
       Text {
 
         font {
-          family: Appearance.font.light
-          pointSize: Appearance.font.normal
+          family: Style.font.light
+          pointSize: Style.font.small
         }
 
-        color: Appearance.srcery.brightWhite
+        color: Style.srcery.brightWhite
         text: ContextData.data.title
       }
       Text {
         id: window
         elide: Text.ElideRight
         Layout.fillWidth: true
-        Layout.rightMargin: Appearance.spacing.p5
+        Layout.rightMargin: Style.spacing.p5
         font {
-          family: Appearance.font.light
-          pointSize: Appearance.font.small
+          family: Style.font.light
+          pointSize: Style.font.tiny
         }
 
-        color: Appearance.srcery.white
+        color: Style.srcery.white
         text: ContextData.data.desc
       }
     }
