@@ -3,26 +3,20 @@
 // │█▀▀▀▀▀▀▀▀█░░░█▀█░░█░░█▀▀░█▀▄░█░░░█▀█░█░█░█░█░█░█░█▀█░░█░░█▀█░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀░▀░░▀░░▀░░░▀░▀░▀▀▀░▀░▀░▀░▀░▀▀░░▀▀░░▀░▀░░▀░░▀░▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>                               ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                         ││
-// ││ Site    : https://www.roosta.sh                                      ││
-// ├┤ License : GNU General Public License v3                              ├┤
-// ┆└──────────────────────────────────────────────────────────────────────┘┆
+// ├┤ Converted for Niri compositor support ───────────────────────────────├┤
+// └──────────────────────────────────────────────────────────────────────┘┘
 
-// Based on: https://github.com/end-4/dots-hyprland/blob/703697e1c40b66619fb224043891aade47494bb3/.config/quickshell/ii/services/HyprlandData.qml
-// Modified 2025 by Daniel Berg <mail@roosta.sh>
-//
 pragma Singleton
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import qs.utils
 
 /**
- * Provides access to some Hyprland data not available in Quickshell.Hyprland.
+ * Provides access to Niri window, workspace, and monitor data structured 
+ * to mimic the expected HyprlandData properties used across Daniel Berg's dotfiles.
  */
 Singleton {
   id: root
@@ -42,13 +36,9 @@ Singleton {
   property string submap: ""
   property bool submapActive: submap.length > 0
 
-
-  /**
-   * Urgent windows
-   */
   property var urgentWindows: []
-  property var activeTopLevel: Hyprland.activeToplevel?.lastIpcObject
-
+  // Fallback representation for active top level window matching Niri's JSON keys
+  property var activeTopLevel: null
 
   function clearUrgentByClass(c) {
     root.urgentWindows = root.urgentWindows.filter(win => {
@@ -56,20 +46,8 @@ Singleton {
     })
   }
 
-  onActiveTopLevelChanged: {
-    if (activeTopLevel && urgentWindows.some(w => {
-     return w.address === activeTopLevel.address
-    })) {
-      clearUrgentByClass(activeTopLevel.class)
-    }
-  }
-
   function updateWindowList() {
     getClients.running = true;
-  }
-
-  function updateLayers() {
-    getLayers.running = true;
   }
 
   function updateMonitors() {
@@ -78,124 +56,162 @@ Singleton {
 
   function updateWorkspaces() {
     getWorkspaces.running = true;
-    getActiveWorkspace.running = true;
   }
 
   function updateAll() {
     updateWindowList();
     updateMonitors();
-    updateLayers();
     updateWorkspaces();
   }
 
   Component.onCompleted: {
     updateAll();
+    eventStream.running = true;
   }
-  Connections {
-    target: Hyprland
 
-    function onRawEvent(event) {
-      root.updateAll()
-      Hyprland.refreshToplevels()
-      if (event.name === "urgent") {
-        const win = root.windowList.find(w => w.address === `0x${event.data}`)
-        if (win) {
-          root.urgentWindows = [
-            ...root.urgentWindows,
-            win
-          ]
-        }
-      } else if (event.name === "submap") {
-        root.submap = event?.data
-      } else if (event.name === "activespecial") {
-        root.specialEventData = event?.data
+  // Niri event stream listener handles real-time updates efficiently
+  Process {
+    id: eventStream
+    command: ["niri", "msg", "event-stream"]
+    stdout: StdioCollector {
+      id: eventCollector
+      onStreamFinished: {
+        // If the stream drops, restart it
+        eventStream.running = true;
+      }
+    }
+    // Read line by line from Niri's event stream output
+    onRunningChanged: {
+      if (!running) {
+        // Auto-reconnect safety net
+        eventStream.running = true;
       }
     }
   }
 
+  // Parse incoming event line chunks if needed, or simply trigger a refresh on change
+  Connections {
+    target: eventCollector
+    function onTextChanged() {
+      // Whenever niri emits an event, refresh state dictionaries
+      root.updateAll();
+    }
+  }
+
+  // Fetch all open windows from Niri
   Process {
     id: getClients
-    command: ["hyprctl", "clients", "-j"]
+    command: ["niri", "msg", "--json", "windows"]
     stdout: StdioCollector {
       id: clientsCollector
       onStreamFinished: {
         if (clientsCollector?.text) {
-          root.windowList = JSON.parse(clientsCollector.text)
-          let tempWinByAddress = {};
-          for (var i = 0; i < root.windowList.length; ++i) {
-            var win = root.windowList[i];
-            tempWinByAddress[win.address] = win;
+          try {
+            const rawWindows = JSON.parse(clientsCollector.text);
+            // Map Niri window structure to match expected properties (id, address, workspace id, class, etc.)
+            root.windowList = rawWindows.map(w => ({
+              address: String(w.id),
+              id: w.id,
+              title: w.title ?? "",
+              class: w.app_id ?? "",
+              workspace: { id: w.workspace_id },
+              is_focused: w.is_focused,
+              is_floating: w.is_floating
+            }));
+
+            let tempWinByAddress = {};
+            let focusedWin = null;
+            for (var i = 0; i < root.windowList.length; ++i) {
+              var win = root.windowList[i];
+              tempWinByAddress[win.address] = win;
+              if (win.is_focused) {
+                focusedWin = win;
+              }
+            }
+            root.windowByAddress = tempWinByAddress;
+            root.windowsByWorkspace = Functions.groupBy(root.windowList, w => w.workspace.id);
+            root.addresses = root.windowList.map(win => win.address);
+            root.activeTopLevel = focusedWin;
+          } catch(e) {
+            console.error("Failed to parse Niri windows JSON: " + e);
           }
-          root.windowByAddress = tempWinByAddress;
-          root.windowsByWorkspace = Functions.groupBy(root.windowList, w => w.workspace.id)
-          root.addresses = root.windowList.map(win => win.address);
         }
       }
     }
   }
 
+  // Fetch monitors / outputs from Niri
   Process {
     id: getMonitors
-    command: ["hyprctl", "monitors", "-j"]
+    command: ["niri", "msg", "--json", "outputs"]
     stdout: StdioCollector {
       id: monitorsCollector
       onStreamFinished: {
         if (monitorsCollector?.text) {
-          root.monitors = JSON.parse(monitorsCollector.text);
+          try {
+            const rawOutputs = JSON.parse(monitorsCollector.text);
+            // Niri outputs object structure formatting
+            root.monitors = Object.keys(rawOutputs).map(key => {
+              let out = rawOutputs[key];
+              return {
+                name: key,
+                make: out.make ?? "",
+                model: out.model ?? "",
+                activeWorkspace: out.current_workspace_id
+              };
+            });
+          } catch(e) {
+            console.error("Failed to parse Niri outputs JSON: " + e);
+          }
         }
       }
     }
   }
 
-  Process {
-    id: getLayers
-    command: ["hyprctl", "layers", "-j"]
-    stdout: StdioCollector {
-      id: layersCollector
-      onStreamFinished: {
-        if (layersCollector?.text) {
-          root.layers = JSON.parse(layersCollector.text);
-        }
-      }
-    }
+  // Layers stub (Niri handles layers differently via layer-shell, return empty object to prevent crashes)
+  function updateLayers() {
+    root.layers = {};
   }
 
+  // Fetch workspaces from Niri
   Process {
     id: getWorkspaces
-    command: ["hyprctl", "workspaces", "-j"]
+    command: ["niri", "msg", "--json", "workspaces"]
     stdout: StdioCollector {
       id: workspacesCollector
       onStreamFinished: {
         if (workspacesCollector?.text) {
-          const workspaces = JSON.parse(workspacesCollector.text)
-            .sort((a, b) => {
-              if (a.id < 0 && b.id >= 0) return 1;
-              if (a.id >= 0 && b.id < 0) return -1;
-              return a.id - b.id;
-            });
-          root.workspaces = workspaces
-          root.special = workspaces.filter(w => w.name.includes("special"))
-          root.workspacesByMonitor = Functions.groupBy(root.workspaces, x => x.monitor)
-          let byId = {};
-          for (var i = 0; i < root.workspaces.length; ++i) {
-            var ws = root.workspaces[i];
-            byId[ws.id] = ws;
-          }
-          root.workspaceById = byId
-          root.workspaceIds = root.workspaces.map(ws => ws.id);
-        }
-      }
-    }
-  }
+          try {
+            const rawWorkspaces = JSON.parse(workspacesCollector.text);
+            const workspaces = rawWorkspaces.map(ws => ({
+              id: ws.id,
+              name: ws.name ?? String(ws.idx),
+              monitor: ws.output,
+              active: ws.is_active,
+              focused: ws.is_focused
+            })).sort((a, b) => a.id - b.id);
 
-  Process {
-    id: getActiveWorkspace
-    command: ["hyprctl", "activeworkspace", "-j"]
-    stdout: StdioCollector {
-      id: activeWorkspaceCollector
-      onStreamFinished: {
-        if (activeWorkspaceCollector?.text) {
-          root.activeWorkspace = JSON.parse(activeWorkspaceCollector.text);
+            root.workspaces = workspaces;
+            root.special = []; // Niri doesn't have Hyprland special workspaces out of the box
+            root.workspacesByMonitor = Functions.groupBy(root.workspaces, x => x.monitor);
+            
+            let byId = {};
+            let activeWs = null;
+            for (var i = 0; i < root.workspaces.length; ++i) {
+              var ws = root.workspaces[i];
+              byId[ws.id] = ws;
+              if (ws.active || ws.focused) {
+                activeWs = ws;
+              }
+            }
+            root.workspaceById = byId;
+            root.workspaceIds = root.workspaces.map(ws => ws.id);
+            if (activeWs) {
+              root.activeWorkspace = activeWs;
+            }
+          } catch(e) {
+            console.error("Failed to parse Niri workspaces JSON: " + e);
+          }
         }
       }
     }
