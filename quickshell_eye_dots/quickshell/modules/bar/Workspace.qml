@@ -3,27 +3,23 @@
 // │█▀▀▀▀▀▀▀▀█░░░█▄█░█░█░█▀▄░█▀▄░▀▀█░█▀▀░█▀█░█░░░█▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀░▀░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░░░▀░▀░▀▀▀░▀▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>                   ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles             ││
-// ││ Site    : https://www.roosta.sh                          ││
-// ├┤ License : GNU General Public License v3                  ├┤
-// ┆└──────────────────────────────────────────────────────────┘┆
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>                    ├┤
+// ├┤ Converted for Niri compositor support                     ├┤
+// ├┤ License : GNU General Public License v3                   ├┤
+// └────────────────────────────────────────────────────────────┘
 
 pragma ComponentBehavior: Bound
-// import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
-
 import QtQuick.Controls
+
 import Quickshell.Widgets
-import Quickshell.Hyprland
+import Quickshell.Io
 import qs.services
-// import qs.utils
 import qs.config
 import qs.components
 import qs.utils
-// import qs.widgets
 
 Button {
   id: root
@@ -56,14 +52,18 @@ Button {
     }
   }
 
+  // Niri Workspace Focus IPC Handler
+  Process {
+    id: focusNiriWorkspace
+    command: ["niri", "msg", "action", "focus-workspace", String(root.workspaceId)]
+  }
+
   onPressed: {
-    if (isSpecial) {
-      const n = modelData.name.split(":")[1]
-      Hyprland.dispatch(`hl.dsp.workspace.toggle_special("${n}")`)
-    } else if (workspaceId !== activeWorkspaceId) {
-      Hyprland.dispatch(`hl.dsp.focus({ workspace = ${workspaceId} })`)
+    if (workspaceId !== activeWorkspaceId) {
+      focusNiriWorkspace.running = true
     }
   }
+
   HoverHandler {
     id: hover
     cursorShape: root.active ? Qt.ArrowCursor : Qt.PointingHandCursor
@@ -83,7 +83,6 @@ Button {
       return (root.active || hover.hovered) ? Style.srcery.brightBlack : Style.srcery.gray2
     }
 
-    // gradientAngle: 45
     property Gradient activeGradient: Gradient {
       orientation: Gradient.Horizontal
       GradientStop { position: 1; color: Style.srcery.cyan }
@@ -173,14 +172,6 @@ Button {
                 duration: Style.durations.normal
                 easing.type: Easing.InOutQuad
               }
-              // PropertyAnimation {
-              //   target: desaturatedIcon
-              //   property: "opacity"
-              //   from: 0.3
-              //   to: 1.0
-              //   duration: Style.durations.normal
-              //   easing.type: Easing.InOutQuad
-              // }
             }
 
             MultiEffect {
@@ -189,7 +180,6 @@ Button {
               implicitHeight: root.iconSize
               anchors.centerIn: parent
 
-              // grayscale scratch icons unless the scratch is active
               saturation: (root.isSpecial && !root.specialActive) ? -1.0 : 0.0
 
               Behavior on saturation {
@@ -201,42 +191,11 @@ Button {
               source: IconImage {
                 source: appIcon.modelData.icon
                 implicitSize: root.iconSize
-
-                // opacity: 0
-                // scale: 0.8
-                //
-                // Component.onCompleted: {
-                //   opacity = 1
-                //   scale = 1
-                // }
-                //
-                // Behavior on opacity {
-                //   NumberAnimation {
-                //     duration: 300
-                //     easing.type: Easing.OutCubic
-                //   }
-                // }
-                //
-                // Behavior on scale {
-                //   NumberAnimation {
-                //     duration: 300
-                //     easing.type: Easing.OutCubic
-                //   }
-                // }
               }
             }
-
-
           }
         }
       }
     }
   }
-  // states: [
-  //   State {
-  //     name: "hovered"
-  //     when: root.hovered
-  //     PropertyChanges { root.saturation: 0.0 }
-  //   }
-  // ]
 }

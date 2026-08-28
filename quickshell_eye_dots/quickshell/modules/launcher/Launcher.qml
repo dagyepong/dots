@@ -3,10 +3,10 @@
 // │█▀▀▀▀▀▀▀▀█░░░█░░░█▀█░█░█░█░█░█░░░█▀█░█▀▀░█▀▄░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>               ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles         ││
-// ││ Site    : https://www.roosta.sh                      ││
-// ├┤ License : GNU General Public License v3              ├┤
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>                ├┤
+// ││ Repo    : https://github.com/roosta/dotfiles          ││
+// ││ Site    : https://www.roosta.sh                       ││
+// ├┤ License : GNU General Public License v3               ├┤
 // ┆└──────────────────────────────────────────────────────┘┆
 
 pragma ComponentBehavior: Bound
@@ -18,7 +18,6 @@ import qs.services
 import qs.utils
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Hyprland
 import Quickshell
 
 Item {
@@ -41,8 +40,6 @@ Item {
 
   readonly property bool active: GlobalState.launcherOpen
     && GlobalState.launcherMonitorId === root.monitorId
-
-  property bool monitorIsFocused: Hyprland.focusedMonitor?.id === monitorId
 
   // Only render while on-screen or mid-transition
   visible: launcher.y < Style.launcher.height
@@ -90,49 +87,6 @@ Item {
 
   onDecrementCurrentIndex: {
     launcherList.list.decrementCurrentIndex()
-  }
-
-  GlobalShortcut { // qmllint disable unresolved-type
-    name: "toggleLauncher"
-    description: "Toggles launcher"
-
-    onPressed: {
-      if (Hyprland.focusedMonitor?.name === root.monitorId) {
-        GlobalState.toggleLauncher({ id: Hyprland.focusedMonitor?.name })
-      }
-    }
-  }
-
-  GlobalShortcut { // qmllint disable unresolved-type
-    name: "toggleMenu"
-    description: "Toggles launcher menu"
-
-    onPressed: {
-      if (Hyprland.focusedMonitor?.name === root.monitorId) {
-        GlobalState.toggleLauncher({id: Hyprland.focusedMonitor?.name, mode: "menu"})
-      }
-    }
-  }
-
-  GlobalShortcut { // qmllint disable unresolved-type
-    name: "toggleNotifications"
-    description: "Toggles nofication launcher panel"
-
-    onPressed: {
-      if (Hyprland.focusedMonitor?.name === root.monitorId) {
-        GlobalState.toggleLauncher({id: Hyprland.focusedMonitor?.name, mode: "notifications" })
-      }
-    }
-  }
-
-  GlobalShortcut { // qmllint disable unresolved-type
-    name: "discardLastNotification"
-    description: "Discards last notification"
-    onPressed: {
-      if (Hyprland.focusedMonitor?.name === root.monitorId) {
-        Notifications.discardLastNotification();
-      }
-    }
   }
 
   BorderRect {

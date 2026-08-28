@@ -3,16 +3,13 @@
 // │█▀▀▀▀▀▀▀▀█░░░█▄█░█░█░█▀▄░█▀▄░▀▀█░█▀▀░█▀█░█░░░█▀▀░▀▀█░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀░▀░▀▀▀░▀░▀░▀░▀░▀▀▀░▀░░░▀░▀░▀▀▀░▀▀▀░▀▀▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>                       ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                 ││
-// ││ Site    : https://www.roosta.sh                              ││
-// ├┤ License : GNU General Public License v3                      ├┤
-// ┆└──────────────────────────────────────────────────────────────┘┆
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>                        ├┤
+// ├┤ Converted for Niri compositor support                         ├┤
+// ├┤ License : GNU General Public License v3                       ├┤
+// └────────────────────────────────────────────────────────────────┘
 
 import QtQuick
-// import Quickshell.Widgets
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick.Layouts
 import qs.services
@@ -28,15 +25,29 @@ BorderRect {
   borderColor: Style.srcery.gray3
   color: Style.srcery.black
   required property string monitorId
+  
+  // Pull workspace array dynamically from Niri wrapper
   property var workspaces: HyprlandData.workspacesByMonitor[monitorId] ?? []
+  
+  // Calculate window counts per workspace via Niri's windowsByWorkspace object
   readonly property var occupied: workspaces.reduce((acc, ws) => {
-    acc[ws.id] = ws?.windows > 0;
+    let wins = HyprlandData.windowsByWorkspace[ws.id] ?? [];
+    acc[ws.id] = wins.length > 0;
     return acc;
   }, {})
-  readonly property HyprlandMonitor monitor: Hyprland
-    .monitorFor(root.QsWindow.window?.screen)
+  
+  // Match active workspace for current output from Niri singleton
+  readonly property int activeWorkspaceId: {
+    let ws = HyprlandData.activeWorkspace;
+    if (ws && (ws.monitor === monitorId || !ws.monitor)) {
+      return ws.id;
+    }
+    // Fallback: look up workspace matching monitor output marked active
+    let activeWs = workspaces.find(w => w.active || w.focused);
+    return activeWs ? activeWs.id : (workspaces[0]?.id ?? 1);
+  }
+
   readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
-  readonly property int activeWorkspaceId: monitor?.activeWorkspace?.id ?? 1
 
   Behavior on implicitWidth {
     NumberAnimation {
@@ -66,7 +77,7 @@ BorderRect {
       gradientAngle: 45
       borderColor: Style.srcery.brightBlack
       gradient: activeGradient
-      gradientActive: (root.monitor?.focused ?? false) && !HyprlandData.specialActive
+      gradientActive: true
       property real targetX: 0
       property real targetWidth: 0
 
@@ -75,6 +86,8 @@ BorderRect {
         let targetIdx = root.workspaces.findIndex(w => {
           return w.id === root.activeWorkspaceId
         });
+
+        if (targetIdx < 0) targetIdx = 0;
 
         for (let i = 0; i < targetIdx && i < workspaceRepeater.count; i++) {
           let item = workspaceRepeater.itemAt(i);
@@ -115,6 +128,7 @@ BorderRect {
       x: targetX
       width: targetWidth
     }
+    
     RowLayout {
       id: layout
       spacing: Style.spacing.p1
@@ -127,13 +141,12 @@ BorderRect {
         Workspace {
           monitorId: root.monitorId
           isOccupied: root.occupied[modelData?.id] ?? false
-          activeWorkspaceId: root.activeWorkspaceId;
-          workspaceId: modelData?.id;
+          activeWorkspaceId: root.activeWorkspaceId
+          workspaceId: modelData?.id ?? 1
           onCalculatedWidthChanged: activeIndicator.updateIndicator()
         }
       }
     }
-
   }
 
   onActiveWorkspaceIdChanged: activeIndicator.updateIndicator()
@@ -141,5 +154,4 @@ BorderRect {
   Component.onCompleted: {
     activeIndicator.updateIndicator();
   }
-
 }

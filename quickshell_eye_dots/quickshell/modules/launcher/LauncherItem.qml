@@ -3,10 +3,10 @@
 // │█▀▀▀▀▀▀▀▀█░░░█░░░█▀█░█░█░█░█░█░░░█▀█░█▀▀░█▀▄░░█░░░█░░█▀▀░█░█░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░░▀░░▀▀▀░▀░▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>                               ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                         ││
-// ││ Site    : https://www.roosta.sh                                      ││
-// ├┤ License : GNU General Public License v3                              ├┤
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>                                ├┤
+// ││ Repo    : https://github.com/roosta/dotfiles                          ││
+// ││ Site    : https://www.roosta.sh                                       ││
+// ├┤ License : GNU General Public License v3                               ├┤
 // ┆└──────────────────────────────────────────────────────────────────────┘┆
 
 pragma ComponentBehavior: Bound
@@ -15,7 +15,6 @@ import qs
 import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick
-// import qs.utils
 import qs.config
 import qs.services
 import qs.components
@@ -38,9 +37,7 @@ Item {
   property bool isNotification: false
   property bool isCurrentItem: ListView.isCurrentItem
   implicitHeight: parent?.height ?? 0
-  // anchors.top: parent?.top
-  // anchors.bottom: parent?.bottom
-  // height: parent?.height ?? 0
+
   implicitWidth: {
     const view = ListView.view
     if (!view || view.width <= 0) return 0
@@ -109,8 +106,6 @@ Item {
   property string imageSource: ""
   property int iconSize: 40
 
-  // clip: true
-
   MouseArea {
     id: mouseArea
     anchors.fill: parent
@@ -132,14 +127,12 @@ Item {
     State {
       name: "current"
       when: root.isCurrentItem && !mouseArea.pressed && (!mouseArea.containsMouse && !actionsArea.hovered)
-      // PropertyChanges { card.color: Style.srcery.gray1 }
     },
 
     State {
       name: "currentHovered"
       when: root.isCurrentItem && !mouseArea.pressed && (mouseArea.containsMouse || actionsArea.hovered)
       PropertyChanges { card.color: Style.srcery.gray1 }
-      // PropertyChanges { card.border.color: Style.srcery.gray6 }
     },
 
     State {
@@ -300,7 +293,6 @@ Item {
           Layout.alignment: Qt.AlignHCenter
           id: container
 
-
           Rectangle {
             id: outer
             implicitWidth: 80
@@ -317,18 +309,14 @@ Item {
               anchors.leftMargin: 8
             }
 
-
             Text {
               color: Style.srcery.brightYellow
               id: favorite
-              // anchors.top: parent.top
               anchors.top: parent.top
               anchors.left: parent.left
               anchors.leftMargin: Style.spacing.p1
               anchors.topMargin: 2
 
-
-              // anchors.horizontalCenter: parent.horizontalCenter
               opacity: root.favorite ? 1 : 0
               rotation: -45
               text: "󰓒"
@@ -350,7 +338,6 @@ Item {
               implicitHeight: childrenRect.height
 
               Rectangle {
-
                 implicitWidth: childrenRect.width
                 implicitHeight: childrenRect.height
                 border.width: 1
@@ -405,13 +392,7 @@ Item {
           elide: Text.ElideRight
           Layout.fillWidth: true
           horizontalAlignment: Text.AlignHCenter
-          text: {
-            if (root.name) {
-              return root.name
-            } else {
-              "(No name)"
-            }
-          }
+          text: root.name ? root.name : "(No name)"
           color: Style.srcery.brightYellow
           font {
             family: Style.font.light
@@ -419,21 +400,12 @@ Item {
           }
         }
 
-
-
-
         Text {
           id: generic
           elide: Text.ElideRight
           Layout.fillWidth: true
           horizontalAlignment: Text.AlignHCenter
-          text: {
-            if (root.genericName) {
-              return root.genericName
-            } else {
-              return "Application"
-            }
-          }
+          text: root.genericName ? root.genericName : "Application"
           color: Style.srcery.brightWhite
           font {
             family: Style.font.main
@@ -450,25 +422,17 @@ Item {
             anchors.fill: parent
             color: Style.srcery.brightBlue
             elide: Text.ElideRight
-            // wrapMode: Text.Wrap
             font {
               family: Style.font.light
               pointSize: Style.font.tiny
             }
           }
         }
-
       }
 
       Text {
         color: Style.srcery.white
-        text: {
-          if (root.description) {
-            return root.description
-          } else {
-            return "No description defined for this desktop entry..."
-          }
-        }
+        text: root.description ? root.description : "No description defined for this desktop entry..."
         Layout.fillWidth: true
         Layout.fillHeight: true
         Layout.bottomMargin: 20
@@ -480,8 +444,8 @@ Item {
           pointSize: Style.font.small
         }
       }
-
     }
+
     Rectangle {
       id: drawer
       property bool drawerExpanded: false
@@ -552,13 +516,7 @@ Item {
           id: actionColumn
           anchors.fill: parent
           Text {
-            text: {
-              if (root.actions.length > 0) {
-                return `${root.actions.length} actions`
-              } else {
-                return "No actions"
-              }
-            }
+            text: root.actions.length > 0 ? `${root.actions.length} actions` : "No actions"
             color: Style.srcery.brightBlack
             font {
               family: Style.font.light
@@ -626,9 +584,7 @@ Item {
                   }
                   contentItem: Text {
                     id: actionText
-                    text: {
-                      return actionButton.modelData?.name ?? actionButton.modelData?.text ?? ""
-                    }
+                    text: actionButton.modelData?.name ?? actionButton.modelData?.text ?? ""
                     color: Style.srcery.brightBlack
                     elide: Text.ElideRight
                     Layout.fillWidth: true
@@ -649,4 +605,3 @@ Item {
     }
   }
 }
-

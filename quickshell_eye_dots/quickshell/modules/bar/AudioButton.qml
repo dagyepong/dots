@@ -22,17 +22,19 @@ import QtQuick.Controls
 ExpandingButton {
   id: root
 
-  property bool muted: AudioData.ready && AudioData.sink.audio.muted
+  property bool muted: AudioData.ready && Boolean(AudioData.sink?.audio?.muted)
   property string mutedIcon: ""
 
   function getSinkIcon(sink) {
-    if (sink) {
+    if (sink && sink.name) {
       const obj = Config.outputs.find(o => o.sink === sink.name);
-      if (obj) { return obj.icon }
-    } else {
-      return ""
+      if (obj && obj.icon) { 
+        return obj.icon; 
+      }
     }
+    return "";
   }
+
   buttonLabel: muted ? mutedIcon : getSinkIcon(AudioData.sink)
 
   Connections {
@@ -55,7 +57,8 @@ ExpandingButton {
   }
 
   property var openAudioMenu: () => {
-    const i = Config.outputs.findIndex(o => o.sink === AudioData.sink.name)
+    const sinkName = AudioData.sink?.name ?? ""
+    const i = Config.outputs.findIndex(o => o.sink === sinkName)
     GlobalState.openLauncher({
       id: root.monitorId,
       mode: "audio",
@@ -143,8 +146,12 @@ ExpandingButton {
     visible: root.active
     implicitWidth: Style.bar.sliderWidth
     from: 0.0
-    value: AudioData.sink?.audio.volume ?? 0
-    onMoved: AudioData.sink.audio.volume = value
+    value: AudioData.sink?.audio?.volume ?? 0.0
+    onMoved: {
+      if (AudioData.sink?.audio) {
+        AudioData.sink.audio.volume = value
+      }
+    }
     to: 1.0
     HoverHandler {
       cursorShape: Qt.PointingHandCursor
@@ -175,7 +182,6 @@ ExpandingButton {
       implicitHeight: Style.spacing.p3
       radius: 0
       color: volumeSlider.pressed ? Style.srcery.brightMagenta : Style.srcery.magenta
-      // border.color: Style.srcery.magenta
     }
   }
 }
