@@ -19,7 +19,6 @@ import qs.modules.launcher
 import qs.modules.tray
 import QtQuick
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import qs.components
 import qs.utils
 import qs.config
@@ -33,10 +32,9 @@ ShellRoot {
       id: scope
       required property ShellScreen modelData
       property string monitorId: modelData?.name ?? ""
-      readonly property HyprlandMonitor monitor: Hyprland
-        .monitorFor(modelData)
-      readonly property int activeWorkspaceId: monitor?.activeWorkspace?.id ?? 1
-      property var windows: HyprlandData.windowsByWorkspace[activeWorkspaceId] ?? []
+
+      // Generic active workspace window count (compositor-agnostic check)
+      property var windows: []
 
       NamedPanel {
         id: wallpaper
@@ -62,8 +60,6 @@ ShellRoot {
         anchors.left: true
         anchors.right: true
 
-        // One commit on open, one on close — Hyprland animates the windows.
-        // Animating this would relayout every window on the monitor per frame.
         exclusiveZone: GlobalState.launcherOpen && GlobalState.launcherMonitorId === scope.monitorId
           ? Style.bar.height + Style.launcher.height
           : Style.bar.height
@@ -78,15 +74,6 @@ ShellRoot {
         WlrLayershell.keyboardFocus: GlobalState.launcherOpen
         ? WlrKeyboardFocus.OnDemand
         : WlrKeyboardFocus.None
-
-        HyprlandFocusGrab {
-          id: grab
-          windows: [main]
-          active: GlobalState.launcherOpen && GlobalState.launcherMonitorId === scope.monitorId
-          onCleared: {
-            // GlobalState.closeLauncher();
-          }
-        }
 
         // Pass through clicks unless overlay is open
         mask: Region {
@@ -127,7 +114,7 @@ ShellRoot {
               width: toast.implicitWidth
               height: toast.implicitHeight
               intersection: {
-                if (Notifications.popupList.length) {
+                if (Notifications.popupList && Notifications.popupList.length) {
                   Intersection.Subtract
                 } else {
                   Intersection.Combine
@@ -167,7 +154,7 @@ ShellRoot {
           states: [
             State {
               name: "open"
-              when: GlobalState.overlayOpen && scope.windows.length > 0
+              when: GlobalState.overlayOpen
               PropertyChanges { content.color: Functions.transparentize("#000", 0.7) }
             }
           ]

@@ -51,7 +51,6 @@ Singleton {
     }
   }
 
-
   Timer {
     id: statusLightPollTimer
     interval: 1000 * 30
@@ -199,9 +198,10 @@ Singleton {
   signal discardAll();
   signal timeout(id: var);
 
+  // Disabled so Dunst can handle org.freedesktop.Notifications without D-Bus collision warnings.
+  /*
   NotificationServer {
     id: notifServer
-    // actionIconsSupported: true
     actionsSupported: true
     bodyHyperlinksSupported: true
     bodyImagesSupported: true
@@ -232,10 +232,10 @@ Singleton {
         root.unread++;
       }
       root.notify(newNotifObject);
-      // console.log(notifToString(newNotifObject));
       notifFileView.setText(root.stringifyList(root.list));
     }
   }
+  */
 
   function markAllRead() {
     root.unread = 0;
@@ -244,13 +244,16 @@ Singleton {
   function discardNotification(id) {
     console.log("[Notifications] Discarding notification with ID: " + id);
     const index = root.list.findIndex((notif) => notif.notificationId === id);
-    const notifServerIndex = notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id);
     if (index !== -1) {
       root.list.splice(index, 1);
       notifFileView.setText(stringifyList(root.list));
       triggerListChange()
     }
-    if (notifServerIndex !== -1) {
+    // Safe lookup if NotificationServer is disabled
+    const notifServerIndex = typeof notifServer !== "undefined" && notifServer.trackedNotifications
+      ? notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id)
+      : -1;
+    if (notifServerIndex !== -1 && typeof notifServer !== "undefined") {
       notifServer.trackedNotifications.values[notifServerIndex].dismiss()
     }
     root.discard(id); // Emit signal
@@ -266,9 +269,11 @@ Singleton {
     root.list = []
     triggerListChange()
     notifFileView.setText(stringifyList(root.list));
-    notifServer.trackedNotifications.values.forEach((notif) => {
-      notif.dismiss()
-    })
+    if (typeof notifServer !== "undefined" && notifServer.trackedNotifications) {
+      notifServer.trackedNotifications.values.forEach((notif) => {
+        notif.dismiss()
+      })
+    }
     root.discardAll();
   }
 
@@ -296,13 +301,14 @@ Singleton {
 
   function attemptInvokeAction(id, notifIdentifier) {
     console.log("[Notifications] Attempting to invoke action with identifier: " + notifIdentifier + " for notification ID: " + id);
-    const notifServerIndex = notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id);
+    const notifServerIndex = typeof notifServer !== "undefined" && notifServer.trackedNotifications
+      ? notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id)
+      : -1;
     console.log("Notification server index: " + notifServerIndex);
-    if (notifServerIndex !== -1) {
+    if (notifServerIndex !== -1 && typeof notifServer !== "undefined") {
       const notifServerNotif = notifServer.trackedNotifications.values[notifServerIndex];
       const action = notifServerNotif.actions.find((action) => action.identifier === notifIdentifier);
-      // console.log("Action found: " + JSON.stringify(action));
-      action.invoke()
+      action?.invoke()
     }
     else {
       console.log("Notification not found in server: " + id)

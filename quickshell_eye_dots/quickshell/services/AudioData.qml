@@ -3,10 +3,10 @@
 // │█▀▀▀▀▀▀▀▀█░░░█▀▀░░█░░█▀▀░█▀▀░█▄█░░█░░█▀▄░█▀▀░█░█░█▀█░░█░░█▀█░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀█░░░▀░░░▀▀▀░▀░░░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░▀▀░░▀░▀░░▀░░▀░▀░░█▀▀▀▀▀▀▀▀█│
 // │█▀▀▀▀▀▀▀▀▀────────────────────────────────────────────────────▀▀▀▀▀▀▀▀▀█│
-// ├┤ Author  : Daniel Berg <mail@roosta.sh>                               ├┤
-// ││ Repo    : https://github.com/roosta/dotfiles                         ││
-// ││ Site    : https://www.roosta.sh                                      ││
-// ├┤ License : GNU General Public License v3                              ├┤
+// ├┤ Author  : Daniel Berg <mail@roosta.sh>                                ├┤
+// ││ Repo    : https://github.com/roosta/dotfiles                          ││
+// ││ Site    : https://www.roosta.sh                                         ││
+// ├┤ License : GNU General Public License v3                               ├┤
 // ┆└──────────────────────────────────────────────────────────────────────┘┆
 // Description: Handles the singleton state for Pipewire, and helper
 // functions for audio manipulation. Also handles cava visualizer data.
@@ -24,7 +24,6 @@ import qs.utils
 
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
-import Quickshell.Hyprland
 
 Singleton {
   id: root
@@ -70,6 +69,7 @@ Singleton {
     sink.audio.muted = !sink.audio.muted
   }
 
+  /* Disabled Hyprland global shortcuts under Niri compositor
   GlobalShortcut { // qmllint disable unresolved-type
     name: "incrementVolume"
     description: "Increases the volume by one step"
@@ -93,7 +93,7 @@ Singleton {
       root.decrementVolume()
     }
   }
-
+  */
 
   // Use cava to provde data for visualizers, runs in background
   // populating root.bars with parsed integers for each bar if
