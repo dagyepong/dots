@@ -9,9 +9,6 @@ import Quickshell.Services.SystemTray
 Scope {
     id: rootScope
 
-    // -------------------------------------------------------------------------
-    // OSD STATE & PROCESSES
-    // -------------------------------------------------------------------------
     property string osdIcon: "🔊"
     property string osdTitle: "Volume"
     property int osdPercent: 50
@@ -118,9 +115,6 @@ Scope {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // MAIN PANEL WINDOW (TOP BAR)
-    // -------------------------------------------------------------------------
     PanelWindow {
         id: root
 
@@ -435,7 +429,6 @@ Scope {
             }
         }
 
-        // Inline Components
         component CavaVisualizer: RowLayout {
             spacing: 2
             Repeater {
@@ -537,7 +530,7 @@ Scope {
         Rectangle {
             id: mainPill
             property bool showStandalonePlayer: !root.expanded && root.hasMedia && root.isPlaying
-            implicitHeight: root.expanded ? 580 : (showStandalonePlayer ? 130 : 36)
+            implicitHeight: root.expanded ? 700 : (showStandalonePlayer ? 130 : 36)
             implicitWidth: root.expanded ? 800 : (showStandalonePlayer ? 340 : compactContent.implicitWidth + 28)
             
             radius: root.expanded ? 24 : (showStandalonePlayer ? 20 : 18)
@@ -567,7 +560,7 @@ Scope {
             Behavior on implicitHeight {
                 SpringAnimation {
                     spring: 4.8
-                    damping: 0.22  // Low damping creates the organic liquid wobble/bounce effect
+                    damping: 0.22
                     epsilon: 0.1
                 }
             }
@@ -683,6 +676,9 @@ Scope {
                     }
                 }
 
+                // Tailscale Card Component Integration
+                TailscaleCard { Layout.fillWidth: true }
+
                 Rectangle {
                     Layout.fillWidth: true; Layout.preferredHeight: 120; radius: 16; color: "#0F0F12"; clip: true
                     Item { anchors.fill: parent; anchors.margins: 12; ActivePlayerCard { anchors.fill: parent } }
@@ -773,9 +769,6 @@ Scope {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // OSD POPUP PANEL WINDOW (With Audio Sink Cycling on Click)
-    // -------------------------------------------------------------------------
     PanelWindow {
         id: osdWindow
 
