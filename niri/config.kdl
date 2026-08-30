@@ -82,19 +82,21 @@ layout {
         color "#4a5353"
     }
 
-    struts {}
+    struts {
+      top 36
+    }
 }
 
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-//spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/autumn.jpg"
+spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/autumn.jpg"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-sh-at-startup "vicinae server"    
 spawn-sh-at-startup "xwayland-satellite"
 spawn-sh-at-startup "/usr/local/bin/pia-start.sh"
-spawn-sh-at-startup "~/.config/quickshell/k4/arrancar"
-//spawn-sh-at-startup "quickshell" 
+//spawn-sh-at-startup "~/.config/quickshell/k4/arrancar"
+spawn-sh-at-startup "quickshell" 
 spawn-sh-at-startup "/usr/libexec/polkit-gnome-authentication-agent-1" 
 spawn-sh-at-startup "wl-paste --watch cliphist store" 
 spawn-at-startup "hypridle" 
