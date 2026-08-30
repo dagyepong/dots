@@ -82,7 +82,9 @@ layout {
         color "#4a5353"
     }
 
-    struts {}
+    struts {
+      top 36
+    }
 }
 
 // ==============================================================================
@@ -93,7 +95,8 @@ spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-sh-at-startup "vicinae server"    
 spawn-sh-at-startup "xwayland-satellite"
 spawn-sh-at-startup "/usr/local/bin/pia-start.sh"
-spawn-sh-at-startup "quickshell"
+//spawn-sh-at-startup "~/.config/quickshell/k4/arrancar"
+spawn-sh-at-startup "quickshell" 
 spawn-sh-at-startup "/usr/libexec/polkit-gnome-authentication-agent-1" 
 spawn-sh-at-startup "wl-paste --watch cliphist store" 
 spawn-at-startup "hypridle" 
@@ -305,11 +308,11 @@ window-rule {
 // ==============================================================================
 binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
-    Mod+Space {spawn-sh " qs -c $HOME/.config/quickshell/ ipc call pill launcher";}
+    Mod+Space {spawn-sh "qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.launcher toggle";}
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Shift+Return hotkey-overlay-title="Toggle Scratchpad" { spawn "foot" "--app-id=foot-scratchpad"; }
     Mod+D hotkey-overlay-title="Run an Application: vicinae open" { spawn-sh "vicinae open"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }
+    Mod+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn-sh "qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.session lock"; }
 
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
@@ -461,3 +464,5 @@ binds {
 
     Mod+Shift+P { power-off-monitors; }
 }
+
+

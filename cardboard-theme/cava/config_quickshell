@@ -1,0 +1,11 @@
+[general]
+framerate = 60
+bars = 16
+
+[output]
+method = raw
+raw_target = /dev/stdout
+data_format = ascii
+ascii_max_range = 255
+bar_delimiter = 59 ; ASCII 59 is a semicolon ';'
+frame_delimiter = 10 ; ASCII 10 is a newline '\n'
