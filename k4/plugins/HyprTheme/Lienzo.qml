@@ -289,7 +289,37 @@ K4.PorPantalla {
         //  Solo existe si hay algo que pintar. Sin fondo asignado no se crea la
         //  superficie: entonces se ve el suelo de swaybg, que es exactamente lo
         //  que había antes de todo esto.
-        visible: lienzo.tipoDe(ruta) !== "nada"
+        //
+        //  ── y una FOTO la pinta swaybg, no esto ──────────────────
+        //
+        //  Con un fondo quieto esta capa dibuja exactamente lo que el suelo ya
+        //  está dibujando debajo. Medido sobre el proceso: **80 MiB de VRAM** y
+        //  unos 18 MB de RSS por no aportar nada —la barra era el mayor
+        //  consumidor de vídeo de la máquina, por delante del navegador—. Así
+        //  que con una foto la barra se aparta y se ve el suelo; se queda solo
+        //  con lo que swaybg no sabe hacer, que es el vídeo, el GIF y las
+        //  transiciones.
+        //
+        //  La GRACIA de después no es un adorno. Al acabar el fundido hay que
+        //  esperar a que swaybg tenga la imagen NUEVA, y ponerlo no es
+        //  instantáneo: `ponerSuelo` amortigua 300 ms, mata al viejo, espera
+        //  200 más y levanta el nuevo. Soltando la capa al terminar la
+        //  transición se ve un parpadeo del fondo viejo, o del vacío.
+        //
+        //  Y se arma también al arrancar, por lo mismo: entre que entras a la
+        //  sesión y swaybg está puesto hay un hueco, y taparlo es justo para lo
+        //  que el suelo existe.
+        readonly property bool loPintaElSuelo: lienzo.tipoDe(ruta) === "quieto"
+            && !tela.cambiando && !gracia.running
+
+        visible: lienzo.tipoDe(ruta) !== "nada" && !tela.loPintaElSuelo
+
+        Timer {
+            id: gracia
+            interval: 2500
+        }
+
+        onCambiandoChanged: if (!tela.cambiando) gracia.restart()
 
         // ── las dos capas y el relevo ───────────────────────────
         //
@@ -318,6 +348,7 @@ K4.PorPantalla {
             anchors.fill: parent
             z: tela.viva === 0 ? 0 : 1
             animando: tela.aLaVista
+            plugin: lienzo.plugin
             anchoPantalla: tela.screen ? tela.screen.width : 1920
             altoPantalla: tela.screen ? tela.screen.height : 1080
         }
@@ -327,12 +358,17 @@ K4.PorPantalla {
             anchors.fill: parent
             z: tela.viva === 1 ? 0 : 1
             animando: tela.aLaVista
+            plugin: lienzo.plugin
             anchoPantalla: tela.screen ? tela.screen.width : 1920
             altoPantalla: tela.screen ? tela.screen.height : 1080
         }
 
         onRutaChanged: tela.relevar()
-        Component.onCompleted: tela.relevar()
+
+        Component.onCompleted: {
+            tela.relevar()
+            gracia.restart()
+        }
 
         function relevar() {
             const nueva = tela.ruta
@@ -425,6 +461,15 @@ K4.PorPantalla {
                 antialiasing: true
 
                 ShapePath {
+                    //  Con id, y NO por `parent`, que es de lo que se quejaba
+                    //  el log en cada transición: un `PathQuad` no es un Item
+                    //  —es un elemento de trazado— así que no tiene `parent`, y
+                    //  `parent.frente` valía `undefined`. Los puntos de control
+                    //  salían indefinidos y la onda del frente no se dibujaba:
+                    //  la marea subía RECTA, que es justo la cortina de la que
+                    //  el comentario de arriba dice que quiere distinguirse.
+                    id: marea
+
                     fillColor: "white"
                     strokeWidth: 0
                     strokeColor: "transparent"
@@ -437,14 +482,14 @@ K4.PorPantalla {
                     startY: frente
 
                     PathQuad {
-                        x: tela.width * 0.5; y: parent.frente
+                        x: tela.width * 0.5; y: marea.frente
                         controlX: tela.width * 0.25
-                        controlY: parent.frente - parent.onda * 2
+                        controlY: marea.frente - marea.onda * 2
                     }
                     PathQuad {
-                        x: tela.width; y: parent.frente
+                        x: tela.width; y: marea.frente
                         controlX: tela.width * 0.75
-                        controlY: parent.frente + parent.onda * 2
+                        controlY: marea.frente + marea.onda * 2
                     }
                     PathLine { x: tela.width; y: tela.height }
                     PathLine { x: 0; y: tela.height }

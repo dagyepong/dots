@@ -19,22 +19,29 @@ K4Plugin {
 
     name: "hyprtheme"
     title: Idioma.t("Tema de Hyprland")
-    priority: 65
-    active: habilitado && open
-    //  El teclado entero mientras está abierto: «opcional» es OnDemand y
-    //  el compositor solo lo da si PINCHAS la superficie, así que abierto
-    //  desde el centro de aplicaciones o por atajo no llegaba ni el ESC.
-    //  Ver `tecladoOpcional` en api/K4/Plugin.qml.
-    grabKeyboard: open
+    //  Sin `active`, sin `view` y sin teclado: este plugin ya NO se dibuja.
+    //
+    //  Tenía su propia pantalla con cuatro pestañas —color, ventanas, efectos y
+    //  fondo— y era un sitio más donde configurar cosas. Todo eso vive ahora en
+    //  la ventana de Ajustes, en sus secciones, con los mismos widgets. Aquí se
+    //  queda lo que nadie más sabe hacer: escribir el Lua de Hyprland, hablar
+    //  con awww/swww/swaybg y pintar el suelo.
+    //
+    //  Es el mismo camino que hicieron la tienda de plugins y los propios
+    //  ajustes: lo que se abre y se usa es una aplicación, y lo que sabe hacer
+    //  algo es un motor. Aquí solo queda el motor.
 
-    property bool open: false
-    property string tab: "tema"        // "tema" | "ventanas" | "efectos" | "fondo"
-
-    islandWidth: 880
-    islandHeight: 470
-
-    handlesBackgroundTap: true
-    onBackgroundTapped: {}   // se traga el clic: cerrar es cosa del botón
+    //  Grande a propósito, y sobre todo ALTO.
+    //
+    //  Con 470 la rejilla de fondos enseñaba dos filas y media de cincuenta:
+    //  para encontrar uno había que recorrerla a ciegas, que es justo lo que
+    //  una rejilla de miniaturas viene a evitar. Con 780 caben cuatro filas
+    //  largas y se elige mirando, que es como se elige un fondo.
+    //
+    //  780 y no más: el techo de la superficie son 880 (`Theme.maxIslandHeight`)
+    //  y conviene dejar aire, que por debajo de la island todavía tiene que
+    //  caber algo de escritorio para no parecer una ventana a pantalla completa
+    //  que no lo es.
 
     // Se abre con el ratón, así que se va al sacarlo. Con más margen que el
     // panel: aquí se arrastran deslizadores y es fácil pasarse del borde.
@@ -708,6 +715,126 @@ K4Plugin {
         return cachePosters + "/" + Qt.md5(String(ruta)) + ".png"
     }
 
+    //  ── el vídeo, a la medida de la pantalla ─────────────────────
+    //
+    //  Un vídeo 4K en un monitor de 1920 se descodifica y se sube entero para
+    //  enseñar EXACTAMENTE lo mismo: cuatro veces los píxeles que caben. Es la
+    //  misma cuenta que la foto ya hacía con `sourceSize` en Capa.qml —«una foto
+    //  de 6000 px en un monitor de 1920 son 140 MB de textura»— y al vídeo le
+    //  faltaba esa mitad.
+    //
+    //  Medido sobre el propio proceso, con un clip de 3840×2160 a 47 Mbps y la
+    //  barra plegada:
+    //
+    //      el original    27 % de un núcleo  ·  1 GB de memoria
+    //      la copia 1920  15 %               ·  553 MB
+    //
+    //  Y no es la descodificación: los hilos de ffmpeg suman un 2 % en los dos
+    //  casos. Lo que cuesta es presentar ese cuadro.
+    //
+    //  La copia se hace UNA vez y vive en la caché. Mientras no está se sigue
+    //  enseñando el original: un fondo tarde es peor que un fondo caro.
+    property var escalados: ({})        // "ruta|ancho" -> la copia, ya hecha
+    property var escaladosPedidos: ({})
+
+    //  Lo de `gif|webp|apng` que admite `esQuieto` NO entra aquí: eso lo pinta
+    //  un AnimatedImage, no el reproductor, y convertirlo a mp4 sería cambiarle
+    //  el tipo por la espalda.
+    function esVideo(ruta) {
+        return /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(String(ruta))
+    }
+
+    function escaladoDe(ruta, ancho) {
+        return cachePosters + "/" + Qt.md5(String(ruta)) + "-" + ancho + ".mp4"
+    }
+
+    //  Qué hay que reproducir de verdad. Lectura PURA —el mapa lo llena la
+    //  cocina de abajo— para poder preguntarlo desde un binding sin que
+    //  preguntar tenga efectos.
+    function videoAMedida(ruta, ancho) {
+        const hecho = escalados[String(ruta) + "|" + ancho]
+        return hecho ? hecho : String(ruta)
+    }
+
+    //  Y esto sí tiene efecto, así que se llama desde un manejador y nunca
+    //  desde un binding: lo hace Capa.qml al cambiar de ruta o de pantalla.
+    function pedirEscalado(ruta, ancho) {
+        if (!esVideo(ruta) || !(ancho > 0))
+            return
+        const clave = String(ruta) + "|" + ancho
+        if (escalados[clave] !== undefined || escaladosPedidos[clave])
+            return
+        escaladosPedidos[clave] = true
+        juntarEscalados.restart()
+    }
+
+    //  Se juntan las peticiones antes de cocinar: con dos monitores y una
+    //  transición, esto llega cuatro veces seguidas para lo mismo.
+    Timer {
+        id: juntarEscalados
+        interval: 400
+        onTriggered: self.cocinarEscalados()
+    }
+
+    K4.Process {
+        id: cocinaEscalados
+        onSalida: function (texto) {
+            const d = Object.assign({}, self.escalados)
+            const lineas = String(texto).split("\n")
+            for (let i = 0; i < lineas.length; ++i) {
+                const partes = lineas[i].split("\t")
+                if (partes.length === 2 && partes[1].length > 0)
+                    d[partes[0]] = partes[1]
+            }
+            self.escalados = d
+        }
+    }
+
+    function cocinarEscalados() {
+        const claves = Object.keys(escaladosPedidos)
+        if (claves.length === 0 || cocinaEscalados.running)
+            return
+
+        const ordenes = []
+        for (let i = 0; i < claves.length; ++i) {
+            const corte = claves[i].lastIndexOf("|")
+            const ruta = claves[i].substring(0, corte)
+            const ancho = claves[i].substring(corte + 1)
+            ordenes.push([
+                's=' + JSON.stringify(ruta),
+                'd=' + JSON.stringify(escaladoDe(ruta, ancho)),
+                'a=' + JSON.stringify(ancho),
+                'k=' + JSON.stringify(claves[i]),
+                //  Se mide antes de tocar nada: un vídeo que ya cabe se deja en
+                //  paz, que reescalar hacia arriba es gastar por empeorar.
+                'if [ ! -f "$d" ]; then',
+                '  w=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$s" 2>/dev/null | head -1)',
+                '  case "$w" in ""|*[!0-9]*) w=0 ;; esac',
+                //  A un fichero temporal y luego `mv`: el renombrado es atómico,
+                //  así que si dos pantallas piden lo mismo a la vez ninguna llega
+                //  a leer una copia a medio escribir.
+                //  En UNA línea: unido con saltos, cada trozo sería una
+                //  orden suelta y el `&&` no encadenaría nada.
+                '  if [ "$w" -gt "$a" ]; then ffmpeg -nostdin -v error -y -i "$s"'
+                + ' -vf "scale=$a:-2" -c:v libx264 -preset veryfast -crf 23 -an'
+                + ' "$d.parcial.mp4" && mv -f "$d.parcial.mp4" "$d"; fi',
+                'fi',
+                '[ -f "$d" ] && printf "%s\\t%s\\n" "$k" "$d"'
+            ].join("\n"))
+        }
+
+        escaladosPedidos = ({})
+        cocinaEscalados.running = false
+        //  En fila y en UN proceso, como los pósters: dos ffmpeg de 4K a la vez
+        //  se comen la máquina justo cuando acabas de cambiar de fondo.
+        cocinaEscalados.command = ["sh", "-c",
+            //  Y un `:` al final para salir en cero: si la última copia no
+            //  está, su `[ -f ]` daría el código de salida de todo el guion.
+            "mkdir -p " + JSON.stringify(cachePosters) + "\n"
+            + ordenes.join("\n") + "\n:"]
+        cocinaEscalados.running = true
+    }
+
     property var postersPedidos: ({})
 
     function sueloDe(ruta) {
@@ -797,25 +924,12 @@ K4Plugin {
         wallScan.running = true
     }
 
-    function toggle() {
-        open = !open
-        if (open) {
-            if (panel) panel.close()
-            Notifs.dismissToast()
-        }
-    }
-
-    // El escaneo va atado al estado, no a una función de entrada: así vale
-    // igual abriendo desde el panel, por IPC o saltando directo a la pestaña.
-    onOpenChanged: if (open) refreshWallpapers()
-    onTabChanged: if (tab === "fondo") refreshWallpapers()
+    //  El rastreo de fondos lo pide quien los enseña —la rejilla, al hacerse
+    //  visible— y no un cambio de pestaña, que ya no existe. Aquí solo queda
+    //  reaplicar si aparece la herramienta después del fondo.
     onWallToolChanged: if (wallTool.length > 0 && wallpaper.length > 0)
         applyWallpaper(wallpaper)
 
-    function close() { open = false }
-
-    // lo aparta al abrirse; lo inyecta el host
-    property var panel: null
 
     // ── archivos ──────────────────────────────────────────────────
     K4.Fichero { id: themeView; path: self.themeFile }
@@ -863,15 +977,12 @@ K4Plugin {
 
     K4.Ipc {
         target: "k4.theme"
-        function toggle(): void { self.toggle() }
-        function close(): void { self.close() }
+        //  Se conserva el verbo porque puede estar atado en Hyprland: abre
+        //  Ajustes, que es donde vive ahora lo que esto configuraba.
+        function toggle(): void { PluginManager.abrirAplicacion("settings") }
         function apply(): void { self.apply() }
         function save(): void { self.persist() }
         function preset(id: string): void { self.applyPreset(id) }
-        function tab(name: string): void {
-            self.open = true
-            self.tab = name
-        }
         function wallpaper(path: string): void { self.setWallpaper(path) }
 
         //  ── el lienzo, mientras no tiene pantalla propia ──────────
@@ -939,7 +1050,4 @@ K4Plugin {
                                 global: self.wallpaper })
     }
 
-    view: Component {
-        HyprThemeView { plugin: self }
-    }
 }

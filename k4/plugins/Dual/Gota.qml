@@ -24,10 +24,10 @@ Item {
     //  -1 el trozo que se va por la izquierda, +1 el de la derecha.
     property int lado: -1
 
-    property real salidaX: 0
-    property real salidaY: 0
-    property real finalX: 0
-    property real finalY: 0
+    //  De dónde sale y a dónde va, en coordenadas de pantalla. Antes eran
+    //  cuatro números sueltos porque el camino sabía de antemano por qué borde
+    //  iba cada tramo; ahora los dos extremos mandan y el camino sale de ellos.
+    //  (Ver `salida` y `destino`, más abajo.)
 
     //  0 arriba (en la barra) · 1 abajo (juntos). Lo mueve la escena POR
     //  ENLACE: asignarlo desde aquí lo rompería y el trozo se quedaría quieto.
@@ -92,17 +92,150 @@ Item {
     //  el centro tiene que acercarse al canto o el trozo se despegaría del
     //  borde justo cuando más deprisa va. En los extremos `dentro` vale medio
     //  grosor de barra, que es donde está el centro de la barra y el del dock.
-    readonly property var puntos: {
-        const bordeX = gota.lado < 0 ? gota.dentro : gota.width - gota.dentro
-        const arriba = gota.dentro
-        const abajo = gota.height - gota.dentro
-        return [
-            { x: gota.salidaX, y: arriba },
-            { x: bordeX,       y: arriba },
-            { x: bordeX,       y: abajo  },
-            { x: gota.finalX,  y: abajo  }
-        ]
+
+    //  ── el camino: una vuelta por el perímetro ───────────────────
+    //
+    //  Antes era un recorrido fijo —del canto de arriba, por un lateral, al de
+    //  abajo— porque la barra estaba arriba y el dock abajo y no había más. Con
+    //  los dos en cualquier borde eso no vale, y GIRAR la escena entera tampoco:
+    //  probado, y el trozo sale ya de canto de una barra que es horizontal.
+    //
+    //  Lo que sí vale es lo que la escena ya contaba: el trozo se despega y se
+    //  va BORDEANDO la pantalla hasta el otro. Escrito así —del punto de salida
+    //  al de destino por el perímetro, en el sentido que le toque a cada trozo—
+    //  sirve para cualquier pareja de bordes sin tocar nada más, porque el
+    //  troceado de abajo ya admite las esquinas que hagan falta y el ángulo sale
+    //  de cuántas lleva dobladas.
+    property point salida: Qt.point(0, 0)
+    property point destino: Qt.point(0, 0)
+
+    //  El rectángulo por el que se bordea, y lo largo que es.
+    readonly property real _x0: gota.dentro
+    readonly property real _y0: gota.dentro
+    readonly property real _x1: Math.max(gota.dentro + 1, gota.width - gota.dentro)
+    readonly property real _y1: Math.max(gota.dentro + 1, gota.height - gota.dentro)
+    readonly property real _w: gota._x1 - gota._x0
+    readonly property real _h: gota._y1 - gota._y0
+    readonly property real _vuelta: 2 * (gota._w + gota._h)
+
+    //  Cuánto perímetro hay desde la esquina de arriba a la izquierda hasta un
+    //  punto, en el sentido de las agujas. Se decide por el borde más cercano,
+    //  que es lo honesto: el punto viene del centro de algo que ya está pegado
+    //  a su canto.
+    function _s(p) {
+        const dArr = Math.abs(p.y - gota._y0), dAba = Math.abs(p.y - gota._y1)
+        const dIzq = Math.abs(p.x - gota._x0), dDer = Math.abs(p.x - gota._x1)
+        const m = Math.min(dArr, dAba, dIzq, dDer)
+        const cx = Math.max(gota._x0, Math.min(gota._x1, p.x))
+        const cy = Math.max(gota._y0, Math.min(gota._y1, p.y))
+        if (m === dArr) return cx - gota._x0
+        if (m === dDer) return gota._w + (cy - gota._y0)
+        if (m === dAba) return gota._w + gota._h + (gota._x1 - cx)
+        return 2 * gota._w + gota._h + (gota._y1 - cy)
     }
+
+    //  Y al revés: el punto que hay a esa distancia.
+    function _p(t) {
+        let u = ((t % gota._vuelta) + gota._vuelta) % gota._vuelta
+        if (u <= gota._w) return { x: gota._x0 + u, y: gota._y0 }
+        u -= gota._w
+        if (u <= gota._h) return { x: gota._x1, y: gota._y0 + u }
+        u -= gota._h
+        if (u <= gota._w) return { x: gota._x1 - u, y: gota._y1 }
+        u -= gota._w
+        return { x: gota._x0, y: gota._y1 - u }
+    }
+
+    //  El camino Y el sentido en que se recorre, juntos: el ángulo del trozo
+    //  necesita el sentido, y calcularlo aparte sería tener dos veces la misma
+    //  decisión con dos sitios donde discrepar.
+    readonly property var ruta: {
+        const s0 = gota._s(gota.salida)
+        const s1 = gota._s(gota.destino)
+        //  Cada trozo va por donde MENOS le queda, y `lado` solo desempata.
+        //
+        //  Forzar «uno por cada lado» valía cuando la barra estaba arriba y el
+        //  dock abajo, porque las dos vueltas miden casi lo mismo. Con bordes
+        //  adyacentes no: medido con la barra arriba y el dock a la izquierda,
+        //  uno hacía 1.391 px y el otro 4.323 —casi la vuelta entera— en el
+        //  mismo tiempo, o sea al triple de velocidad y dando un rodeo absurdo.
+        //
+        //  Por el camino corto salen 1.391 y 1.541, que se lee. Y no se pierde
+        //  nada de lo de antes: con la barra arriba y el dock abajo las dos
+        //  vueltas miden lo mismo —2.857 cada una, dos esquinas cada una— así
+        //  que ahí manda el desempate de abajo y los trozos se siguen
+        //  separando y volviendo a juntarse igual que siempre.
+        const L = gota._vuelta
+        const dHorario = (((s1 - s0)) % L + L) % L
+        const dAnti = L - dHorario
+        let dir = dHorario < dAnti ? 1 : -1
+
+        //  Y el empate —los bordes ENFRENTADOS, donde las dos vueltas miden lo
+        //  mismo— lo rompe la geometría, no el signo del parámetro. Diciendo
+        //  «el de la izquierda por el sentido negativo» salía bien con la barra
+        //  arriba y al revés con la barra abajo, porque el perímetro se recorre
+        //  siempre desde la esquina de arriba a la izquierda y en el canto de
+        //  abajo eso va de derecha a izquierda. Lo que no depende del borde es
+        //  esto: el trozo de la izquierda tiene que EMPEZAR yendo hacia la
+        //  izquierda —hacia arriba si la barra está de canto—, que es hacia
+        //  donde se acaba de despegar.
+        if (Math.abs(dHorario - dAnti) < 1) {
+            const eps = Math.min(8, L / 8)
+            const a = gota._p(s0 + eps), b = gota._p(s0 - eps)
+            const porY = Math.abs(a.y - b.y) > Math.abs(a.x - b.x)
+            const avance = porY ? a.y - b.y : a.x - b.x
+            dir = (avance < 0) === (gota.lado < 0) ? 1 : -1
+        }
+        const d = dir > 0 ? dHorario : dAnti
+
+        const fuera = [{ x: gota.salida.x, y: gota.salida.y }]
+
+        //  Las esquinas que quedan por el camino, en orden de encuentro.
+        const esquinas = [0, gota._w, gota._w + gota._h, 2 * gota._w + gota._h]
+        const paradas = []
+        for (let i = 0; i < 4; ++i) {
+            const dc = ((((esquinas[i] - s0) * dir) % L) + L) % L
+            //  Ni la de debajo de los pies ni la de detrás del destino: una
+            //  esquina a cero o a `d` es un codo de largo cero que solo mete
+            //  ruido en el ángulo.
+            if (dc > 1 && dc < d - 1)
+                paradas.push({ d: dc, p: gota._p(esquinas[i]) })
+        }
+        paradas.sort(function (a, b) { return a.d - b.d })
+        for (let i = 0; i < paradas.length; ++i)
+            fuera.push(paradas[i].p)
+
+        fuera.push({ x: gota.destino.x, y: gota.destino.y })
+        return { puntos: fuera, sentido: dir }
+    }
+
+    readonly property var puntos: gota.ruta.puntos
+
+    //  ── con qué inclinación va ───────────────────────────────────
+    //
+    //  El lado fundido tiene que mirar SIEMPRE hacia afuera, así que el ángulo
+    //  es el del borde por el que va: 0 arriba, 90 a la derecha, 180 abajo y
+    //  −90 a la izquierda. Se cuenta desde el borde del que SE DESPEGA y se le
+    //  suma un cuarto de vuelta por esquina doblada.
+    //
+    //  Antes se contaba desde cero a secas, que es como decir «la barra está
+    //  arriba». Con la barra de canto los trozos salían tumbados de un borde
+    //  vertical y llegaban de pie al de abajo: dos torres corriendo por el
+    //  suelo. Visto en pantalla, no deducido.
+    readonly property real anguloSalida: {
+        const s = gota._s(gota.salida)
+        if (s < gota._w) return 0
+        if (s < gota._w + gota._h) return 90
+        if (s < 2 * gota._w + gota._h) return 180
+        return -90
+    }
+
+    //  Y el cuarto de vuelta lo da el SENTIDO DE LA MARCHA, no qué trozo es.
+    //  Yendo con las agujas se dobla hacia la derecha y contra ellas hacia la
+    //  izquierda, y eso vale igual para los dos trozos. Sacándolo de `lado`
+    //  coincidía solo mientras cada trozo se iba por su costado; en cuanto los
+    //  dos toman el mismo —bordes adyacentes— uno de ellos giraba al revés.
+    readonly property real giro: gota.ruta.sentido > 0 ? 90 : -90
 
     function _len(a, b) { return Math.hypot(b.x - a.x, b.y - a.y) }
 
@@ -152,7 +285,8 @@ Item {
     //  reparten poco a poco, así que el giro acompaña a la curva en vez de
     //  pegar un salto al entrar y otro al salir.
     function estadoEn(u) {
-        const giro = gota.lado < 0 ? -90 : 90
+        const base = gota.anguloSalida
+        const giro = gota.giro
         let resto = Math.max(0, Math.min(1, u)) * gota.largoTotal
         let esquinas = 0
         const ts = gota.tramos
@@ -170,16 +304,23 @@ Item {
             if (tr.tipo === "recta")
                 return { x: tr.a.x + (tr.b.x - tr.a.x) * k,
                          y: tr.a.y + (tr.b.y - tr.a.y) * k,
-                         ang: esquinas * giro }
+                         ang: base + esquinas * giro }
             const m = 1 - k
             return {
                 x: m * m * tr.a.x + 2 * m * k * tr.c.x + k * k * tr.b.x,
                 y: m * m * tr.a.y + 2 * m * k * tr.c.y + k * k * tr.b.y,
-                ang: (esquinas + k) * giro
+                ang: base + (esquinas + k) * giro
             }
         }
+        //  Al final, tantos cuartos de vuelta como esquinas tenga el camino.
+        //  Estaban fijos en dos porque el recorrido era siempre el mismo; ahora
+        //  pueden ser de cero a tres.
+        let codos = 0
+        for (let j = 0; j < ts.length; ++j)
+            if (ts[j].tipo === "codo")
+                codos += 1
         const f = gota.puntos[gota.puntos.length - 1]
-        return { x: f.x, y: f.y, ang: 2 * giro }
+        return { x: f.x, y: f.y, ang: base + codos * giro }
     }
 
     readonly property var ahora: gota.estadoEn(gota.t)

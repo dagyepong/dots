@@ -239,6 +239,35 @@ Item {
 }
 ```
 
+### Pick a priority above 50, or the clock eats your panel
+
+`priority` decides who gets the island when more than one plugin wants it,
+and the number is not decoration. The bar's **resting views sit at 50 and
+55** — the clock and the player — and they activate on `Island.hovered`.
+
+So a panel below 50 cannot be closed. To reach your close button the user
+puts the pointer on the island; that turns the clock on; the clock outranks
+you; and your panel becomes the clock **exactly as they were reaching for
+it**. It is not a rare case: it is what happens every single time, and with
+the bar in *Hidden* space mode it happens sooner, because entering with the
+pointer is the first thing anyone does.
+
+The map, so you can place yourself:
+
+| | |
+|---|---|
+| 0 | the pill at rest |
+| 40 | volume |
+| 50 · 55 | **clock · player** — the hover views. Be above these. |
+| 59 | notification toast |
+| 60 · 64 · 66 | control center · dungeon · settings |
+| 80 · 83 | launcher · window switcher |
+
+Above the resting views so you survive being touched; below the things the
+user opens on purpose if yours can open **itself**. A module that appears
+over what someone was already doing is rude, and a plugin that announces
+something is announcing it, not demanding the screen.
+
 ### The size is yours
 
 You ask for `islandWidth` and `islandHeight`, and **you can change them
@@ -270,6 +299,54 @@ always opening instead of toggling.
 
 - Processes, timers and IPC go as children of the `K4.Plugin`, not of the
   view: the view is destroyed every time you lose the island.
+
+### An animation nobody sees still runs
+
+**In Qt Quick an animation does not stop because its item stopped being
+visible.** It keeps running, and while it runs the whole scene keeps
+repainting — at the refresh rate, on every monitor, for as long as its
+condition holds.
+
+That is not a warning from the manual. k4's own pill had a five-pixel dot
+pulsing whenever the dungeon had unopened chests:
+
+```qml
+SequentialAnimation on opacity {
+    running: Game.cofres > 0        // ← data, not visibility
+    loops: Animation.Infinite
+    NumberAnimation { to: 0.3; duration: 900 }
+    NumberAnimation { to: 1;   duration: 900 }
+}
+```
+
+The condition asks about *data*, never about being seen. With 61 chests
+sitting there it had been true for weeks, so the bar rendered **122 frames per
+second while collapsed with nothing open** — around 6% of a core, day and
+night, for a dot nobody was looking at. Fixing that one line took the bar to
+**0 fps and 0.0% at rest**.
+
+So an animation with `loops: Animation.Infinite` asks whether anyone can see
+it:
+
+```qml
+running: hayAlgoQueContar && K4.Isla.aLaVista
+```
+
+`K4.Isla.aLaVista` is false while the island is retracted (the *Hidden* mode
+in Settings), while a capture or a system dialog has it out of the way, and on
+a monitor whose bar is not showing. It is published per screen, so with two
+monitors the answer is "yes" when any of them shows it. With no bar behind it
+— a `--test` run — it answers "yes", because an animation too many is easier
+to notice than one that never starts.
+
+Your view is destroyed when you lose the island, so an animation that lives
+inside it goes away with it and costs nothing. The trap is everything drawn
+where the view survives: what you contribute to the pill, your own
+`K4.Ventana`, anything you hang in a place that is not yours.
+
+The same reasoning covers anything that repeats without an end: a `Timer` with
+`repeat: true`, a `Canvas` that repaints itself, an `AnimatedImage`. If it
+runs forever, it needs a reason to be running *now*.
 
 ### Your own files
 
@@ -315,6 +392,8 @@ bar's directory, not yours.
 | `K4.Sonido` | a short sound — requires the `sonido` permission |
 | `K4.Fichero` | reading and writing files — requires `ficheros` |
 | `K4.Pildora` | an indicator on the folded pill |
+| `K4.Capsula` | a flank extension: the capsule grows toward a screen edge with your text |
+| `K4.Submapas` | the Hyprland submap in force right now, read only |
 | `K4.Paths` | paths: `estadoDe(id)` is your state directory |
 | `K4.IconoPlugin` | a plugin's icon: its image if it brings one, its glyph if not |
 
@@ -448,7 +527,10 @@ opciones: [
     { id: "clave", tipo: "texto", secreto: true,
       nombre: K4.Idioma.t("Clave de API"),
       desc: K4.Idioma.t("Se guarda donde tú digas; la barra no la retiene"),
-      pista: "sk-…", glifo: 0xF0306 }
+      pista: "sk-…", glifo: 0xF0306 },
+    { id: "ancho", tipo: "numero", nombre: K4.Idioma.t("Ancho"),
+      desc: K4.Idioma.t("Hasta dónde puede crecer"), glifo: 0xF046D,
+      min: 60, max: 1200, paso: 20, unidad: "px" }
 ]
 ```
 
@@ -463,6 +545,13 @@ binding for that, not a value computed once:
 opciones: !Consola.esNuestra ? [] : [ /* … */ ]
 ```
 
+A number is two steppers with the value between them, for something you
+nudge rather than type — a width, a cap, a count. `min`, `max` and `paso`
+clamp it on every step and `unidad` is printed after the figure; what
+arrives through `cambiado` is already an INTEGER inside those bounds, so
+there is nothing for you to validate. A spent stepper stops answering
+instead of offering a value you were going to reject.
+
 A choice shows its `alternativas` as chips and `cambiado` delivers the
 chosen `codigo`. A text is a free field — a URL, a model, a key: `pista` is
 the empty field's gray, `secreto: true` masks it with dots once typing
@@ -470,6 +559,49 @@ stops, and the value arrives on confirm — Enter or a click outside — not
 keystroke by keystroke. With this, a plugin that talks to a service, an AI
 or a CLI configures itself in Settings like everything else, without
 inventing a screen of its own.
+
+**The pill's flank, and the capsule growing.** `K4.Pildora` gives you an
+indicator *inside* the pill — a glyph and a few characters, arbitrated with
+everyone else's. When that is too small to read at a glance, `K4.Capsula`
+grows the capsule itself toward a screen edge carrying your text: for a
+thing that is GOING ON and that the user must not have to remember — a mode
+that grabbed the keyboard, a recording running, a long job in flight.
+
+```qml
+K4.Capsula {
+    plugin: "rec"
+    extension: grabando ? ({
+        lado: "derecha",            // "izquierda" · "derecha"
+        texto: K4.Idioma.t("Grabando"),
+        glifo: 0xF037E,             // md-record_circle_outline
+        color: K4.Tema.rojo,
+        largoMaximo: 300            // px it may grow to
+    }) : null
+}
+```
+
+`extension` is a binding or it is nothing: it must produce a NEW object
+when your state changes, since mutating the old one in place tells nobody.
+Set it to `null` to fold the capsule back.
+
+The width is not yours to fight for, and that is the point: the bar hugs
+your text with the pill's own font and caps it twice — at your
+`largoMaximo` and at the room left to the screen edge, so a capsule parked
+at an aligned end never runs off the screen. The pill also stays itself:
+its art, clock and tray do not move a pixel while the capsule stretches,
+because the host anchors the island to keep the body still and grows toward
+that one side only. Two plugins asking for opposite flanks both get one.
+
+While a deployed view owns the island — the control center, the launcher —
+the extension folds away with the pill and comes back when the pill does.
+That rule is the capsule's, not yours.
+
+`K4.Submapas.actual` is the first customer and a useful one on its own: the
+Hyprland submap in force right now, `""` when there is none. A plugin may
+not reach for Hyprland's event socket itself, so the bar listens and
+publishes it. `plugins/Submap/` is the whole worked example — it imports
+`QtQuick` and `K4`, nothing else, and could be dropped into
+`~/.config/k4/plugins` as it stands.
 
 **Your results, in the launcher.** You answer when you can; if yours is
 expensive — a network query — you block nobody. Yours shows up **below**

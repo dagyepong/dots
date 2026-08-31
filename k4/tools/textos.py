@@ -14,6 +14,26 @@ cadenas repartidas por setenta ficheros, inventar un identificador para cada
 una es mucho trabajo, se desincroniza sola y deja al traductor mirando
 etiquetas en vez de frases. Así, además, lo que no esté traducido sale en
 español en vez de salir roto.
+
+De dónde salen las cadenas
+--------------------------
+
+De los `.qml` de widgets/, services/ y plugins/ —las propiedades conocidas
+(`text:`, `title:`…) y cualquier `Idioma.t("…")` esté donde esté—, y además de
+los guiones de `tools/` que marquen las suyas con `T("…")`.
+
+Esa marca hace falta porque un guion de aquí es un programa de línea de
+órdenes y habla español, pero parte de lo que imprime NO es para quien lo
+ejecuta: sube en JSON y lo pinta la barra, en el idioma que le hayan puesto.
+Los verbos del panel de atajos y las etiquetas del portapapeles son eso.
+
+`T` no hace nada —devuelve lo que le den— y por eso sirve de clave igual que
+antes. Está solo para que esta herramienta las vea. Sin marcar no cuentan, y
+no contar no significa «sin traducir»: significa que NADIE va a avisar de que
+están sin traducir. Así pasaron 23 desapercibidas.
+
+Este fichero no se recoge a sí mismo, y las líneas de comentario tampoco: si
+no, el ejemplo de aquí arriba entraría en la lista.
 """
 
 import json
@@ -200,9 +220,47 @@ RE_PAR = re.compile(r'"([^"\n]+)"\s*:\s*"([^"\n]*)"')
 RE_ENVUELTA = re.compile(r'Idioma\.t\(\s*(["\'])((?:[^"\'\\\n]|\\.)*?)\1')
 
 
+#  `T("…")` en los guiones de `tools/`: cadenas que nacen en Python pero se
+#  pintan en la barra —los verbos del panel de atajos, las etiquetas del
+#  portapapeles—. Ver la función `T` en esos ficheros para el porqué.
+RE_MARCADA = re.compile(r'\bT\(\s*(["\'])((?:[^"\'\\\n]|\\.)*?)\1\s*\)')
+
+
+def guiones():
+    base = os.path.join(RAIZ, "tools")
+    for n in sorted(os.listdir(base)):
+        #  Este fichero no: documenta la marca con un ejemplo, y recogerse a
+        #  sí mismo metía el «…» del comentario en la lista de cadenas.
+        if n.endswith(".py") and n != os.path.basename(__file__):
+            yield os.path.join(base, n)
+
+
+def sin_comentarios(texto):
+    """Las líneas de código, sin las de comentario.
+
+    Basta con las que EMPIEZAN por almohadilla: es donde se explica la marca,
+    y una `T("…")` a media línea después de un `#` no se ha visto nunca. Un
+    analizador de verdad para esto sería pagar mucho por muy poco.
+    """
+    return "\n".join(l for l in texto.split("\n")
+                     if not l.lstrip().startswith("#"))
+
+
 def recolectar():
     """Todas las cadenas de la interfaz, envueltas o no, con dónde salen."""
     encontradas = {}
+
+    #  Lo que marcan los guiones. Va primero para que su procedencia salga en
+    #  el informe aunque la misma cadena aparezca luego en un .qml.
+    for ruta in guiones():
+        try:
+            texto = open(ruta, encoding="utf-8").read()
+        except OSError:
+            continue
+        rel = os.path.relpath(ruta, RAIZ)
+        for m in RE_MARCADA.finditer(sin_comentarios(texto)):
+            if m.group(2):
+                encontradas.setdefault(m.group(2), set()).add(rel)
     for ruta in ficheros():
         try:
             texto = open(ruta, encoding="utf-8").read()

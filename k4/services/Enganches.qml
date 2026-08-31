@@ -87,6 +87,23 @@ Singleton {
                 continue
             salida.push({
                 grupo: a.grupo || a.plugin,
+                //  Para la barra lateral de la ventana de Ajustes: un icono y
+                //  una línea por sección. Si el plugin no dice nada, se coge
+                //  el icono que ya declara en su manifiesto — que es el que la
+                //  gente asocia con él en el centro de aplicaciones, así que
+                //  pedirle otro sería pedirle lo mismo dos veces.
+                glifo: a.fuente && a.fuente.glifo ? a.fuente.glifo : 0,
+                desc: a.fuente && a.fuente.desc ? a.fuente.desc : "",
+                dePlugin: a.plugin,
+                //  No salen como sección propia en la lateral: viven dentro de
+                //  la fila de SU plugin, al lado del interruptor que los
+                //  enciende. Tenerlos en dos cajones distintos obligaba a
+                //  cruzar la ventana para apagar lo que acabas de configurar.
+                //
+                //  Pero siguen en `Settings.definicion`, y eso importa: el
+                //  buscador recorre la lista entera, así que escribir el nombre
+                //  de un ajuste de plugin lo sigue encontrando.
+                enLateral: false,
                 opciones: a.opciones.map(function (o) {
                     return Object.assign({}, o, {
                         id: registro.idExterno(a.plugin, o.id)

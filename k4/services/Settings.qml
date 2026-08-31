@@ -83,16 +83,75 @@ Singleton {
     //  En qué borde vive la barra. shell.qml ancla la ventana, voltea la
     //  silueta y orienta los gestos con esto; los plugins lo leen por
     //  K4.Isla.posicion para adaptar lo que pinten fuera.
-    property string posicionBarra: "arriba"     // arriba · abajo
+    //  En los laterales la píldora se pone de canto: gira su contenido un
+    //  cuarto de vuelta en vez de reinventarlo. Las vistas que se ABREN no
+    //  giran nunca — ver `colocacionVistas`.
+    property string posicionBarra: "arriba"     // arriba · abajo · izquierda · derecha
     //  En qué punto del borde se centra la island, en tanto por ciento del
     //  ancho libre: 50 es el centro de siempre. Un plugin puede desplazarla
     //  TEMPORALMENTE con K4.Isla.colocar; esto es la base a la que vuelve.
     property int alineacionBarra: 50            // 15 · 50 · 85
+    //  Qué hace la barra con el sitio del escritorio.
+    //
+    //  «reserva» es lo de siempre: la franja plegada se le quita al escritorio
+    //  y ninguna ventana se mete debajo. «encima» no le quita nada —la píldora
+    //  flota sobre las ventanas— y «escondida» además la retira por el borde
+    //  hasta que hay algo que enseñar. Y «completa» no es un cuarto estado
+    //  sino una regla: reserva como siempre, y se esconde SOLO mientras una
+    //  ventana llena la pantalla. shell.qml es quien las obedece.
+    property string reservaIsla: "reserva"   // reserva · completa · encima · escondida
     // widgets/TrayRow.qml: iconos de bandeja en la píldora
     // Apagada de fábrica: en la píldora los iconos de bandeja son ruido casi
     // siempre, y al acercar el ratón la island ya se abre y ahí sí se ven —y
     // encima se pueden pulsar, que en la píldora no—.
     property bool bandejaEnPildora: false
+    //  ── por qué borde se abre cada vista ──────────────────────────
+    //
+    //  `{ "<id de plugin>": { lado, alineacion } }`, y VACÍO de fábrica: una
+    //  vista sin entrada se abre exactamente donde se abría siempre, así que
+    //  al actualizar no se mueve nada.
+    //
+    //  La píldora no entra en esto. Ella y sus vistas al pasar el ratón viven
+    //  donde diga la sección Island, que es su casa; lo que elige borde es lo
+    //  que ABRES, que es lo que a veces quieres en otro sitio —el lanzador a
+    //  la izquierda, la captura abajo— sin mudar la barra entera.
+    property var colocacionVistas: ({})
+
+    function ladoDe(id) {
+        const c = colocacionVistas[id]
+        const l = c && c.lado ? String(c.lado) : ""
+        return (l === "arriba" || l === "abajo"
+                || l === "izquierda" || l === "derecha") ? l : ""
+    }
+
+    //  −1 cuando la vista no dice nada: entonces manda la de la barra, con lo
+    //  que un plugin pueda estar pidiendo por `K4.Isla.colocar`.
+    function alineacionDe(id) {
+        const c = colocacionVistas[id]
+        if (!c || c.alineacion === undefined)
+            return -1
+        const n = Math.floor(Number(c.alineacion))
+        return isFinite(n) ? Math.max(0, Math.min(100, n)) : -1
+    }
+
+    function colocarVista(id, lado, alineacion) {
+        const d = {}
+        for (const k in colocacionVistas)
+            d[k] = colocacionVistas[k]
+        if (!lado || lado.length === 0)
+            delete d[id]
+        else
+            d[id] = { lado: lado, alineacion: Math.max(0, Math.min(100,
+                        Math.floor(Number(alineacion)) || 0)) }
+        colocacionVistas = d
+        guardar()
+    }
+
+    //  Un clic fuera de la barra cierra lo que haya desplegado, igual que
+    //  Escape. shell.qml es quien lo hace: mientras hay una vista abierta, su
+    //  máscara de entrada cubre la pantalla y se gasta el toque en cerrarla.
+    //  Apagado es lo de antes: el clic pasa de largo a la ventana de debajo.
+    property bool cerrarConClicFuera: true
     // widgets/NotifStrip.qml: notificaciones recientes al pasar el ratón
     property bool notificacionesAlPasar: true
     // services/Notifs.qml: descartar las de una aplicación al ir a su ventana
@@ -106,7 +165,7 @@ Singleton {
     //  Ids y no una copia de nombres e iconos: así al renombrar un plugin o
     //  cambiarle el icono el acceso directo se entera solo, y uno que apunte a
     //  un plugin desinstalado simplemente no se pinta.
-    property var accesosDirectos: ["game", "hyprtheme", "system", "clipboard"]
+    property var accesosDirectos: ["game", "settings", "system", "clipboard"]
 
     function esAccesoDirecto(id) {
         return (accesosDirectos || []).indexOf(id) >= 0
@@ -135,7 +194,16 @@ Singleton {
 
     readonly property var definicion: [
         {
+            //  El asa ESTABLE de cada sección, la que no cambia de
+            //  idioma. `grupo` se traduce, así que atar una tecla a él
+            //  («k4 settingsSection Apariencia») deja de funcionar en
+            //  cuanto la barra habla otra lengua: con la barra en inglés
+            //  el grupo se llama «Appearance» y el atajo no abría nada.
+            //  Esto no se enseña, solo se nombra.
+            id: "idioma",
             grupo: Idioma.t("Idioma"),
+            glifo: 0xF05CA,
+            desc: Idioma.t("En qué idioma habla la barra."),
             opciones: [
                 { id: "idioma", tipo: "eleccion", de: "idiomas",
                   nombre: Idioma.t("Idioma de la barra"),
@@ -144,7 +212,10 @@ Singleton {
             ]
         },
         {
+            id: "mazmorra",
             grupo: Idioma.t("Mazmorra"),
+            glifo: 0xF04E5,
+            desc: Idioma.t("El juego que vive en la píldora: si corre, si guarda y cuánto se le ve."),
             opciones: [
                 { id: "juegoActivo", nombre: Idioma.t("Mazmorra activa"),
                   desc: Idioma.t("Apagada no corre, no guarda y no ocupa sitio"), glifo: 0xF04E5 },
@@ -172,7 +243,10 @@ Singleton {
             ]
         },
         {
+            id: "datos",
             grupo: Idioma.t("Datos personales"),
+            glifo: 0xF0237,
+            desc: Idioma.t("Qué puede saber de ti un plugin, y qué no."),
             opciones: [
                 { id: "huellaActiva", nombre: Idioma.t("Compartir mi huella con plugins"),
                   desc: Idioma.t("Solo agregados, solo con permiso declarado, y borrable"),
@@ -188,7 +262,10 @@ Singleton {
             ]
         },
         {
+            id: "captura",
             grupo: Idioma.t("Captura"),
+            glifo: 0xF0100,
+            desc: Idioma.t("Qué entra en la foto y qué hacer con ella después."),
             opciones: [
                 { id: "capturaDestino", tipo: "eleccion", de: "destinos",
                   nombre: Idioma.t("Qué hacer con la foto"),
@@ -200,7 +277,10 @@ Singleton {
             ]
         },
         {
+            id: "grabacion",
             grupo: Idioma.t("Grabación"),
+            glifo: 0xF044A,
+            desc: Idioma.t("Audio, cámara y calidad de lo que grabas."),
             opciones: [
                 { id: "grabarAudio", tipo: "eleccion", de: "audios",
                   nombre: Idioma.t("Qué sonido se graba"),
@@ -230,7 +310,10 @@ Singleton {
             ]
         },
         {
+            id: "editor",
             grupo: Idioma.t("Editor"),
+            glifo: 0xF03EB,
+            desc: Idioma.t("El editor que se abre cuando terminas de capturar."),
             opciones: [
                 { id: "zoomAuto", nombre: Idioma.t("Proponer zoom al grabar"),
                   desc: Idioma.t("Del rastro del cursor y de los clics"),
@@ -251,16 +334,37 @@ Singleton {
             ]
         },
         {
+            id: "island",
             grupo: Idioma.t("Island"),
+            glifo: 0xF1513,
+            desc: Idioma.t("Cuánto sitio se queda la barra, y cuándo se aparta."),
+            //  Dónde vive, cómo se alinea y cómo ocupa el sitio se explican mal
+            //  con palabras: «Reservar sitio» y «Encima» suenan parecido y
+            //  hacen cosas muy distintas con tus ventanas. Encima de las
+            //  opciones va un croquis que lo enseña.
+            vista: "island",
             opciones: [
                 { id: "posicionBarra", tipo: "eleccion", de: "posiciones",
                   nombre: Idioma.t("Dónde vive la barra"),
-                  desc: Idioma.t("La island y sus alas se voltean solas"),
+                  desc: Idioma.t("La island y sus alas se voltean solas; de canto, la píldora gira"),
                   glifo: 0xF10A9 },
-                { id: "alineacionBarra", tipo: "eleccion", de: "alineaciones",
+                //  Un número y no tres chips. Izquierda, centro y derecha
+                //  eran quince, cincuenta y ochenta y cinco, y un cuarto o un
+                //  tercio no eran ninguno de los tres. Quien quiera señalar en
+                //  vez de contar lo arrastra en el croquis de aquí arriba; esto
+                //  es la cifra exacta, y siempre dice dónde estás de verdad.
+                { id: "alineacionBarra", tipo: "numero",
                   nombre: Idioma.t("Alineación de la island"),
-                  desc: Idioma.t("En qué punto del borde se coloca"),
-                  glifo: 0xF11C3 },
+                  desc: Idioma.t("En qué punto del borde se coloca; también se arrastra en el croquis"),
+                  glifo: 0xF11C3,
+                  min: 0, max: 100, paso: 5, unidad: "%" },
+                { id: "reservaIsla", tipo: "eleccion", de: "reservas",
+                  nombre: Idioma.t("Cómo ocupa el sitio"),
+                  desc: Idioma.t("Aparta las ventanas, flota sobre ellas o se esconde"),
+                  glifo: 0xF003E },   // md-arrange_bring_to_front
+                { id: "cerrarConClicFuera", nombre: Idioma.t("Cerrar al clicar fuera"),
+                  desc: Idioma.t("Un clic fuera cierra lo abierto, como Escape"),
+                  glifo: 0xF015A },   // md-close_circle_outline
                 { id: "bandejaEnPildora", nombre: Idioma.t("Bandeja en la píldora"),
                   desc: Idioma.t("Iconos de las aplicaciones en segundo plano"), glifo: 0xF0FB0 },
                 { id: "notificacionesAlPasar", nombre: Idioma.t("Notificaciones al pasar el ratón"),
@@ -270,7 +374,86 @@ Singleton {
             ]
         },
         {
+            id: "apariencia",
+            grupo: Idioma.t("Apariencia"),
+            //  Palabras por las que el buscador debe encontrar esta sección.
+            //  Hacen falta porque sus controles viven dentro de un widget y no
+            //  como `opciones`: sin esto, escribir «blur» no daba NADA aunque
+            //  el interruptor esté ahí dentro.
+            //
+            //  En los dos idiomas y sin `Idioma.t`: no se enseñan, solo se
+            //  buscan, y quien teclea «gaps» en una barra en español merece
+            //  encontrarlo igual.
+            claves: ["fondo", "fondos", "wallpaper", "escritorio", "desktop", "imagen", "video", "monitor", "pantalla",
+                     "color", "colour", "colores", "preset", "acento", "accent", "paleta", "palette", "tema", "theme", "degradado"],
+            glifo: 0xF03D8,
+            desc: Idioma.t("El fondo de escritorio, y los colores que salen de él."),
+            //  El fondo y el color, juntos y en este orden: el color SALE del
+            //  fondo mientras no lo toques a mano, así que separarlos en dos
+            //  cajones obligaba a cruzar la ventana para entender una cosa.
+            //  Ninguna opción declarada: lo que se elige aquí es una imagen y
+            //  un color, y eso no cabe en una fila con un interruptor.
+            vista: "fondos",
+            opciones: []
+        },
+        {
+            id: "colocacion",
+            grupo: Idioma.t("Colocación"),
+            //  Palabras por las que el buscador debe encontrar esta sección:
+            //  sus controles viven dentro de un widget y no como `opciones`.
+            claves: ["colocacion", "colocación", "placement", "lado", "side",
+                     "borde", "edge", "izquierda", "derecha", "left", "right",
+                     "lateral", "lanzador", "launcher"],
+            glifo: 0xF11C3,
+            desc: Idioma.t("Por qué borde de la pantalla se abre cada módulo."),
+            vista: "colocacion",
+            opciones: []
+        },
+        {
+            id: "ventanas",
+            grupo: Idioma.t("Ventanas"),
+            //  Palabras por las que el buscador debe encontrar esta sección.
+            //  Hacen falta porque sus controles viven dentro de un widget y no
+            //  como `opciones`: sin esto, escribir «blur» no daba NADA aunque
+            //  el interruptor esté ahí dentro.
+            //
+            //  En los dos idiomas y sin `Idioma.t`: no se enseñan, solo se
+            //  buscan, y quien teclea «gaps» en una barra en español merece
+            //  encontrarlo igual.
+            claves: ["ventanas", "windows", "borde", "border", "hueco", "huecos", "gap", "gaps", "redondeo", "rounding", "esquina", "esquinas"],
+            glifo: 0xF10AC,
+            desc: Idioma.t("Bordes, huecos y esquinas de las ventanas de Hyprland."),
+            vista: "ventanas",
+            opciones: []
+        },
+        {
+            id: "efectos",
+            grupo: Idioma.t("Efectos"),
+            //  Palabras por las que el buscador debe encontrar esta sección.
+            //  Hacen falta porque sus controles viven dentro de un widget y no
+            //  como `opciones`: sin esto, escribir «blur» no daba NADA aunque
+            //  el interruptor esté ahí dentro.
+            //
+            //  En los dos idiomas y sin `Idioma.t`: no se enseñan, solo se
+            //  buscan, y quien teclea «gaps» en una barra en español merece
+            //  encontrarlo igual.
+            claves: ["efectos", "effects", "blur", "desenfoque", "opacidad", "opacity", "sombra", "sombras", "shadow", "animacion", "animaciones", "animation"],
+            glifo: 0xF00B5,
+            desc: Idioma.t("Desenfoque, opacidad, sombras y animaciones."),
+            vista: "efectos",
+            opciones: []
+        },
+        {
+            id: "plugins",
             grupo: Idioma.t("Plugins"),
+            glifo: 0xF0431,
+            desc: Idioma.t("Lo que tienes instalado: encender, apagar y de dónde vino."),
+            //  Esta sección no se pinta como una pila de interruptores: son
+            //  casi cuarenta, y el ajuste de cada plugin estaba en OTRA
+            //  sección. Se despliega cada uno con lo suyo dentro. La vista lo
+            //  mira por este nombre; cualquier otro grupo se pinta como
+            //  siempre.
+            vista: "plugins",
             opciones: PluginManager.opcionesAjustes
         }
     //  Y al final, lo que aporten los plugins con K4.Ajustes. Van los
@@ -329,12 +512,17 @@ Singleton {
             return [{ codigo: 30, nombre: "30" },
                     { codigo: 60, nombre: "60" }]
         if (de === "posiciones")
-            return [{ codigo: "arriba", nombre: Idioma.t("Arriba") },
+            return [{ codigo: "izquierda", nombre: Idioma.t("Izquierda") },
+                    { codigo: "derecha", nombre: Idioma.t("Derecha") },
+                    { codigo: "arriba", nombre: Idioma.t("Arriba") },
                     { codigo: "abajo",  nombre: Idioma.t("Abajo") }]
-        if (de === "alineaciones")
-            return [{ codigo: 15, nombre: Idioma.t("Izquierda") },
-                    { codigo: 50, nombre: Idioma.t("Centro") },
-                    { codigo: 85, nombre: Idioma.t("Derecha") }]
+        //  De menos a más, que es como se lee una escala: quitar sitio
+        //  siempre, quitarlo salvo cuando estorba, no quitarlo, y no estar.
+        if (de === "reservas")
+            return [{ codigo: "reserva",   nombre: Idioma.t("Reservar sitio") },
+                    { codigo: "completa",  nombre: Idioma.t("Fuera a pantalla completa") },
+                    { codigo: "encima",    nombre: Idioma.t("Encima") },
+                    { codigo: "escondida", nombre: Idioma.t("Escondida") }]
         if (de === "niveles")
             //  Etiquetas y no números: «2,5» no le dice nada a nadie, y lo que se
             //  quiere elegir es cuánto se nota.
@@ -393,8 +581,9 @@ Singleton {
         "grabarAudio", "grabarMicro", "grabarSalida", "grabarCodec", "grabarFps",
         "grabarCamara", "camaraDispositivo",
         "zoomAuto", "zoomNivel", "editorCodec", "editorSonoridad",
-        "posicionBarra", "alineacionBarra",
+        "posicionBarra", "alineacionBarra", "reservaIsla",
         "huellaActiva", "huellaSteam", "huellaPaquetes",
+        "cerrarConClicFuera", "colocacionVistas",
         "bandejaEnPildora", "notificacionesAlPasar", "notificacionesAlEnfocar",
         "accesosDirectos"
     ]

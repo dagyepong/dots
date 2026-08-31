@@ -17,6 +17,28 @@ K4.Ventana {
 
     required property var plugin
 
+    //  ── un solo centro para todo el dock ─────────────────────────
+    //
+    //  Las piezas del dock —la zona que recoge el ratón, el cuerpo y la fila
+    //  de iconos— tienen ANCHOS DISTINTOS, así que no pueden calcular su sitio
+    //  cada una por su cuenta aunque usen la misma fórmula: `(pantalla − w)·f`
+    //  con tres `w` distintas da tres sitios distintos. Solo coinciden con la
+    //  alineación al 50 % —o al 0—, que es justo con lo que se probó, y por eso
+    //  coló.
+    //
+    //  Descentrado se veía: los iconos dejaban de ir concéntricos con el
+    //  cuerpo, asomaban por fuera de la silueta ANTES de que terminara de
+    //  abrirse, y al asentarse pegaban un salto para recolocarse.
+    //
+    //  Así que el sitio lo decide UNA cuenta, la del cuerpo, y las demás piezas
+    //  se centran en ella. Un solo punto de verdad y no tres que se parecen.
+    //  El largo del borde, que DENTRO del marco es siempre su ancho: girado,
+    //  el eje largo del dock es el alto de la pantalla. Con `muelle.width` a
+    //  secas el dock de canto se colocaba contra 1920 en un borde de 1080 y
+    //  salía descentrado y a medio camino de la esquina.
+    readonly property real xCuerpo: plugin.xDock(marco.width, muelle.anchoLleno)
+    readonly property real centroDock: xCuerpo + muelle.anchoLleno / 2
+
     nombre: "k4-dual-muelle"
 
     //  El dock vive en la capa `Top`, que es la de un panel: por encima de las
@@ -252,7 +274,43 @@ K4.Ventana {
     //  item. Con la escala negativa funcionaba igual, pero es de las cosas que
     //  uno no quiere tener que volver a comprobar: este item no pinta nada, no
     //  lleva transformadas y solo marca el rectángulo bueno.
-    zonaActiva: zona
+    //  La región de entrada NO puede ser `zona`: está dentro del marco
+    //  girado, y la máscara de la capa se calcula sin la rotación, así que con
+    //  el dock de canto el hueco por el que entran los clics se quedaba donde
+    //  habría estado sin girar. Medido: con el dock abajo, el puntero encima da
+    //  `ratonX = 960`; a la izquierda, −9999 en el dock Y en el sitio de antes.
+    //  O sea, el dock se veía y no se podía tocar.
+    zonaActiva: zonaEntrada
+
+    //  El mismo rectángulo que `zona`, pero en coordenadas de PANTALLA y sin
+    //  girar. La cuenta es el mapeo del marco: un punto (px, py) del marco cae
+    //  en la pantalla en
+    //     abajo      (px, py)
+    //     arriba     (W − px, H − py)
+    //     izquierda  (W − py, px)
+    //     derecha    (py, H − px)
+    //  y de ahí sale la caja de cada lado. Dentro de ella, Qt ya reparte los
+    //  clics a los hijos girados por su cuenta.
+    Item {
+        id: zonaEntrada
+
+        readonly property real largo: zona.width
+        readonly property real hondo: zona.height
+        readonly property real zx: zona.x
+        readonly property string lado: muelle.plugin.ladoDock
+
+        width: muelle.plugin.dockVertical ? hondo : largo
+        height: muelle.plugin.dockVertical ? largo : hondo
+
+        x: lado === "izquierda" ? 0
+            : lado === "derecha" ? muelle.width - hondo
+            : lado === "arriba" ? muelle.width - zx - largo
+            : zx
+        y: lado === "izquierda" ? zx
+            : lado === "derecha" ? muelle.height - zx - largo
+            : lado === "arriba" ? 0
+            : muelle.height - hondo
+    }
 
     //  Con un menú o el selector desplegado, la zona se agranda a toda la
     //  ventana: es lo que permite que un clic FUERA lo cierre. Sin eso, la
@@ -274,15 +332,133 @@ K4.Ventana {
     readonly property bool hayDesplegable:
         menuDe.length > 0 || selectorDe.length > 0 || cajon
 
+    //  ── el dock que se quita de en medio ─────────────────────────
+    //
+    //  Lo elige el usuario en Ajustes → Modo dual y lo resuelve el plugin; aquí
+    //  solo se obedece. Retirado, el dock se va POR DEBAJO del borde y lo único
+    //  que queda de él es la tira de cuatro píxeles por donde se le llama.
+    property bool seEsconde: false
+    property bool retirado: false
+
+    //  Cuánto baja. Con `altoAhora` y no `altoDock` para que el cajón abierto
+    //  saliera también entero; no llega a darse —con el cajón abierto el dock
+    //  no se retira— pero sale gratis y así no hay que acordarse.
+    //
+    //  Y sin `readonly`, que un `Behavior` escribe en la propiedad que anima:
+    //  en todo el repo no hay una sola animada que lo sea.
+    property real retiro: retirado ? altoAhora + 8 : 0
+
+    //  Una sola curva para ir y volver, y SIN rebote. `OutBack` se pasa del
+    //  destino, y el destino es cero: pasarse de cero es despegarse del borde
+    //  de abajo. Esta pieza lleva esquinas invertidas justamente para fundirse
+    //  con ese canto, así que el píxel de aire del rebote no se lee como un
+    //  rebote sino como un salto. Que frene, no que bote.
+    Behavior on retiro {
+        NumberAnimation {
+            duration: 360
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    //  Qué cuenta como «hace falta».
+    //
+    //  `dentro` lo pone el sensor del ratón del final del fichero, que está
+    //  anclado al borde de abajo y NO se retira con el dock: es lo que hace que
+    //  la misma área valga para las dos cosas —la lupa cuando el dock está, y
+    //  la llamada cuando no—. Sin movimiento del ratón nadie garantiza un
+    //  `hovered` nuevo al volver el dock, y con dos sensores relevándose el
+    //  dock se iba otra vez con el puntero encima.
+    //
+    //  Y `despliegue < 0.999` porque retirarse a mitad del viaje es enseñar un
+    //  dock que se va sin haber acabado de venir.
+    readonly property bool hazteVer: dentro || hayDesplegable
+        || arrastreDesde >= 0 || despliegue < 0.999
+
+    function repensarRetiro() {
+        if (!seEsconde || !mostrando) {
+            retiroTimer.stop()
+            retirado = false
+        } else if (hazteVer) {
+            retiroTimer.stop()
+            retirado = false
+        } else {
+            retiroTimer.restart()
+        }
+    }
+
+    onSeEscondeChanged: repensarRetiro()
+    onHazteVerChanged: repensarRetiro()
+    onMostrandoChanged: repensarRetiro()
+    Component.onCompleted: repensarRetiro()
+
+    Timer {
+        id: retiroTimer
+        interval: 1600
+        //  Se vuelve a preguntar al vencer y no se da por hecho lo que era
+        //  verdad al armarlo: entre medias ha podido volver el ratón.
+        onTriggered: muelle.retirado = muelle.seEsconde && muelle.mostrando
+            && !muelle.hazteVer
+    }
+
+    //  ── el marco: el dock se escribe abajo y se GIRA ─────────────
+    //
+    //  Todo el dock está escrito para el borde de abajo: anclas a
+    //  `parent.bottom`, iconos que se levantan del suelo, una lupa que compara
+    //  con la `x` del ratón. Reescribir eso por ejes serían cuarenta usos del
+    //  alto como profundidad y treinta y ocho del ancho como largo, repartidos
+    //  por mil seiscientas líneas.
+    //
+    //  Así que no se reescribe: se gira. Este marco lleva la caja con los ejes
+    //  cambiados y una rotación, y dentro sigue todo hablando de «abajo». La
+    //  `x` del ratón le llega ya en el marco girado, así que la lupa y el
+    //  arrastre para reordenar funcionan sin tocarlos.
+    //
+    //  Girando el fondo del marco hacia cada borde:
+    //    abajo 0 · arriba 180 · izquierda +90 · derecha −90
+    //  (en QML la rotación es en el sentido del reloj, y el fondo del marco
+    //   está por debajo del centro, así que +90 lo manda a la izquierda).
+    //
+    //  Lo único que hay que deshacer es lo que tiene que verse DERECHO: los
+    //  iconos, sus nombres y el cajón. Se contrarrotan, que es una línea cada
+    //  uno en vez de una maquetación nueva.
+    Item {
+        id: marco
+
+        readonly property real giro: {
+            const l = muelle.plugin.ladoDock
+            if (l === "arriba") return 180
+            if (l === "izquierda") return 90
+            if (l === "derecha") return -90
+            return 0
+        }
+
+        width: muelle.plugin.dockVertical ? muelle.height : muelle.width
+        height: muelle.plugin.dockVertical ? muelle.width : muelle.height
+        x: (muelle.width - width) / 2
+        y: (muelle.height - height) / 2
+        rotation: giro
+    }
+
     Item {
         id: zona
-        width: muelle.hayDesplegable ? muelle.width
+        parent: marco
+        width: muelle.hayDesplegable ? marco.width
             : Math.max(muelle.anchoAhora, muelle.cajon ? muelle.anchoLleno : 0)
         //  `altoAhora` ya lleva dentro lo que crece el cajón; sumarlo otra vez
         //  era pedir región de entrada de más.
-        height: muelle.hayDesplegable ? muelle.height : muelle.altoAhora
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
+        //
+        //  Y retirado, cuatro píxeles pegados al borde: el dock ya no está
+        //  —lo que se ha movido es su dibujo— así que la zona entera seguiría
+        //  tragándose los clics de algo que no se ve. Esa misma tira es por
+        //  donde se le llama, porque el sensor del ratón se queda aquí abajo.
+        height: muelle.retirado ? 4
+            : (muelle.hayDesplegable ? marco.height : muelle.altoAhora)
+        //  Por la alineación del dock y no al centro: ver `alineacionDock` en
+        //  el plugin. Centrada en el cuerpo, como todo lo demás: ver
+        //  `centroDock`. Si esta discrepara, el ratón se recogería en un sitio
+        //  y el dibujo estaría en otro.
+        x: muelle.centroDock - width / 2
+        anchors.bottom: marco.bottom
         visible: muelle.mostrando
     }
 
@@ -322,6 +498,7 @@ K4.Ventana {
 
     Shape {
         id: silueta
+        parent: marco
 
         visible: muelle.mostrando
 
@@ -341,8 +518,13 @@ K4.Ventana {
         //  se crea una vez y lo que se anima es geometría.
         width: muelle.anchoLleno
         height: muelle.alto + muelle.altoCajon
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
+        x: muelle.xCuerpo
+        anchors.bottom: marco.bottom
+        //  El escondite, por el ancla y no por una transformada: esta pieza ya
+        //  lleva el espejo de aquí abajo, y en una lista de transformadas quién
+        //  se aplica antes decide si esto baja o SUBE. Con el margen no hay
+        //  nada que comprobar.
+        anchors.bottomMargin: -muelle.retiro
 
         //  El espejo: la barra de arriba hace exactamente esto cuando el
         //  usuario la manda abajo.
@@ -411,7 +593,23 @@ K4.Ventana {
     //  los límites que reparten los clics.
     Item {
         id: capa
-        anchors.fill: parent
+        //  COPIA el marco en vez de meterse dentro.
+        //
+        //  Reparentarla con `parent: marco` deja el dock negro y vacío, con o
+        //  sin `anchors.fill`: los iconos se dibujan fuera y no hay un solo
+        //  aviso en el log. Se probó de las dos maneras. Copiando la caja y el
+        //  giro se llega al mismo sitio —la capa acaba encima del marco, con la
+        //  misma rotación— sin depender de cuándo se resuelve un reparentado.
+        x: marco.x
+        y: marco.y
+        width: marco.width
+        height: marco.height
+        rotation: marco.rotation
+        //  Aquí sí una transformada: esta capa ocupa la ventana entera —lo
+        //  necesita para que un icono crecido y un menú desplegado quepan— así
+        //  que moverla con el ancla la redimensionaría, y la fila y los menús
+        //  se colocan contando desde su alto.
+        transform: Translate { y: muelle.retiro }
         //  Sin recorte: un icono crecido tiene que poder asomar por encima
         //  del dock. Recortando, lo que sobraba se cortaba a ras del borde y
         //  quedaba raro — se veía media aplicación asomando por debajo.
@@ -429,7 +627,15 @@ K4.Ventana {
 
         Row {
             id: fila
-            anchors.horizontalCenter: parent.horizontalCenter
+            //  En el borde DERECHO el marco gira al otro lado, así que la fila
+            //  correría de abajo arriba y la primera aplicación quedaría en la
+            //  esquina de abajo. Espejando la fila vuelve a leerse de arriba
+            //  abajo, que es como se lee un dock vertical en cualquier sitio.
+            LayoutMirroring.enabled: muelle.plugin.ladoDock === "derecha"
+            //  `capa` ocupa la ventana entera, así que centrarse en ella era
+            //  centrarse en la pantalla. La fila va centrada EN EL CUERPO, que
+            //  es más ancho que ella: con su propia cuenta se descolgaba.
+            x: muelle.centroDock - width / 2
             anchors.bottom: parent.bottom
             height: muelle.altoDock
             spacing: 0
@@ -628,6 +834,10 @@ K4.Ventana {
                         width: muelle.base * (1 + 0.62 * ranura.cerca)
                         height: width
 
+                        //  Derecho aunque el marco esté girado: lo que gira es
+                        //  la tira, no las aplicaciones.
+                        rotation: -marco.giro
+
                         anchors.horizontalCenter: parent.horizontalCenter
                         //  Anclado abajo: al crecer se levanta del suelo del
                         //  dock en vez de crecer hacia los dos lados.
@@ -646,6 +856,7 @@ K4.Ventana {
                     }
 
                     K4.Etiqueta {
+                        rotation: -marco.giro
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.bottom: icono.top
                         anchors.bottomMargin: 10 + 12 * ranura.cerca
@@ -1146,6 +1357,8 @@ K4.Ventana {
                     id: glifoCajon
                     width: muelle.base * (1 + 0.62 * cajonRaton.cerca)
                     height: width
+                    //  Derecho, como los demás iconos de la tira.
+                    rotation: -marco.giro
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 8 + 10 * cajonRaton.cerca
@@ -1196,6 +1409,11 @@ K4.Ventana {
     //  ponerlas, que es el gesto que todo el mundo prueba primero.
     Rectangle {
         id: panelCajon
+        parent: marco
+        //  Y derecho: es un panel con una rejilla de aplicaciones y sus
+        //  nombres, no una tira. Gira con el marco para colocarse junto al
+        //  dock y se desgira para leerse.
+        rotation: -marco.giro
         visible: muelle.cajonAbierto > 0.01
         opacity: muelle.cajonAbierto
 
@@ -1209,9 +1427,16 @@ K4.Ventana {
         //  con ella, el cajón se mete en el dock —que es de donde había salido—
         //  y la rejilla baja con él.
         height: muelle.altoCajon * muelle.cajonAbierto
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: muelle.altoDock
+        //  Sobre el DOCK y no sobre el centro de la pantalla.
+        //
+        //  Anclado al centro del marco, el cajón se abría en medio aunque el
+        //  dock estuviera en un extremo: se veía en cuanto el dock dejó de
+        //  estar centrado, o sea desde que tiene alineación propia. Sale del
+        //  mismo `centroDock` que la tira, que es el único sitio donde está
+        //  escrito dónde vive el dock.
+        x: muelle.centroDock - width / 2
+        anchors.bottom: marco.bottom
+        anchors.bottomMargin: muelle.altoDock - muelle.retiro
 
         //  Sin fondo ni borde: lo pinta la silueta del dock, del que esto es
         //  la parte de arriba. Con caja propia se veía como un panel flotando
@@ -1312,8 +1537,22 @@ K4.Ventana {
                 readonly property int anchoCelda: Math.floor(
                     (width - spacing * (columnas - 1)) / columnas)
 
+                //  Vacío mientras el cajón está cerrado, y esto no es un
+                //  detalle: un `Repeater` INSTANCIA todos sus delegates aunque
+                //  su contenedor esté invisible, así que la rejilla entera
+                //  —una celda y un icono por aplicación instalada— se
+                //  construía al arrancar la barra y se quedaba ahí para
+                //  siempre, en modo barra, con el dock sin desplegar jamás.
+                //
+                //  Medido en una capa invisible con los iconos de las 68
+                //  aplicaciones de esta máquina: 54 MB. El plugin dual entero
+                //  costaba 60.
+                //
+                //  Atado a `cajon` —la intención— y no a `cajonAbierto` —la
+                //  animación—: así la rejilla se construye en cuanto pulsas,
+                //  mientras el cajón crece, y no después de que haya crecido.
                 Repeater {
-                    model: muelle.listaCajon
+                    model: muelle.cajon ? muelle.listaCajon : []
 
                     delegate: Item {
                         id: celda
@@ -1408,11 +1647,11 @@ K4.Ventana {
                                 }
                                 const p = mapToItem(muelle.contentItem, ev.x, ev.y)
                                 //  ¿Ha caído sobre el dock?
-                                if (p.y < muelle.height - muelle.alto - 4)
+                                if (p.y < marco.height - muelle.alto - 4)
                                     return
                                 muelle.plugin.ponerEnDock(
                                     muelle.plugin.idDe(celda.modelData),
-                                    Math.floor((p.x - (muelle.width
+                                    Math.floor((p.x - (marco.width
                                         - muelle.anchoLleno) / 2 - muelle.margen)
                                         / muelle.hueco))
                             }
@@ -1455,14 +1694,17 @@ K4.Ventana {
     //  dos cuentas salían de orígenes distintos y la lupa se agrandaba un
     //  icono al lado del que señalabas.
     MouseArea {
-        width: muelle.width
+        parent: marco
+        width: marco.width
         height: muelle.altoDock
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: marco.horizontalCenter
+        anchors.bottom: marco.bottom
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         onEntered: muelle.dentro = true
         onExited: muelle.dentro = false
+        //  Dentro del marco, así que esta `x` ya viene girada: la lupa compara
+        //  con los centros de los huecos, que están en el mismo marco.
         onPositionChanged: function (ev) { muelle.ratonX = ev.x }
     }
 }

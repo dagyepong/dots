@@ -11,6 +11,14 @@
    "configurable": false
   },
   {
+   "id": "battery",
+   "entry": "Battery/BatteryPlugin.qml",
+   "version": "1.0.0",
+   "title": "Batería",
+   "enabledByDefault": true,
+   "icono": "0xF0079"
+  },
+  {
    "id": "volume",
    "entry": "Volume/VolumePlugin.qml",
    "version": "1.0.0",
@@ -73,8 +81,7 @@
    "version": "1.0.0",
    "title": "Tema de Hyprland",
    "enabledByDefault": true,
-   "icono": "0xF03D8",
-   "aplicacion": true
+   "icono": "0xF03D8"
   },
   {
    "id": "pantallas",
@@ -111,7 +118,7 @@
    "entry": "Game/GamePlugin.qml",
    "version": "1.0.0",
    "title": "Mazmorra",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "icono": "0xF011A",
    "aplicacion": true
   },
@@ -249,6 +256,26 @@
    "permisos": [
     "procesos"
    ]
+  },
+  {
+   "id": "atalaya",
+   "entry": "Atalaya/AtalayaPlugin.qml",
+   "version": "1.0.0",
+   "title": "Atalaya",
+   "enabledByDefault": true,
+   "icono": "0xF0570",
+   "aplicacion": true,
+   "permisos": [
+    "procesos"
+   ]
+  },
+  {
+   "id": "submap",
+   "entry": "Submap/SubmapPlugin.qml",
+   "version": "1.0.0",
+   "title": "Submapa",
+   "enabledByDefault": true,
+   "icono": "0xF030E"
   }
  ],
  "version": "1.1.0"
