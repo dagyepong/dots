@@ -119,7 +119,7 @@ Scope {
         id: root
 
         WlrLayershell.layer: WlrLayer.Overlay
-        exclusionMode: ExclusionMode.Normal
+        exclusionMode: ExclusionMode.Ignore
 
         anchors { top: true }
         margins { top: 0 }
@@ -450,8 +450,8 @@ Scope {
                 delegate: Rectangle {
                     required property var modelData
                     width: modelData.is_active ? 16 : 6
-                    height: 6
-                    radius: 3
+                    height: 5
+                    radius: 2.5
                     color: modelData.is_active ? root.dynamicAccent : "#44444C"
                     Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     MouseArea { anchors.fill: parent; onClicked: root.runCmd("niri msg action focus-workspace " + modelData.idx) }
@@ -460,21 +460,21 @@ Scope {
         }
 
         component ModernBatteryIcon: RowLayout {
-            spacing: 5
-            Text { text: root.batteryCapacity; color: "#FFFFFF"; font.pixelSize: 11; font.bold: true }
+            spacing: 4
+            Text { text: root.batteryCapacity; color: "#FFFFFF"; font.pixelSize: 10; font.bold: true }
             Item {
-                width: 22; height: 11
+                width: 20; height: 10
                 Rectangle {
-                    anchors.fill: parent; radius: 3; color: "transparent"
+                    anchors.fill: parent; radius: 2.5; color: "transparent"
                     border.color: root.batteryStatus === "Charging" ? "#00FF88" : (root.batteryPctVal <= 20 ? "#FF453A" : "#FFFFFF")
                     border.width: 1.2
                     Rectangle {
                         anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.margins: 1.5
-                        width: Math.max(2, (parent.width - 3) * (root.batteryPctVal / 100.0)); radius: 1.5; color: parent.border.color
+                        width: Math.max(2, (parent.width - 3) * (root.batteryPctVal / 100.0)); radius: 1.2; color: parent.border.color
                     }
                 }
                 Rectangle {
-                    width: 1.5; height: 4; radius: 0.75
+                    width: 1.5; height: 3.5; radius: 0.75
                     color: root.batteryStatus === "Charging" ? "#00FF88" : (root.batteryPctVal <= 20 ? "#FF453A" : "#FFFFFF")
                     anchors.left: parent.right; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter
                 }
@@ -530,14 +530,14 @@ Scope {
         Rectangle {
             id: mainPill
             property bool showStandalonePlayer: !root.expanded && root.hasMedia && root.isPlaying
-            implicitHeight: root.expanded ? 700 : (showStandalonePlayer ? 130 : 36)
-            implicitWidth: root.expanded ? 800 : (showStandalonePlayer ? 340 : compactContent.implicitWidth + 28)
+            implicitHeight: root.expanded ? 700 : (showStandalonePlayer ? 110 : 30)
+            implicitWidth: root.expanded ? 800 : (showStandalonePlayer ? 320 : compactContent.implicitWidth + 24)
             
-            radius: root.expanded ? 24 : (showStandalonePlayer ? 20 : 18)
+            radius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
             topLeftRadius: 0
             topRightRadius: 0
-            bottomLeftRadius: root.expanded ? 24 : (showStandalonePlayer ? 20 : 18)
-            bottomRightRadius: root.expanded ? 24 : (showStandalonePlayer ? 20 : 18)
+            bottomLeftRadius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
+            bottomRightRadius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
 
             color: "#000000"
             transformOrigin: Item.Top
@@ -578,41 +578,41 @@ Scope {
 
             RowLayout {
                 id: compactContent
-                anchors.centerIn: parent; height: 36; spacing: 10
+                anchors.centerIn: parent; height: 30; spacing: 8
                 visible: !root.expanded && !mainPill.showStandalonePlayer
 
                 Rectangle {
-                    width: 22; height: 22; radius: 11; color: "#1E1E24"
-                    Text { anchors.centerIn: parent; text: "🔍"; font.pixelSize: 10 }
+                    width: 18; height: 18; radius: 9; color: "#1E1E24"
+                    Text { anchors.centerIn: parent; text: "🔍"; font.pixelSize: 9 }
                     MouseArea { anchors.fill: parent; onClicked: root.launchAppLauncher() }
                 }
 
                 NiriWorkspaceBar {}
 
-                Rectangle { width: 1; height: 12; color: "#FFFFFF"; opacity: 0.15 }
+                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
 
                 Text {
                     text: root.timeStr
                     color: "#FFFFFF"
-                    font.pixelSize: 11
+                    font.pixelSize: 10
                     font.bold: true
                 }
 
-                Rectangle { width: 1; height: 12; color: "#FFFFFF"; opacity: 0.15 }
+                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
 
                 RowLayout {
-                    spacing: 4
+                    spacing: 3
                     Repeater {
                         model: SystemTray.items
                         delegate: Item {
-                            width: 16; height: 16
+                            width: 14; height: 14
                             required property var modelData
-                            Image { anchors.centerIn: parent; width: 14; height: 14; source: modelData.icon || ""; fillMode: Image.PreserveAspectFit; smooth: true }
+                            Image { anchors.centerIn: parent; width: 12; height: 12; source: modelData.icon || ""; fillMode: Image.PreserveAspectFit; smooth: true }
                         }
                     }
                 }
 
-                Rectangle { width: 1; height: 12; color: "#FFFFFF"; opacity: 0.15 }
+                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
                 ModernBatteryIcon {}
             }
 
@@ -676,7 +676,6 @@ Scope {
                     }
                 }
 
-                // Tailscale Card Component Integration
                 TailscaleCard { Layout.fillWidth: true }
 
                 Rectangle {
@@ -731,126 +730,6 @@ Scope {
                                     Item { Layout.fillWidth: true }
                                     Text { text: root.cpuTempStr; color: "#00FF88"; font.pixelSize: 10; font.bold: true }
                                 }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true; Layout.fillHeight: true; radius: 16; color: "#141418"
-                        ColumnLayout {
-                            anchors.fill: parent; anchors.margins: 12; spacing: 8
-                            Text { text: "Pomodoro Focus"; color: "#FFFFFF"; font.bold: true; font.pixelSize: 11 }
-                            Item { Layout.fillHeight: true }
-                            Text { text: root.formatTimerDisplay(root.timerSecondsLeft); color: "#FFFFFF"; font.pixelSize: 30; font.bold: true; Layout.alignment: Qt.AlignHCenter }
-                            Item { Layout.fillHeight: true }
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Rectangle {
-                                    Layout.fillWidth: true; height: 28; radius: 6; color: "#222228"
-                                    MouseArea { anchors.fill: parent; onClicked: if (!root.timerRunning) { root.timerMinutes = (root.timerMinutes + 5) % 60; root.syncTimerFromInputs(); } }
-                                    Text { anchors.centerIn: parent; text: "+5m"; color: "#AAAAAA"; font.pixelSize: 10; font.bold: true }
-                                }
-                                Rectangle {
-                                    Layout.fillWidth: true; height: 28; radius: 6
-                                    color: root.timerRunning ? "#E08200" : "#FF9500"
-                                    MouseArea { anchors.fill: parent; onClicked: root.timerRunning = !root.timerRunning }
-                                    Text { anchors.centerIn: parent; text: root.timerRunning ? "Pause" : "Start"; color: "#FFFFFF"; font.pixelSize: 10; font.bold: true }
-                                }
-                                Rectangle {
-                                    width: 28; height: 28; radius: 6; color: "#222228"
-                                    MouseArea { anchors.fill: parent; onClicked: { root.timerRunning = false; root.syncTimerFromInputs(); } }
-                                    Text { anchors.centerIn: parent; text: "↺"; color: "#FFFFFF"; font.pixelSize: 11 }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    PanelWindow {
-        id: osdWindow
-
-        WlrLayershell.layer: WlrLayer.Overlay
-        exclusionMode: ExclusionMode.Ignore
-
-        anchors { bottom: true }
-        margins { bottom: 70 }
-
-        implicitWidth: 240
-        implicitHeight: 64
-        color: "transparent"
-        visible: rootScope.osdVisible
-
-        Rectangle {
-            anchors.fill: parent
-            radius: 18
-            color: "#121216"
-            border.color: "#2A2A32"
-            border.width: 1
-            opacity: rootScope.osdVisible ? 1.0 : 0.0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (rootScope.osdTitle === "Volume" || rootScope.osdTitle === "Muted") {
-                        root.runCmd("bash -c 'sinks=( $(pactl list short sinks | awk \"{print \\$2}\") ); current=$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep \"node.name\" | cut -d'\"' -f2); for i in \"\\${!sinks[@]}\"; do if [ \"\\${sinks[\\$i]}\" = \"\\$current\" ]; then next=\\$(( (i+1) % \\${#sinks[@]} )); pactl set-default-sink \"\\${sinks[\\$next]}\"; notify-send \"Audio Output\" \"Switched to \\${sinks[\\$next]}\"; break; fi; done'");
-                    }
-                }
-            }
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 12
-
-                Text {
-                    text: rootScope.osdIcon
-                    font.pixelSize: 22
-                    Layout.alignment: Qt.AlignVCenter
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: rootScope.osdTitle
-                            color: "#8E8E93"
-                            font.pixelSize: 11
-                            font.bold: true
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: rootScope.osdPercent + "%"
-                            color: "#FFFFFF"
-                            font.pixelSize: 11
-                            font.bold: true
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: "#22222A"
-
-                        Rectangle {
-                            height: parent.height
-                            width: parent.width * (rootScope.osdPercent / 100.0)
-                            radius: 3
-                            color: rootScope.osdTitle === "Brightness" ? "#F59E0B" : (rootScope.osdTitle === "Kbd Backlight" ? "#10B981" : root.dynamicAccent)
-
-                            Behavior on width {
-                                NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
                             }
                         }
                     }
