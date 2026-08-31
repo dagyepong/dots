@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -35,27 +36,23 @@ Scope {
         stdout: SplitParser {
             onRead: data => {
                 let trimmed = data.trim();
-                if (trimmed.startsWith("Volume:")) {
-                    let isMuted = trimmed.includes("[MUTED]");
-                    let val = parseFloat(trimmed.split(" ")[1]) || 0;
-                    let pct = Math.round(val * 100);
-                    let icon = isMuted ? "🔇" : (pct === 0 ? "🔈" : (pct > 50 ? "🔊" : "🔉"));
-                    rootScope.triggerOsd(icon, isMuted ? "Muted" : "Volume", pct);
-                } else {
-                    let pct = parseInt(trimmed) || 0;
-                    rootScope.triggerOsd("🔊", "Volume", pct);
-                }
+                let isMuted = trimmed.includes("[MUTED]");
+                let numericPart = trimmed.replace("Volume:", "").replace("[MUTED]", "").trim();
+                let val = parseFloat(numericPart) || 0;
+                let pct = Math.round(val <= 1.0 ? val * 100 : val);
+                let icon = isMuted ? "🔇" : (pct === 0 ? "🔈" : (pct > 50 ? "🔊" : "🔉"));
+                rootScope.triggerOsd(icon, isMuted ? "Muted" : "Volume", pct);
             }
         }
     }
 
     Process {
         id: volEventSubscriber
-        command: ["bash", "-c", "pactl subscribe 2>/dev/null | grep --line-buffered \"change\""]
+        command: ["bash", "-c", "pactl subscribe 2>/dev/null | grep --line-buffered -E 'change|new|remove'"]
         running: true
         stdout: SplitParser {
             onRead: data => {
-                if (data.includes("sink")) {
+                if (data.includes("sink") || data.includes("server")) {
                     volPoller.running = true;
                 }
             }
@@ -122,7 +119,7 @@ Scope {
         exclusionMode: ExclusionMode.Ignore
 
         anchors { top: true }
-        margins { top: 0 }
+        margins { top: -4 }
 
         implicitHeight: mainPill.implicitHeight
         implicitWidth: mainPill.implicitWidth
@@ -136,15 +133,11 @@ Scope {
         }
 
         function launchAppLauncher() {
-            runCmd("niri msg action spawn -- fuzzel || niri msg action spawn -- rofi -show drun || niri msg action spawn -- app-launcher")
+            runCmd("fuzzel || rofi -show drun || app-launcher")
         }
 
         function openWifiPicker() {
-            runCmd("niri msg action spawn -- foot -e nmtui || niri msg action spawn -- nm-connection-editor")
-        }
-
-        function openBtPicker() {
-            runCmd("niri msg action spawn -- blueman-manager || niri msg action spawn -- foot -e bluetoothctl")
+            runCmd("foot -e nmtui || nm-connection-editor")
         }
 
         property bool expanded: false
@@ -166,7 +159,11 @@ Scope {
 
         property bool wifiEnabled: false
         property string wifiSsid: "Disconnected"
-        property bool btPowered: false
+
+        // Recommendation widget configuration using sudo for the entire update block
+        property string recommendationText: "System Update Available"
+        property string recommendationSub: "emaint & emerge @world"
+        property string recommendationCmd: "foot -e sudo bash -c 'emaint sync -a && emerge -avuDN @world; echo \"Press enter to close\"; read'"
 
         Process {
             id: wifiInfoProc
@@ -183,12 +180,6 @@ Scope {
                     }
                 }
             }
-        }
-
-        Process {
-            id: btStatusProc
-            command: ["bash", "-c", "rfkill list bluetooth 2>/dev/null | grep -q 'Soft blocked: no'"]
-            onExited: (code) => { root.btPowered = (code === 0); }
         }
 
         property var niriWorkspaces: []
@@ -335,33 +326,6 @@ Scope {
             }
         }
 
-        property int timerHours: 0
-        property int timerMinutes: 25
-        property int timerSecondsLeft: 1500
-        property bool timerRunning: false
-
-        Timer {
-            id: mainPomodoroTimer
-            interval: 1000
-            running: root.timerRunning
-            repeat: true
-            onTriggered: {
-                if (root.timerSecondsLeft > 0) root.timerSecondsLeft--;
-                else { root.timerRunning = false; root.runCmd("notify-send 'Timer Complete!' 'Your focus session has finished.'"); }
-            }
-        }
-
-        function syncTimerFromInputs() {
-            if (!root.timerRunning) root.timerSecondsLeft = (root.timerHours * 3600) + (root.timerMinutes * 60);
-        }
-
-        function formatTimerDisplay(totalSecs) {
-            let h = Math.floor(totalSecs / 3600);
-            let m = Math.floor((totalSecs % 3600) / 60);
-            let s = totalSecs % 60;
-            return h > 0 ? (h < 10 ? "0" + h : h) + ":" + (m < 10 ? "0" + m : m) : (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-        }
-
         property int cpuUsagePct: 0
         property int ramUsagePct: 0
         property string cpuTempStr: "--°C"
@@ -422,7 +386,6 @@ Scope {
             triggeredOnStart: true
             onTriggered: {
                 wifiInfoProc.running = true;
-                btStatusProc.running = true;
                 batProc.running = true;
                 batStatProc.running = true;
                 root.updateNiriWorkspaces();
@@ -527,41 +490,51 @@ Scope {
             }
         }
 
-        Rectangle {
+        Item {
             id: mainPill
             property bool showStandalonePlayer: !root.expanded && root.hasMedia && root.isPlaying
             implicitHeight: root.expanded ? 700 : (showStandalonePlayer ? 110 : 30)
             implicitWidth: root.expanded ? 800 : (showStandalonePlayer ? 320 : compactContent.implicitWidth + 24)
-            
-            radius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
-            topLeftRadius: 0
-            topRightRadius: 0
-            bottomLeftRadius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
-            bottomRightRadius: root.expanded ? 24 : (showStandalonePlayer ? 18 : 15)
-
-            color: "#000000"
-            transformOrigin: Item.Top
-
-            transform: Scale {
-                id: dropletScale
-                yScale: 1.0
-                xScale: 1.0
-                origin.x: mainPill.width / 2
-                origin.y: 0
-            }
 
             Behavior on implicitWidth {
-                SpringAnimation {
-                    spring: 4.2
-                    damping: 0.30
-                    epsilon: 0.1
-                }
+                SpringAnimation { spring: 4.2; damping: 0.30; epsilon: 0.1 }
             }
             Behavior on implicitHeight {
-                SpringAnimation {
-                    spring: 4.8
-                    damping: 0.22
-                    epsilon: 0.1
+                SpringAnimation { spring: 4.8; damping: 0.22; epsilon: 0.1 }
+            }
+
+            Shape {
+                anchors.fill: parent
+                ShapePath {
+                    fillColor: "#000000"
+                    strokeColor: "transparent"
+
+                    startX: 15; startY: 0
+                    PathLine { x: mainPill.width / 2 - 35; y: 0 }
+                    PathCubic {
+                        x: mainPill.width / 2 - 15
+                        y: -10
+                        control1X: mainPill.width / 2 - 25
+                        control1Y: 0
+                        control2X: mainPill.width / 2 - 20
+                        control2Y: -10
+                    }
+                    PathCubic {
+                        x: mainPill.width / 2 + 35
+                        y: 0
+                        control1X: mainPill.width / 2 + 20
+                        control1Y: -10
+                        control2X: mainPill.width / 2 + 25
+                        control2Y: 0
+                    }
+                    PathLine { x: mainPill.width - 15; y: 0 }
+                    PathArc { x: mainPill.width; y: 15; radiusX: 15; radiusY: 15 }
+                    PathLine { x: mainPill.width; y: mainPill.height - 15 }
+                    PathArc { x: mainPill.width - 15; y: mainPill.height; radiusX: 15; radiusY: 15 }
+                    PathLine { x: 15; y: mainPill.height }
+                    PathArc { x: 0; y: mainPill.height - 15; radiusX: 15; radiusY: 15 }
+                    PathLine { x: 0; y: 15 }
+                    PathArc { x: 15; y: 0; radiusX: 15; radiusY: 15 }
                 }
             }
 
@@ -658,20 +631,25 @@ Scope {
                         }
                     }
 
+                    // System update execution widget with explicit sudo wrapper
                     Rectangle {
                         Layout.fillWidth: true; height: 54; radius: 14
-                        color: root.btPowered ? "#2E1065" : "#141418"
-                        border.color: root.btPowered ? root.dynamicAccent : "transparent"; border.width: 1
+                        color: "#141418"
+                        border.color: root.dynamicAccent; border.width: 1
                         RowLayout {
                             anchors.fill: parent; anchors.margins: 10; spacing: 10
-                            Text { text: "ᛡ"; color: root.btPowered ? root.dynamicAccent : "#FFFFFF"; font.pixelSize: 14; MouseArea { anchors.fill: parent; onClicked: { root.runCmd(root.btPowered ? "rfkill block bluetooth || bluetoothctl power off" : "rfkill unblock bluetooth || bluetoothctl power on"); root.btPowered = !root.btPowered; } } }
+                            Text { text: "💡"; font.pixelSize: 14 }
                             ColumnLayout {
                                 Layout.fillWidth: true; spacing: 1
-                                Text { text: "Bluetooth"; color: "#FFFFFF"; font.bold: true; font.pixelSize: 12 }
-                                Text { text: root.btPowered ? "Active" : "Off"; color: root.btPowered ? root.dynamicAccent : "#888888"; font.pixelSize: 10 }
-                                MouseArea { anchors.fill: parent; onClicked: root.openBtPicker() }
+                                Text { text: root.recommendationText; color: "#FFFFFF"; font.bold: true; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+                                Text { text: root.recommendationSub; color: root.dynamicAccent; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
                             }
-                            Text { text: "⚙"; color: "#888888"; font.pixelSize: 12; MouseArea { anchors.fill: parent; onClicked: root.openBtPicker() } }
+                            Text { text: "▶"; color: "#888888"; font.pixelSize: 10 }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.runCmd(root.recommendationCmd)
                         }
                     }
                 }
