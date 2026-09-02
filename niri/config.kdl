@@ -83,7 +83,7 @@ layout {
     }
 
     struts {
-      top 36
+    //  top 33
     }
 }
 

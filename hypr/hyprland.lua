@@ -57,3 +57,12 @@ hl.on("hyprland.start", function ()
 end)
 
 -- vim: set ts=2 sw=2 tw=0 fdm=marker ft=lua et :
+
+-- k4: atajos y arranque de la barra
+require("config.k4")
+
+-- k4: tema gestionado desde la barra (debe ir el último)
+require("config.k4-theme")
+
+-- Brain_ShellKeybinds
+dofile("/home/nana/.config/Brain_Shell/Brain_ShellKeybinds.lua")
