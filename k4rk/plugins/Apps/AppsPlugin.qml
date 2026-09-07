@@ -1,0 +1,179 @@
+//  El centro de aplicaciones: todo lo que la barra sabe abrir, en una rejilla.
+//
+//  La barra tiene once cosas que son aplicaciones —la mazmorra, el editor, el
+//  portapapeles, los atajos…— y hasta ahora la única forma de llegar a ellas
+//  era saberse el atajo o el nombre del comando. Eso está bien para quien la
+//  configuró y es invisible para todos los demás, y sobre todo deja fuera a
+//  los plugins instalados: un juego que te bajas no tiene atajo hasta que te
+//  lo pones.
+//
+//  Es el cajón de aplicaciones del móvil, y a propósito: rejilla, buscador
+//  arriba, escribes y filtras, Enter abre. Nadie tiene que aprender nada.
+//
+//  Qué sale aquí lo dice el catálogo (`aplicacion: true`), no el código: así
+//  un plugin de fuera entra solo con declararlo en su manifiesto.
+
+import QtQuick
+import K4 as K4
+import "../../services"
+
+K4.Plugin {
+    id: self
+
+    name: "apps"
+    title: "Applications"
+    priority: 72
+    colocable: true
+    active: abierto
+    grabKeyboard: abierto
+    islandWidth: 700
+    islandHeight: 520
+
+    property bool abierto: false
+    property string busqueda: ""
+    property int seleccion: 0
+    //  Con esto puesto, la rejilla se aparta y sale la lista de
+    //  actualizaciones pendientes, cada una con su interruptor.
+    property bool modoActualizaciones: false
+
+    //  The packages plugin, injected by catalog id. It owns updates now;
+    //  when it is not there — off, or no backend on this machine — the
+    //  facade below turns its absence into honest zeros, so the updates
+    //  view reads one shape either way and hides on its own.
+    property var packages: null
+    readonly property var paq: ({
+        pendientes: packages ? packages.pendientes : 0,
+        pendientesRepo: packages ? packages.pendientesRepo : 0,
+        pendientesAur: packages ? packages.pendientesAur : 0,
+        marcadas: packages ? packages.marcadas : 0,
+        comprobando: packages ? packages.comprobando : false,
+        detalles: packages ? packages.detalles : [],
+        excluidos: packages ? packages.excluidos : ({}),
+        nombresPendientes: packages ? packages.nombresPendientes : [],
+        comprobar: function (forzar) {
+            if (packages) packages.comprobar(forzar)
+        },
+        alternarExcluida: function (nombre) {
+            if (packages) packages.alternarExcluida(nombre)
+        },
+        actualizarMarcadas: function () {
+            if (packages) packages.actualizarMarcadas()
+        },
+        actualizarTodo: function () {
+            if (packages) packages.actualizarTodo()
+        }
+    })
+
+    //  Las de la barra, filtradas por lo que se escribe. Una apagada NO
+    //  desaparece: sale en gris. Que algo se esfume al apagarlo obliga a
+    //  adivinar dónde se fue; en gris se ve que está y por qué no se abre.
+    readonly property var lista: {
+        const todas = PluginManager.aplicaciones
+        const q = busqueda.trim().toLowerCase()
+        if (q.length === 0)
+            return todas
+        return todas.filter(function (a) {
+            return a.nombre.toLowerCase().indexOf(q) >= 0
+        })
+    }
+
+    readonly property int columnas: 5
+
+    view: Component { AppsView { plugin: self } }
+
+    function abrirse() {
+        busqueda = ""
+        seleccion = 0
+        modoActualizaciones = false
+        abierto = true
+        if (packages)
+            packages.comprobar(false)
+    }
+
+    //  Entrar directo a elegir qué actualizar: lo usa el lanzador.
+    function abrirActualizaciones() {
+        abrirse()
+        modoActualizaciones = true
+    }
+
+    function toggle() {
+        if (abierto)
+            cerrar()
+        else
+            abrirse()
+    }
+
+    function cerrar() { abierto = false }
+    function close() { cerrar() }
+
+    //  Abrir la elegida: se cierra ANTES, que si no las dos piden la island a
+    //  la vez y gana la de más prioridad —que es esta— y parece que no ha
+    //  pasado nada.
+    function lanzar(id) {
+        cerrar()
+        PluginManager.abrirAplicacion(id)
+    }
+
+    function lanzarSeleccion() {
+        if (seleccion >= 0 && seleccion < lista.length)
+            lanzar(lista[seleccion].id)
+    }
+
+    function mover(dx, dy) {
+        if (lista.length === 0)
+            return
+        let n = seleccion + dx + dy * columnas
+        //  En los bordes se queda, no da la vuelta: saltar de la última a la
+        //  primera con una flecha desorienta más de lo que ayuda.
+        seleccion = Math.max(0, Math.min(lista.length - 1, n))
+    }
+
+    //  Y anunciarse en el lanzador de aplicaciones del escritorio.
+    //
+    //  Los dos cajones se quedan separados a propósito —son preguntas
+    //  distintas: «abre un programa de mi ordenador» son cientos de entradas,
+    //  «abre una parte de la barra» son once, y mezclarlas entierra las
+    //  once—. Pero separarlos deja un agujero: escribir «portapapeles» en
+    //  SUPER+Space y que no salga NADA es exactamente la sensación de que
+    //  algo no funciona, aunque esté a un atajo de distancia.
+    //
+    //  Así que se anuncian: dos cajones, una sola búsqueda que encuentra
+    //  todo. Y lo hace este módulo y no cada plugin, porque el que sabe qué
+    //  es una «aplicación de la barra» es este.
+    property var enElLanzador: K4.Lanzador {
+        plugin: "apps"
+
+        onBuscando: function (texto) {
+            const q = texto.trim().toLowerCase()
+            //  Con una letra sale medio mundo; a partir de dos ya es una
+            //  intención.
+            if (q.length < 2) {
+                resultados = []
+                return
+            }
+            resultados = PluginManager.aplicaciones
+                .filter(function (a) {
+                    return a.habilitado
+                        && a.nombre.toLowerCase().indexOf(q) >= 0
+                })
+                .map(function (a) {
+                    //  Cada una con SU icono, en los dos campos que el
+                    //  lanzador entiende. Iba en `icono`, que es el nombre de
+                    //  un icono del escritorio, y ninguna aplicación de la
+                    //  barra tiene uno: salían todas sin icono.
+                    return { id: a.id, titulo: a.nombre,
+                             desc: "Bar application",
+                             imagen: a.imagen, glifo: a.glifo }
+                })
+        }
+
+        onElegido: function (id) { PluginManager.abrirAplicacion(id) }
+    }
+
+    K4.Ipc {
+        target: "k4.apps"
+        function toggle(): void { self.toggle() }
+        function open(): void { self.abrirse() }
+        function close(): void { self.cerrar() }
+    }
+}

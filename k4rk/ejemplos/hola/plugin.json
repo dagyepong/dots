@@ -1,0 +1,9 @@
+{
+  "id": "hola",
+  "entry": "HolaPlugin.qml",
+  "version": "1.0.0",
+  "title": "Hello",
+  "description": "The guide's minimal plugin: a view, a counter and its settings",
+  "host": ">=1.1.0",
+  "permisos": []
+}

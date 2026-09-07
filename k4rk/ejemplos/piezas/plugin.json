@@ -1,0 +1,9 @@
+{
+  "id": "piezas",
+  "entry": "PiezasPlugin.qml",
+  "version": "1.0.0",
+  "title": "Pieces",
+  "description": "Showcase of the API's visual components",
+  "host": ">=1.1.0",
+  "permisos": []
+}

@@ -1,0 +1,9 @@
+{
+  "id": "snake",
+  "entry": "SnakePlugin.qml",
+  "version": "1.0.0",
+  "title": "Snake",
+  "description": "The usual snake, playable in the island",
+  "host": ">=1.1.0",
+  "permisos": []
+}
