@@ -1,0 +1,4 @@
+singleton PetManager PetManager.qml
+singleton WindowTracker WindowTracker.qml
+singleton InputTracker InputTracker.qml
+singleton SystemMonitor SystemMonitor.qml

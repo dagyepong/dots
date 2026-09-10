@@ -1,0 +1,96 @@
+{
+  "schema": 2,
+  "gx": 1700.8648707548232,
+  "gy": 779.1914641609596,
+  "homeGX": 1642.3263881784164,
+  "homeGY": 172.67776890337345,
+  "happiness": 0.5791108295290389,
+  "mood": 0.7859429991035369,
+  "restDrive": 0.101215892,
+  "exploreDrive": 0.6975895000000001,
+  "socialDrive": 0.003437121324728963,
+  "comfortDrive": 0.026310637750641176,
+  "playDrive": 0.2605304986650226,
+  "alertness": 0.9997945636272983,
+  "boredom": 0,
+  "thoughts": [
+    {
+      "type": "cursor_greet",
+      "time": 1789083301538,
+      "x": 1642,
+      "y": 173,
+      "state": "idle",
+      "mood": 0.54,
+      "drives": {
+        "rest": 0.1,
+        "explore": 0.3,
+        "social": 0.2,
+        "play": 0.1
+      }
+    },
+    {
+      "type": "petted",
+      "time": 1789083308364,
+      "x": 1642,
+      "y": 173,
+      "state": "idle",
+      "mood": 0.79,
+      "drives": {
+        "rest": 0.1,
+        "explore": 1,
+        "social": 0,
+        "play": 0.26
+      }
+    },
+    {
+      "type": "adventure",
+      "time": 1789083313727,
+      "x": 1642,
+      "y": 173,
+      "state": "idle",
+      "mood": 0.79,
+      "drives": {
+        "rest": 0.1,
+        "explore": 1,
+        "social": 0,
+        "play": 0.26
+      }
+    },
+    {
+      "type": "arrived",
+      "time": 1789083317968,
+      "x": 1701,
+      "y": 779,
+      "state": "walk",
+      "mood": 0.79,
+      "drives": {
+        "rest": 0.1,
+        "explore": 1,
+        "social": 0,
+        "play": 0.26
+      },
+      "intent": "adventure"
+    }
+  ],
+  "visitedCells": {
+    "8,0": 1
+  },
+  "windowPrefs": {},
+  "placeMemory": {
+    "4,0": {
+      "affect": 0.170145,
+      "visits": 2,
+      "lastVisit": 1789083308364
+    },
+    "4,1": {
+      "affect": 0.015,
+      "visits": 1,
+      "lastVisit": 1789083317968
+    }
+  },
+  "relationships": {},
+  "learnedTraits": null,
+  "userRhythm": {
+    "18": 0.5148137453218671
+  }
+}

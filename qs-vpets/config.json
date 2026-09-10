@@ -1,0 +1,16 @@
+{
+  "pets": [
+    {
+      "name": "Mochi",
+      "sprite": "charizard",
+      "personality": "energetic",
+      "scale": 2,
+      "monitor": "",
+      "actions": {}
+    }
+  ],
+  "behavior": {
+    "idleTimeout": 300,
+    "walkSpeed": 120
+  }
+}

@@ -1,0 +1,3 @@
+PetWindow PetWindow.qml
+Pet Pet.qml
+SpriteAnimation SpriteAnimation.qml
