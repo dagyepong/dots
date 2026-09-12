@@ -108,10 +108,10 @@ config() {
     declare -g use_glyphs=true
     declare -g use_badges=true
 
-    # Define custom colors
-    declare -g color_primary="#f5992e"
-    declare -g color_secondary="#785cea"
-    declare -g color_neutral="#5f5f87"
+    # Define custom colors (Nord / Emerald Mint Palette)
+    declare -g color_primary="#88c0d0"
+    declare -g color_secondary="#b48ead"
+    declare -g color_neutral="#4c566a"
     declare -g color_global
 
     declare -g glyph_badge_left=""
