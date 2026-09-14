@@ -1,3 +1,181 @@
-singleton TailscaleSvc TailscaleSvc.qml
-TailscaleCard TailscaleCard.qml
-singleton Theme Theme.qml
+module QuickshellConfig
+
+singleton Theme              1.0 theme/Theme.qml
+singleton Palettes           1.0 theme/Palettes.qml
+singleton Motion             1.0 theme/Motion.qml
+singleton Board              1.0 theme/Board.qml
+singleton Tr                 1.0 theme/Tr.qml
+
+singleton SettingsService    1.0 services/SettingsService.qml
+singleton ThemeService       1.0 services/ThemeService.qml
+singleton WallpaperService   1.0 services/WallpaperService.qml
+singleton LauncherService    1.0 services/LauncherService.qml
+singleton SystemService      1.0 services/SystemService.qml
+singleton HyprlandService    1.0 services/HyprlandService.qml
+singleton MonitorService     1.0 services/MonitorService.qml
+singleton AudioService       1.0 services/AudioService.qml
+singleton BatteryService     1.0 services/BatteryService.qml
+singleton BrightnessService  1.0 services/BrightnessService.qml
+singleton OsdService         1.0 services/OsdService.qml
+singleton MediaService       1.0 services/MediaService.qml
+singleton NotificationService 1.0 services/NotificationService.qml
+singleton LockService        1.0 services/LockService.qml
+singleton WeatherService     1.0 services/WeatherService.qml
+singleton SessionService     1.0 services/SessionService.qml
+singleton NetworkService     1.0 services/NetworkService.qml
+singleton FontService        1.0 services/FontService.qml
+singleton StatsService       1.0 services/StatsService.qml
+singleton TimerService       1.0 services/TimerService.qml
+singleton CavaService        1.0 services/CavaService.qml
+singleton CompositorService  1.0 services/CompositorService.qml
+singleton BluetoothService   1.0 services/BluetoothService.qml
+singleton ClaudeService      1.0 services/ClaudeService.qml
+singleton UpdatesService     1.0 services/UpdatesService.qml
+singleton PetService         1.0 services/PetService.qml
+singleton ModuleService      1.0 services/ModuleService.qml
+singleton ShortcutService    1.0 services/ShortcutService.qml
+singleton AccountService     1.0 services/AccountService.qml
+singleton MachineService     1.0 services/MachineService.qml
+singleton DesktopService     1.0 services/DesktopService.qml
+singleton DockService        1.0 services/DockService.qml
+singleton ControlsService    1.0 services/ControlsService.qml
+singleton GamesService       1.0 services/GamesService.qml
+singleton NotesService       1.0 services/NotesService.qml
+singleton TasksService       1.0 services/TasksService.qml
+singleton DeckService        1.0 services/DeckService.qml
+singleton PickerService      1.0 services/PickerService.qml
+singleton CaptureService     1.0 services/CaptureService.qml
+singleton RecorderService    1.0 services/RecorderService.qml
+singleton ClipboardService   1.0 services/ClipboardService.qml
+singleton SunsetService      1.0 services/SunsetService.qml
+singleton IdleService        1.0 services/IdleService.qml
+singleton GithubService      1.0 services/GithubService.qml
+singleton PackagesService    1.0 services/PackagesService.qml
+singleton ProfileService     1.0 services/ProfileService.qml
+
+Card             1.0 components/Card.qml
+ColorSwatch      1.0 components/ColorSwatch.qml
+QuickTile        1.0 components/QuickTile.qml
+ToggleSwitch     1.0 components/ToggleSwitch.qml
+SegmentedControl 1.0 components/SegmentedControl.qml
+SettingRow       1.0 components/SettingRow.qml
+RingIndicator    1.0 components/RingIndicator.qml
+ContributionGrid 1.0 components/ContributionGrid.qml
+Sparkline        1.0 components/Sparkline.qml
+Spectrum         1.0 components/Spectrum.qml
+NotchFillet      1.0 components/NotchFillet.qml
+ClaudeMark       1.0 components/ClaudeMark.qml
+PaletteBoard     1.0 components/PaletteBoard.qml
+PetFace          1.0 components/PetFace.qml
+PetFamily        1.0 components/PetFamily.qml
+PetShelf         1.0 components/PetShelf.qml
+UsageBar         1.0 components/UsageBar.qml
+Figure           1.0 components/Figure.qml
+Stepper          1.0 components/Stepper.qml
+StatCard         1.0 components/StatCard.qml
+SliderRow        1.0 components/SliderRow.qml
+IconButton       1.0 components/IconButton.qml
+PillButton       1.0 components/PillButton.qml
+SettingSlider    1.0 components/SettingSlider.qml
+SettingTiles     1.0 components/SettingTiles.qml
+PreviewTile      1.0 components/PreviewTile.qml
+BarPreview       1.0 components/BarPreview.qml
+WindowsPreview   1.0 components/WindowsPreview.qml
+SettingsHero     1.0 components/SettingsHero.qml
+Avatar           1.0 components/Avatar.qml
+SettingField     1.0 components/SettingField.qml
+GroupHeading     1.0 components/GroupHeading.qml
+TabStrip         1.0 components/TabStrip.qml
+LidPreview       1.0 components/LidPreview.qml
+MotionPreview    1.0 components/MotionPreview.qml
+IslandMotionPreview 1.0 components/IslandMotionPreview.qml
+StyleSwatch      1.0 components/StyleSwatch.qml
+EditTray         1.0 components/EditTray.qml
+Sticky           1.0 components/Sticky.qml
+PopMenu          1.0 components/PopMenu.qml
+
+Bar              1.0 bar/Bar.qml
+Deck             1.0 deck/Deck.qml
+DynamicIsland    1.0 bar/widgets/DynamicIsland.qml
+WorkspacesWidget 1.0 bar/widgets/WorkspacesWidget.qml
+BatteryWidget    1.0 bar/widgets/BatteryWidget.qml
+BarZone          1.0 bar/widgets/BarZone.qml
+BarChip          1.0 bar/widgets/BarChip.qml
+
+IslandState      1.0 bar/island/IslandState.qml
+IslandRest       1.0 bar/island/IslandRest.qml
+IslandSummary    1.0 bar/island/IslandSummary.qml
+DetailFace       1.0 bar/island/DetailFace.qml
+OsdLayer         1.0 bar/island/OsdLayer.qml
+TimerWidget      1.0 bar/widgets/TimerWidget.qml
+NotificationLayer 1.0 bar/island/NotificationLayer.qml
+AppearancePanel  1.0 bar/island/AppearancePanel.qml
+ControlsPanel    1.0 bar/island/ControlsPanel.qml
+LauncherPanel    1.0 bar/island/LauncherPanel.qml
+StatsPanel       1.0 bar/island/StatsPanel.qml
+OverviewPanel    1.0 bar/island/OverviewPanel.qml
+
+Module           1.0 bar/modules/Module.qml
+ClockModule      1.0 bar/modules/ClockModule.qml
+MediaModule      1.0 bar/modules/MediaModule.qml
+TimerModule      1.0 bar/modules/TimerModule.qml
+ClaudeModule     1.0 bar/modules/ClaudeModule.qml
+BatteryModule    1.0 bar/modules/BatteryModule.qml
+VolumeModule     1.0 bar/modules/VolumeModule.qml
+BrightnessModule 1.0 bar/modules/BrightnessModule.qml
+NetworkModule    1.0 bar/modules/NetworkModule.qml
+BluetoothModule  1.0 bar/modules/BluetoothModule.qml
+WeatherModule    1.0 bar/modules/WeatherModule.qml
+StatsModule      1.0 bar/modules/StatsModule.qml
+UpdatesModule    1.0 bar/modules/UpdatesModule.qml
+PetModule        1.0 bar/modules/PetModule.qml
+GamesModule      1.0 bar/modules/GamesModule.qml
+NotesModule      1.0 bar/modules/NotesModule.qml
+NotificationsModule 1.0 bar/modules/NotificationsModule.qml
+ChipFace         1.0 bar/modules/ChipFace.qml
+
+SettingsWindow        1.0 settings/SettingsWindow.qml
+SettingsPanel         1.0 settings/SettingsPanel.qml
+SettingsSection       1.0 settings/SettingsSection.qml
+BarSection            1.0 settings/BarSection.qml
+ModulesPart           1.0 settings/ModulesPart.qml
+LayoutEditor          1.0 settings/LayoutEditor.qml
+AppearanceSection     1.0 settings/AppearanceSection.qml
+LauncherSection       1.0 settings/LauncherSection.qml
+SessionSection        1.0 settings/SessionSection.qml
+InputSection          1.0 settings/InputSection.qml
+MonitorsSection       1.0 settings/MonitorsSection.qml
+KeysSection           1.0 settings/KeysSection.qml
+SystemSection         1.0 settings/SystemSection.qml
+ProfilesPart          1.0 settings/ProfilesPart.qml
+ControlsSection       1.0 settings/ControlsSection.qml
+FontPicker            1.0 settings/FontPicker.qml
+LayoutPicker          1.0 settings/LayoutPicker.qml
+ShortcutRow           1.0 settings/ShortcutRow.qml
+
+MediaCard        1.0 bar/island/controls/MediaCard.qml
+CalendarCard     1.0 bar/island/controls/CalendarCard.qml
+LockScreen       1.0 lock/LockScreen.qml
+LockSurface      1.0 lock/LockSurface.qml
+SessionPanel     1.0 bar/island/SessionPanel.qml
+PetPanel         1.0 bar/island/PetPanel.qml
+GamesPanel       1.0 bar/island/GamesPanel.qml
+NotesPanel       1.0 bar/island/NotesPanel.qml
+BoardPanel       1.0 bar/island/BoardPanel.qml
+KeysPanel        1.0 bar/island/KeysPanel.qml
+PackagesPanel    1.0 bar/island/PackagesPanel.qml
+GameBoard        1.0 bar/island/games/GameBoard.qml
+NotificationList 1.0 bar/island/controls/NotificationList.qml
+AppearanceCard   1.0 bar/island/controls/AppearanceCard.qml
+WeatherCard      1.0 bar/island/controls/WeatherCard.qml
+PowerRow         1.0 bar/island/controls/PowerRow.qml
+Block            1.0 bar/island/controls/Block.qml
+BlockFace        1.0 bar/island/controls/BlockFace.qml
+TogglesBlock     1.0 bar/island/controls/TogglesBlock.qml
+ImpastoBlock     1.0 bar/island/controls/ImpastoBlock.qml
+PetBlock         1.0 bar/island/controls/PetBlock.qml
+ClockBlock       1.0 bar/island/controls/ClockBlock.qml
+GamesBlock       1.0 bar/island/controls/GamesBlock.qml
+ControlsTray     1.0 bar/island/controls/ControlsTray.qml
+NetworkDetail    1.0 bar/island/NetworkDetail.qml
+BluetoothDetail  1.0 bar/island/BluetoothDetail.qml

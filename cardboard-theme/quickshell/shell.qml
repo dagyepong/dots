@@ -1,718 +1,465 @@
+// ╭──────────────────────────────────────────────────────────────────────────╮
+// │                                                                          │
+// │   S H E L L                                                              │
+// │   quickshell entry point · windows and top-level wiring                  │
+// │                                                                          │
+// │   github.com/andreumassanet/impasto                                      │
+// │                                                                          │
+// ╰──────────────────────────────────────────────────────────────────────────╯
+
 import QtQuick
-import QtQuick.Layouts
-import QtQuick.Controls
-import QtQuick.Shapes
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
-import Quickshell.Wayland
-import Quickshell.Services.SystemTray
 
-Scope {
-    id: rootScope
+import "./bar"
+import "./capture"
+import "./desktop"
+import "./dock"
+import "./lock"
+import "./services"
+import "./settings"
 
-    property string osdIcon: "🔊"
-    property string osdTitle: "Volume"
-    property int osdPercent: 50
-    property bool osdVisible: false
+// Entry point: the windows, the services that must start at boot, and the
+// wiring between services that may not reference each other.
+ShellRoot {
+    id: root
 
-    Timer {
-        id: osdHideTimer
-        interval: 1800
-        repeat: false
-        onTriggered: rootScope.osdVisible = false
+    // Singletons are built on first use. Each of these has to be running from
+    // boot, not from the moment a panel first reads it.
+    Component.onCompleted: {
+        // Restores the saved palette.
+        void ThemeService.activeId
+        // Builds the launcher index ahead of the first open.
+        void LauncherService.applications
+        // Keeps history, so the graph has data before the panel opens.
+        void StatsService.ready
+        // Re-applies the animation preset and every other overridden
+        // Hyprland option.
+        void CompositorService.animationPreset
+        // Re-applies the monitor arrangement kept for this set of screens.
+        void MonitorService.loaded
+        // Writes the profile's keys to keys.tsv for keybinds.lua.
+        void ShortcutService.catalogue
+        // Reads the user's name and face ahead of the first lock.
+        void AccountService.user
+        // Probes for hyprpicker, so the first press is not the one that asks.
+        void PickerService.available
+        // Starts the clipboard watcher.
+        void ClipboardService.count
+        // Probes the monitor source, so the first take is not silent, and
+        // picks up a take left running by a previous shell.
+        void RecorderService.available
+        // Restores the night light.
+        void SunsetService.available
+        // Arms the idle monitors.
+        void IdleService.lockAfter
+        // Seeds the example profiles on a first install.
+        void ProfileService.arrived
     }
 
-    function triggerOsd(icon, title, value) {
-        rootScope.osdIcon = icon;
-        rootScope.osdTitle = title;
-        rootScope.osdPercent = Math.min(100, Math.max(0, value));
-        rootScope.osdVisible = true;
-        osdHideTimer.restart();
+    // ── SCREENS ─────────────────────────────────────────────────────────────
+    //
+    // Single-screen surfaces are Variants over a list of one. A PanelWindow
+    // whose ShellScreen is destroyed (output unplugged) does not recover when
+    // handed a new one; Variants destroys and rebuilds the window with the
+    // list, which does.
+    readonly property var primaryScreens: {
+        const chosen = MonitorService.primaryScreen
+        return chosen ? [chosen] : []
     }
 
-    Process {
-        id: volPoller
-        command: ["bash", "-c", "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || pamixer --get-volume"]
-        stdout: SplitParser {
-            onRead: data => {
-                let trimmed = data.trim();
-                let isMuted = trimmed.includes("[MUTED]");
-                let numericPart = trimmed.replace("Volume:", "").replace("[MUTED]", "").trim();
-                let val = parseFloat(numericPart) || 0;
-                let pct = Math.round(val <= 1.0 ? val * 100 : val);
-                let icon = isMuted ? "🔇" : (pct === 0 ? "🔈" : (pct > 50 ? "🔊" : "🔉"));
-                rootScope.triggerOsd(icon, isMuted ? "Muted" : "Volume", pct);
-            }
-        }
+    // Built rather than filtered: `Quickshell.screens` is a QML list and has
+    // no `filter`.
+    readonly property var secondaryScreens: {
+        const rest = []
+        for (const screen of Quickshell.screens)
+            if (!MonitorService.isPrimary(screen))
+                rest.push(screen)
+        return rest
     }
 
-    Process {
-        id: volEventSubscriber
-        command: ["bash", "-c", "pactl subscribe 2>/dev/null | grep --line-buffered -E 'change|new|remove'"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                if (data.includes("sink") || data.includes("server")) {
-                    volPoller.running = true;
-                }
-            }
-        }
-    }
+    // Follows the bar when it is rebuilt on another screen.
+    readonly property var island: islandBars.instances[0]?.island ?? null
 
-    Process {
-        id: brightnessProc
-        command: ["bash", "-c", "brightnessctl --machine-readable 2>/dev/null || brightnessctl g"]
-        stdout: SplitParser {
-            onRead: data => {
-                let parts = data.trim().split(",");
-                if (parts.length >= 4) {
-                    let current = parseInt(parts[2]) || 0;
-                    let max = parseInt(parts[3]) || 1;
-                    let pct = Math.round((current / max) * 100);
-                    rootScope.triggerOsd("☀️", "Brightness", pct);
-                }
-            }
-        }
-    }
+    // ── BARS ────────────────────────────────────────────────────────────────
+    //
+    // One island, on the primary screen; every other screen gets a bar
+    // without it. Two islands would draw the same state twice.
+    Variants {
+        id: islandBars
 
-    Process {
-        id: brightnessEventSubscriber
-        command: ["bash", "-c", "brightnessctl --monitor 2>/dev/null"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => { brightnessProc.running = true; }
-        }
-    }
+        model: root.primaryScreens
 
-    Process {
-        id: kbdBrightnessProc
-        command: ["bash", "-c", "brightnessctl --device='*::kbd_backlight' --machine-readable 2>/dev/null || brightnessctl -d '*::kbd_backlight' g"]
-        stdout: SplitParser {
-            onRead: data => {
-                let parts = data.trim().split(",");
-                if (parts.length >= 4) {
-                    let current = parseInt(parts[2]) || 0;
-                    let max = parseInt(parts[3]) || 1;
-                    let pct = Math.round((current / max) * 100);
-                    rootScope.triggerOsd("⌨️", "Kbd Backlight", pct);
-                } else {
-                    let val = parseInt(data.trim()) || 0;
-                    rootScope.triggerOsd("⌨️", "Kbd Backlight", val);
-                }
-            }
+        Bar {
+            required property var modelData
+
+            screen: modelData
         }
     }
 
-    Process {
-        id: kbdBrightnessEventSubscriber
-        command: ["bash", "-c", "brightnessctl --device='*::kbd_backlight' --monitor 2>/dev/null"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => { kbdBrightnessProc.running = true; }
+    Variants {
+        model: root.secondaryScreens
+
+        SecondBar {
+            required property var modelData
+
+            screen: modelData
         }
     }
 
-    PanelWindow {
-        id: root
+    // Widgets under the windows. Primary screen only: a widget is stored by
+    // grid square alone, so a second screen would draw the same widget twice.
+    Variants {
+        model: root.primaryScreens
 
-        WlrLayershell.layer: WlrLayer.Overlay
-        exclusionMode: ExclusionMode.Ignore
+        Desktop {
+            required property var modelData
 
-        anchors { top: true }
-        margins { top: -4 }
-
-        implicitHeight: mainPill.implicitHeight
-        implicitWidth: mainPill.implicitWidth
-        color: "transparent"
-
-        Process { id: execProc }
-
-        function runCmd(cmdStr) {
-            execProc.command = ["bash", "-c", cmdStr]
-            execProc.running = true
+            screen: modelData
         }
+    }
 
-        function launchAppLauncher() {
-            runCmd("fuzzel || rofi -show drun || app-launcher")
+    // The dock has no per-screen state, so it is on every screen.
+    Variants {
+        model: Quickshell.screens
+
+        Dock {
+            required property var modelData
+
+            screen: modelData
+
+            // The dock cannot see the island, so it asks.
+            onLauncherRequested: root.island?.toggle("launcher")
         }
+    }
 
-        function openWifiPicker() {
-            runCmd("foot -e nmtui || nm-connection-editor")
+    // Notes docked on the screen edge. Primary only, for the desktop's reason.
+    Variants {
+        model: root.primaryScreens
+
+        Deck {
+            required property var modelData
+
+            screen: modelData
         }
+    }
 
-        property bool expanded: false
-        property string timeStr: "00:00"
-        property string dateStr: "Sun, Jan 01"
-        property string dynamicAccent: "#3B82F6"
+    // A normal window rather than an island panel, so the island stays
+    // visible while its settings change.
+    SettingsWindow {
+        id: settingsWindow
 
-        Timer {
-            interval: 1000
-            running: true
-            repeat: true
-            triggeredOnStart: true
-            onTriggered: {
-                let d = new Date();
-                root.timeStr = d.toLocaleTimeString(Qt.locale(), "hh:mm ap");
-                root.dateStr = d.toLocaleDateString(Qt.locale(), "ddd, MMM dd");
-            }
+        // The palette and wallpaper pickers live on the island.
+        onPanelRequested: panel => root.island?.open(panel)
+    }
+
+    // The control centre's gear. The island has already closed itself.
+    Connections {
+        target: root.island
+
+        function onSettingsRequested(): void {
+            settingsWindow.open()
         }
+    }
 
-        property bool wifiEnabled: false
-        property string wifiSsid: "Disconnected"
+    Connections {
+        target: DesktopService
 
-        // Recommendation widget configuration using sudo for the entire update block
-        property string recommendationText: "System Update Available"
-        property string recommendationSub: "emaint & emerge @world"
-        property string recommendationCmd: "foot -e sudo bash -c 'emaint sync -a && emerge -avuDN @world; echo \"Press enter to close\"; read'"
-
-        Process {
-            id: wifiInfoProc
-            command: ["bash", "-c", "if [ \"$(cat /sys/class/net/w*/operstate 2>/dev/null | head -n1)\" = \"up\" ]; then nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null | grep '^yes:' | cut -d':' -f2 || echo 'Connected'; else echo 'OFF'; fi"]
-            stdout: SplitParser {
-                onRead: data => {
-                    let trimmed = data.trim();
-                    if (trimmed === "OFF" || trimmed === "" || trimmed === "Disconnected") {
-                        root.wifiSsid = "Disconnected";
-                        root.wifiEnabled = false;
-                    } else {
-                        root.wifiSsid = trimmed;
-                        root.wifiEnabled = true;
-                    }
-                }
-            }
+        function onSettingsRequested(): void {
+            root.island?.close()
+            settingsWindow.open()
         }
+    }
 
-        property var niriWorkspaces: []
-        property int activeWorkspaceId: 1
+    // Optional clipboard wipe on lock. Joined here so neither service depends
+    // on the other. Password-manager copies are never stored in the first
+    // place; this covers everything else.
+    Connections {
+        target: LockService
 
-        function updateNiriWorkspaces() {
-            niriWsFetchProc.running = true;
+        function onLockedChanged(): void {
+            if (LockService.locked && SettingsService.clipboardWipeOnLock)
+                ClipboardService.wipe()
         }
+    }
 
-        Process {
-            id: niriWsFetchProc
-            command: ["bash", "-c", "niri msg --json workspaces 2>/dev/null"]
-            stdout: SplitParser {
-                onRead: data => {
-                    try {
-                        let parsed = JSON.parse(data);
-                        let list = [];
-                        for (let i = 0; i < parsed.length; i++) {
-                            let ws = parsed[i];
-                            list.push({ id: ws.id, idx: ws.idx, name: ws.name || ws.idx.toString(), is_active: ws.is_active, is_focused: ws.is_focused });
-                            if (ws.is_active) root.activeWorkspaceId = ws.id;
-                        }
-                        root.niriWorkspaces = list;
-                    } catch(e) {}
-                }
-            }
+    // ext-session-lock. The bar is not on screen while it is up.
+    LockScreen {}
+
+    // The lock screenshots the desktop before covering it, so it waits until
+    // the island is collapsed and settled.
+    Binding {
+        target: LockService
+        property: "shellQuiet"
+        value: !root.island || (!root.island.expanded && root.island.settled)
+    }
+
+    // Global shortcuts: keybinds.lua binds a key to the name, and the action
+    // lives here, so a new panel needs no compositor config.
+    GlobalShortcut {
+        name: "launcher"
+        description: "Open the island launcher"
+        onPressed: root.island?.toggle("launcher")
+    }
+
+    // ── LID ─────────────────────────────────────────────────────────────────
+    //
+    // Handled here rather than with `switch:` binds in Lua. MonitorService's
+    // display profile is the one owner of whether the panel is lit, and it is
+    // re-applied on hotplug and after config reloads. A `switch:` bind in the
+    // same file as `hl.monitor()` calls is also silently not registered, and
+    // a runtime monitor rule does not survive a reload.
+    GlobalShortcut {
+        name: "lidClosed"
+        description: "The laptop lid was closed"
+        onPressed: MonitorService.lid(true)
+    }
+
+    GlobalShortcut {
+        name: "lidOpened"
+        description: "The laptop lid was opened"
+        onPressed: MonitorService.lid(false)
+    }
+
+    GlobalShortcut {
+        name: "controls"
+        description: "Open the island quick controls"
+        onPressed: root.island?.toggle("controls")
+    }
+
+    GlobalShortcut {
+        name: "overview"
+        description: "Open the workspace overview"
+        onPressed: root.island?.toggle("overview")
+    }
+
+    GlobalShortcut {
+        name: "stats"
+        description: "Open the system statistics"
+        onPressed: root.island?.toggle("stats")
+    }
+
+    GlobalShortcut {
+        name: "session"
+        description: "Open the session menu"
+        onPressed: root.island?.toggle("session")
+    }
+
+    GlobalShortcut {
+        name: "lock"
+        description: "Lock the screen"
+        onPressed: LockService.lock()
+    }
+
+    GlobalShortcut {
+        name: "settings"
+        description: "Open the settings window"
+        // An open panel holds the keyboard exclusively, which beats a normal
+        // window, so the island closes first or the window cannot be typed in.
+        onPressed: {
+            if (!settingsWindow.shown)
+                root.island?.close()
+            settingsWindow.toggle()
         }
+    }
 
-        Process {
-            id: niriEventStreamProc
-            command: ["bash", "-c", "niri msg --json event-stream 2>/dev/null"]
-            running: true
-            stdout: SplitParser {
-                onRead: data => {
-                    if (data.includes("WorkspaceActivated") || data.includes("WorkspacesChanged")) {
-                        root.updateNiriWorkspaces();
-                    }
-                }
+    GlobalShortcut {
+        name: "appearance"
+        description: "Open the island appearance panel"
+        onPressed: root.island?.toggle("appearance")
+    }
+
+    // Same panel, on the palette strip. Each name only closes from its own
+    // strip.
+    GlobalShortcut {
+        name: "palette"
+        description: "Open the island appearance panel on the palettes"
+        onPressed: root.island?.toggle("palette")
+    }
+
+    GlobalShortcut {
+        name: "pet"
+        description: "Open the pet"
+        onPressed: root.island?.toggle("pet")
+    }
+
+    GlobalShortcut {
+        name: "games"
+        description: "Open the games"
+        onPressed: root.island?.toggle("games")
+    }
+
+    GlobalShortcut {
+        name: "notes"
+        description: "Open the notes"
+        onPressed: root.island?.toggle("notes")
+    }
+
+    GlobalShortcut {
+        name: "board"
+        description: "Open the task board"
+        onPressed: root.island?.toggle("board")
+    }
+
+    GlobalShortcut {
+        name: "keys"
+        description: "Show every key"
+        onPressed: root.island?.toggle("keys")
+    }
+
+    GlobalShortcut {
+        name: "packages"
+        description: "Open the packages"
+        onPressed: root.island?.toggle("packages")
+    }
+
+    // The clipboard is a launcher mode: pressed again on that mode it closes,
+    // pressed on another mode it switches. The query is set before opening
+    // because with `launcherFits` the panel's height depends on it, and the
+    // island is sized before the panel exists.
+    GlobalShortcut {
+        name: "clipboard"
+        description: "Open the launcher on the clipboard"
+        onPressed: {
+            const sigil = SettingsService.launcherPrefix("clipboard")
+            const showing = root.island?.state.openPanel === "launcher"
+            if (showing && LauncherService.query.startsWith(sigil)) {
+                root.island?.close()
+                return
             }
+            LauncherService.query = sigil
+            root.island?.open("launcher")
         }
+    }
 
-        property var cavaSpectrumValues: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-
-        Process {
-            id: cavaStreamProc
-            command: ["bash", "-c", "cava -p ~/.config/cava/config_quickshell 2>/dev/null"]
-            running: root.hasMedia && root.isPlaying
-            stdout: SplitParser {
-                onRead: data => {
-                    let rawValues = data.trim().split(";");
-                    let bars = [];
-                    for (let i = 0; i < 16; i++) {
-                        let val = parseInt(rawValues[i]) || 0;
-                        bars.push(Math.min(1.0, Math.max(0.0, val / 255.0)));
-                    }
-                    root.cavaSpectrumValues = bars;
-                }
-            }
+    // hyprpicker freezes a screenshot of the screen, so an open panel has to
+    // finish closing before it starts.
+    GlobalShortcut {
+        name: "picker"
+        description: "Pick a colour off the screen"
+        onPressed: {
+            const wasOpen = root.island?.expanded ?? false
+            root.island?.close()
+            PickerService.pick(wasOpen ? PickerService.settle : 0)
         }
+    }
 
-        property string trackTitle: "No Track Active"
-        property string trackArtist: "Playerctl Idle"
-        property string albumArtUrl: ""
-        property bool isPlaying: false
-        property bool hasMedia: false
-        property real trackProgress: 0.0
-        property int currentPositionSec: 0
-        property int totalLengthSec: 0
-        property string currentTimeStr: "0:00"
-        property string totalTimeStr: "0:00"
+    // ── CAPTURE ─────────────────────────────────────────────────────────────
+    //
+    // `capture` opens the surface in its last mode; the others preset a shape
+    // or destination and are unbound by default. The photo is taken with
+    // whatever panel is open, so a panel can be captured.
+    function capture(shape: string, to: string): void {
+        CaptureService.open(shape, "photo", to, 0)
+    }
 
-        function formatTime(sec) {
-            let m = Math.floor(sec / 60);
-            let s = sec % 60;
-            return m + ":" + (s < 10 ? "0" : "") + s;
+    GlobalShortcut {
+        name: "capture"
+        description: "Open the capture surface"
+        onPressed: CaptureService.open("", "", "", 0)
+    }
+
+    GlobalShortcut {
+        name: "captureRegion"
+        description: "Capture a region"
+        onPressed: root.capture("region", "file")
+    }
+
+    GlobalShortcut {
+        name: "captureWindow"
+        description: "Capture a window"
+        onPressed: root.capture("window", "file")
+    }
+
+    GlobalShortcut {
+        name: "captureScreen"
+        description: "Capture the whole screen"
+        onPressed: root.capture("screen", "file")
+    }
+
+    GlobalShortcut {
+        name: "captureEdit"
+        description: "Capture a region and annotate it"
+        onPressed: root.capture("region", "editor")
+    }
+
+    GlobalShortcut {
+        name: "captureText"
+        description: "Read a region as text"
+        onPressed: root.capture("region", "text")
+    }
+
+    // Toggles a recording. In region mode it opens the surface instead (see
+    // the connections below).
+    GlobalShortcut {
+        name: "record"
+        description: "Start or stop recording the screen"
+        onPressed: {
+            const wasOpen = root.island?.expanded ?? false
+            root.island?.close()
+            RecorderService.toggle(wasOpen ? CaptureService.settle : 0)
         }
+    }
 
-        function updateProgressVisuals() {
-            root.trackProgress = root.totalLengthSec > 0 ? Math.min(1.0, root.currentPositionSec / root.totalLengthSec) : 0.0;
-            root.currentTimeStr = root.formatTime(root.currentPositionSec);
-            root.totalTimeStr = root.formatTime(root.totalLengthSec);
+    // Always built rather than behind a Loader: creating a layer surface at
+    // capture time flashes a black frame over the screen being captured.
+    CaptureOverlay {}
+
+    // Region recording, joined here to keep the two services acyclic.
+    Connections {
+        target: CaptureService
+
+        function onRecordRequested(shape: string, geometry: string): void {
+            RecorderService.startAt(shape, geometry)
         }
+    }
 
-        Timer {
-            id: positionTicker
-            interval: 1000
-            running: root.hasMedia && root.isPlaying
-            repeat: true
-            onTriggered: {
-                if (root.currentPositionSec < root.totalLengthSec) {
-                    root.currentPositionSec += 1;
-                    root.updateProgressVisuals();
-                }
-            }
+    Connections {
+        target: RecorderService
+
+        function onSurfaceRequested(shape: string, after: int): void {
+            CaptureService.open(shape, "video", "", after)
         }
+    }
 
-        Process {
-            id: mprisFollowProc
-            command: ["bash", "-c", "playerctl metadata --follow --format '{{status}};;;{{title}};;;{{artist}};;;{{mpris:artUrl}};;;{{position}};;;{{mpris:length}}' 2>/dev/null"]
-            running: true
-            stdout: SplitParser {
-                onRead: data => {
-                    let parts = data.trim().split(";;;");
-                    if (parts.length >= 2 && parts[1].trim() !== "") {
-                        root.hasMedia = true;
-                        root.isPlaying = (parts[0] === "Playing");
-                        root.trackTitle = parts[1];
-                        root.trackArtist = (parts.length >= 3 && parts[2]) ? parts[2] : "Unknown Artist";
-                        let newArt = (parts.length >= 4 && parts[3]) ? parts[3] : "";
-                        if (newArt !== root.albumArtUrl) {
-                            root.albumArtUrl = newArt;
-                            if (newArt.startsWith("file://")) {
-                                colorExtractProc.command = ["bash", "-c", "python3 -c \"from PIL import Image; img = Image.open('" + newArt.replace("file://", "") + "').resize((1,1)); print('#%02x%02x%02x' % img.getpixel((0,0))) 2>/dev/null\" || echo '#3B82F6'"];
-                                colorExtractProc.running = true;
-                            }
-                        }
-                        if (parts.length >= 6 && parts[5]) {
-                            root.currentPositionSec = Math.floor((parseInt(parts[4]) || 0) / 1000000);
-                            root.totalLengthSec = Math.floor((parseInt(parts[5]) || 1) / 1000000);
-                            root.updateProgressVisuals();
-                        }
-                    } else {
-                        root.hasMedia = false;
-                        root.isPlaying = false;
-                        root.trackTitle = "No Track Playing";
-                        root.trackArtist = "Playerctl";
-                        root.currentPositionSec = 0;
-                        root.totalLengthSec = 0;
-                        root.updateProgressVisuals();
-                    }
-                }
-            }
+    // A new wallpaper re-derives the adaptive palette. Wired here so the
+    // dependency runs one way: the theme knows about wallpapers, not the
+    // reverse.
+    Connections {
+        target: WallpaperService
+
+        function onApplied(path: string): void {
+            ThemeService.reloadAdaptiveColors()
         }
+    }
 
-        Process {
-            id: colorExtractProc
-            stdout: SplitParser {
-                onRead: data => {
-                    let col = data.trim();
-                    if (col.startsWith("#") && col.length === 7) {
-                        root.dynamicAccent = col;
-                    }
-                }
-            }
+    // ── IPC ─────────────────────────────────────────────────────────────────
+    //
+    // Every palette push hangs off WallpaperService.applied, which only fires
+    // inside this process. External callers (Thunar's "Set as Wallpaper")
+    // come in here instead of running theme_manager.py directly:
+    //   qs ipc call wallpaper set <path>
+    IpcHandler {
+        target: "wallpaper"
+
+        function set(path: string): string {
+            if (!path)
+                return "usage: qs ipc call wallpaper set <path>"
+            WallpaperService.apply(path)
+            return path
         }
+    }
 
-        property int cpuUsagePct: 0
-        property int ramUsagePct: 0
-        property string cpuTempStr: "--°C"
+    // `./setup sync` calls this once every file has landed. The reload the
+    // shell starts on its own when a file changes can begin before the last
+    // one is written, and then never sees it:
+    //   qs ipc call shell reload
+    IpcHandler {
+        target: "shell"
 
-        Process {
-            id: sysResourcesProc
-            command: ["bash", "-c", "
-                CPU=$(top -bn1 | grep 'Cpu(s)' | awk '{print int(100 - $8)}');
-                RAM=$(free | awk '/Mem:/{print int($3/$2 * 100)}');
-                TEMP=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n1);
-                if [ -n \"$TEMP\" ]; then
-                    TEMP_C=$((TEMP / 1000));
-                    echo \"${CPU:-0}:${RAM:-0}:${TEMP_C}°C\";
-                else
-                    echo \"${CPU:-0}:${RAM:-0}:N/A\";
-                fi
-            "]
-            stdout: SplitParser {
-                onRead: data => {
-                    let parts = data.trim().split(":");
-                    if (parts.length >= 3) {
-                        root.cpuUsagePct = Math.min(100, Math.max(0, parseInt(parts[0]) || 0));
-                        root.ramUsagePct = Math.min(100, Math.max(0, parseInt(parts[1]) || 0));
-                        root.cpuTempStr = parts[2];
-                    }
-                }
-            }
-        }
-
-        Timer {
-            interval: 2000
-            running: true
-            repeat: true
-            triggeredOnStart: true
-            onTriggered: sysResourcesProc.running = true
-        }
-
-        property int batteryPctVal: 100
-        property string batteryCapacity: "100%"
-        property string batteryStatus: "Discharging"
-
-        Process {
-            id: batProc
-            command: ["bash", "-c", "cat /sys/class/power_supply/BAT*/capacity 2>/dev/null || echo '100'"]
-            stdout: SplitParser { onRead: data => { root.batteryPctVal = parseInt(data.trim()) || 100; root.batteryCapacity = root.batteryPctVal + "%"; } }
-        }
-
-        Process {
-            id: batStatProc
-            command: ["bash", "-c", "cat /sys/class/power_supply/BAT*/status 2>/dev/null || echo 'Discharging'"]
-            stdout: SplitParser { onRead: data => root.batteryStatus = data.trim() }
-        }
-
-        Timer {
-            interval: 4000
-            running: true
-            repeat: true
-            triggeredOnStart: true
-            onTriggered: {
-                wifiInfoProc.running = true;
-                batProc.running = true;
-                batStatProc.running = true;
-                root.updateNiriWorkspaces();
-            }
-        }
-
-        component CavaVisualizer: RowLayout {
-            spacing: 2
-            Repeater {
-                model: 12
-                delegate: Rectangle {
-                    width: 3
-                    height: Math.max(2, 18 * (root.cavaSpectrumValues[index] || 0))
-                    radius: 1.5
-                    color: root.dynamicAccent
-                    Behavior on height { NumberAnimation { duration: 40; easing.type: Easing.OutQuad } }
-                }
-            }
-        }
-
-        component NiriWorkspaceBar: RowLayout {
-            spacing: 4
-            Repeater {
-                model: root.niriWorkspaces
-                delegate: Rectangle {
-                    required property var modelData
-                    width: modelData.is_active ? 16 : 6
-                    height: 5
-                    radius: 2.5
-                    color: modelData.is_active ? root.dynamicAccent : "#44444C"
-                    Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    MouseArea { anchors.fill: parent; onClicked: root.runCmd("niri msg action focus-workspace " + modelData.idx) }
-                }
-            }
-        }
-
-        component ModernBatteryIcon: RowLayout {
-            spacing: 4
-            Text { text: root.batteryCapacity; color: "#FFFFFF"; font.pixelSize: 10; font.bold: true }
-            Item {
-                width: 20; height: 10
-                Rectangle {
-                    anchors.fill: parent; radius: 2.5; color: "transparent"
-                    border.color: root.batteryStatus === "Charging" ? "#00FF88" : (root.batteryPctVal <= 20 ? "#FF453A" : "#FFFFFF")
-                    border.width: 1.2
-                    Rectangle {
-                        anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.margins: 1.5
-                        width: Math.max(2, (parent.width - 3) * (root.batteryPctVal / 100.0)); radius: 1.2; color: parent.border.color
-                    }
-                }
-                Rectangle {
-                    width: 1.5; height: 3.5; radius: 0.75
-                    color: root.batteryStatus === "Charging" ? "#00FF88" : (root.batteryPctVal <= 20 ? "#FF453A" : "#FFFFFF")
-                    anchors.left: parent.right; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-        }
-
-        component ActivePlayerCard: ColumnLayout {
-            spacing: 10
-            
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: (mouse) => {
-                    if (mouse.button === Qt.RightButton) {
-                        root.runCmd("foot -e cava");
-                    } else {
-                        root.runCmd("playerctl play-pause");
-                    }
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true; spacing: 12
-                Rectangle {
-                    Layout.preferredWidth: 44; Layout.preferredHeight: 44; radius: 8; color: "#1A1A1E"; clip: true
-                    Image { anchors.fill: parent; source: root.albumArtUrl; fillMode: Image.PreserveAspectCrop; visible: root.albumArtUrl !== "" }
-                    Text { anchors.centerIn: parent; text: "🎵"; font.pixelSize: 18; visible: root.albumArtUrl === "" }
-                }
-                ColumnLayout {
-                    Layout.fillWidth: true; spacing: 1
-                    Text { text: root.trackTitle; color: "#FFFFFF"; font.pixelSize: 14; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-                    Text { text: root.trackArtist; color: "#7D8BA1"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
-                }
-                CavaVisualizer {}
-            }
-            RowLayout {
-                Layout.fillWidth: true; spacing: 8
-                Text { text: root.currentTimeStr; color: "#8E8E93"; font.pixelSize: 11 }
-                Rectangle {
-                    Layout.fillWidth: true; height: 4; radius: 2; color: "#333336"
-                    Rectangle { height: parent.height; width: parent.width * root.trackProgress; radius: 2; color: root.dynamicAccent }
-                }
-                Text { text: root.totalTimeStr; color: "#8E8E93"; font.pixelSize: 11 }
-            }
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter; spacing: 22
-                Text { text: "⏮"; color: "#FFFFFF"; font.pixelSize: 16; MouseArea { anchors.fill: parent; onClicked: root.runCmd("playerctl previous") } }
-                Text { text: root.isPlaying ? "⏸" : "▶"; color: "#FFFFFF"; font.pixelSize: 20; MouseArea { anchors.fill: parent; onClicked: root.runCmd("playerctl play-pause") } }
-                Text { text: "⏭"; color: "#FFFFFF"; font.pixelSize: 16; MouseArea { anchors.fill: parent; onClicked: root.runCmd("playerctl next") } }
-            }
-        }
-
-        Item {
-            id: mainPill
-            property bool showStandalonePlayer: !root.expanded && root.hasMedia && root.isPlaying
-            implicitHeight: root.expanded ? 700 : (showStandalonePlayer ? 110 : 30)
-            implicitWidth: root.expanded ? 800 : (showStandalonePlayer ? 320 : compactContent.implicitWidth + 24)
-
-            Behavior on implicitWidth {
-                SpringAnimation { spring: 4.2; damping: 0.30; epsilon: 0.1 }
-            }
-            Behavior on implicitHeight {
-                SpringAnimation { spring: 4.8; damping: 0.22; epsilon: 0.1 }
-            }
-
-            Shape {
-                anchors.fill: parent
-                ShapePath {
-                    fillColor: "#000000"
-                    strokeColor: "transparent"
-
-                    startX: 15; startY: 0
-                    PathLine { x: mainPill.width / 2 - 35; y: 0 }
-                    PathCubic {
-                        x: mainPill.width / 2 - 15
-                        y: -10
-                        control1X: mainPill.width / 2 - 25
-                        control1Y: 0
-                        control2X: mainPill.width / 2 - 20
-                        control2Y: -10
-                    }
-                    PathCubic {
-                        x: mainPill.width / 2 + 35
-                        y: 0
-                        control1X: mainPill.width / 2 + 20
-                        control1Y: -10
-                        control2X: mainPill.width / 2 + 25
-                        control2Y: 0
-                    }
-                    PathLine { x: mainPill.width - 15; y: 0 }
-                    PathArc { x: mainPill.width; y: 15; radiusX: 15; radiusY: 15 }
-                    PathLine { x: mainPill.width; y: mainPill.height - 15 }
-                    PathArc { x: mainPill.width - 15; y: mainPill.height; radiusX: 15; radiusY: 15 }
-                    PathLine { x: 15; y: mainPill.height }
-                    PathArc { x: 0; y: mainPill.height - 15; radiusX: 15; radiusY: 15 }
-                    PathLine { x: 0; y: 15 }
-                    PathArc { x: 15; y: 0; radiusX: 15; radiusY: 15 }
-                }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.expanded = !root.expanded
-            }
-
-            Item {
-                anchors.fill: parent; anchors.margins: 12; visible: mainPill.showStandalonePlayer
-                ActivePlayerCard { anchors.fill: parent }
-            }
-
-            RowLayout {
-                id: compactContent
-                anchors.centerIn: parent; height: 30; spacing: 8
-                visible: !root.expanded && !mainPill.showStandalonePlayer
-
-                Rectangle {
-                    width: 18; height: 18; radius: 9; color: "#1E1E24"
-                    Text { anchors.centerIn: parent; text: "🔍"; font.pixelSize: 9 }
-                    MouseArea { anchors.fill: parent; onClicked: root.launchAppLauncher() }
-                }
-
-                NiriWorkspaceBar {}
-
-                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
-
-                Text {
-                    text: root.timeStr
-                    color: "#FFFFFF"
-                    font.pixelSize: 10
-                    font.bold: true
-                }
-
-                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
-
-                RowLayout {
-                    spacing: 3
-                    Repeater {
-                        model: SystemTray.items
-                        delegate: Item {
-                            width: 14; height: 14
-                            required property var modelData
-                            Image { anchors.centerIn: parent; width: 12; height: 12; source: modelData.icon || ""; fillMode: Image.PreserveAspectFit; smooth: true }
-                        }
-                    }
-                }
-
-                Rectangle { width: 1; height: 10; color: "#FFFFFF"; opacity: 0.15 }
-                ModernBatteryIcon {}
-            }
-
-            ColumnLayout {
-                id: expandedContent
-                anchors.fill: parent; anchors.margins: 18; spacing: 14
-                visible: root.expanded
-                opacity: root.expanded ? 1.0 : 0.0
-
-                Behavior on opacity {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    RowLayout {
-                        spacing: 8
-                        Text { text: root.timeStr; color: "#FFFFFF"; font.pixelSize: 20; font.bold: true }
-                        Text { text: root.dateStr; color: "#888888"; font.pixelSize: 12 }
-                    }
-                    Item { Layout.fillWidth: true }
-                    NiriWorkspaceBar {}
-                    Item { Layout.fillWidth: true }
-                    ModernBatteryIcon {}
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true; spacing: 12
-                    Rectangle {
-                        Layout.fillWidth: true; height: 54; radius: 14
-                        color: root.wifiEnabled ? "#1E293B" : "#141418"
-                        border.color: root.wifiEnabled ? root.dynamicAccent : "transparent"; border.width: 1
-                        RowLayout {
-                            anchors.fill: parent; anchors.margins: 10; spacing: 10
-                            Text { text: "📶"; font.pixelSize: 14; MouseArea { anchors.fill: parent; onClicked: { root.runCmd(root.wifiEnabled ? "rfkill block wlan || nmcli radio wifi off" : "rfkill unblock wlan || nmcli radio wifi on"); root.wifiEnabled = !root.wifiEnabled; } } }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 1
-                                Text { text: "Wi-Fi"; color: "#FFFFFF"; font.bold: true; font.pixelSize: 12 }
-                                Text { text: root.wifiSsid; color: root.wifiEnabled ? "#60A5FA" : "#888888"; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                                MouseArea { anchors.fill: parent; onClicked: root.openWifiPicker() }
-                            }
-                            Text { text: "⚙"; color: "#888888"; font.pixelSize: 12; MouseArea { anchors.fill: parent; onClicked: root.openWifiPicker() } }
-                        }
-                    }
-
-                    // System update execution widget with explicit sudo wrapper
-                    Rectangle {
-                        Layout.fillWidth: true; height: 54; radius: 14
-                        color: "#141418"
-                        border.color: root.dynamicAccent; border.width: 1
-                        RowLayout {
-                            anchors.fill: parent; anchors.margins: 10; spacing: 10
-                            Text { text: "💡"; font.pixelSize: 14 }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 1
-                                Text { text: root.recommendationText; color: "#FFFFFF"; font.bold: true; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
-                                Text { text: root.recommendationSub; color: root.dynamicAccent; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                            }
-                            Text { text: "▶"; color: "#888888"; font.pixelSize: 10 }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.runCmd(root.recommendationCmd)
-                        }
-                    }
-                }
-
-                TailscaleCard { Layout.fillWidth: true }
-
-                Rectangle {
-                    Layout.fillWidth: true; Layout.preferredHeight: 120; radius: 16; color: "#0F0F12"; clip: true
-                    Item { anchors.fill: parent; anchors.margins: 12; ActivePlayerCard { anchors.fill: parent } }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true; Layout.fillHeight: true; spacing: 12
-                    Rectangle {
-                        Layout.fillWidth: true; Layout.fillHeight: true; radius: 16; color: "#141418"
-                        ColumnLayout {
-                            anchors.fill: parent; anchors.margins: 12; spacing: 10
-                            Text { text: "System Monitor"; color: "#FFFFFF"; font.bold: true; font.pixelSize: 11 }
-                            ColumnLayout {
-                                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 6
-                                ColumnLayout {
-                                    Layout.fillWidth: true; spacing: 3
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text: "CPU"; color: "#AAAAAA"; font.pixelSize: 10; font.bold: true }
-                                        Item { Layout.fillWidth: true }
-                                        Text { text: root.cpuUsagePct + "%"; color: "#FFFFFF"; font.pixelSize: 10 }
-                                    }
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 5; radius: 2.5; color: "#222228"
-                                        Rectangle {
-                                            height: parent.height; width: parent.width * (root.cpuUsagePct / 100.0); radius: 2.5
-                                            color: root.cpuUsagePct > 85 ? "#FF453A" : root.dynamicAccent
-                                        }
-                                    }
-                                }
-                                ColumnLayout {
-                                    Layout.fillWidth: true; spacing: 3
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text: "RAM"; color: "#AAAAAA"; font.pixelSize: 10; font.bold: true }
-                                        Item { Layout.fillWidth: true }
-                                        Text { text: root.ramUsagePct + "%"; color: "#FFFFFF"; font.pixelSize: 10 }
-                                    }
-                                    Rectangle {
-                                        Layout.fillWidth: true; height: 5; radius: 2.5; color: "#222228"
-                                        Rectangle {
-                                            height: parent.height; width: parent.width * (root.ramUsagePct / 100.0); radius: 2.5
-                                            color: root.ramUsagePct > 85 ? "#FF9500" : root.dynamicAccent
-                                        }
-                                    }
-                                }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Temperature"; color: "#AAAAAA"; font.pixelSize: 10 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.cpuTempStr; color: "#00FF88"; font.pixelSize: 10; font.bold: true }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        function reload(): void {
+            Quickshell.reload(false)
         }
     }
 }
