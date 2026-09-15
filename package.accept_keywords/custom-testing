@@ -17,3 +17,5 @@
  gui-apps/hypridle ~amd64
  dev-cpp/sdbus-c++ ~amd64
  net-dns/dnsmasq ~amd64
+ dev-lua/luv ~amd64
+ dev-libs/tree-sitter-markdown-inline ~amd64
