@@ -36,7 +36,6 @@ hl.bind(main_mod .. " + D", hl.dsp.global("quickshell:calendar"))
 hl.bind(main_mod .. " + W", hl.dsp.global("quickshell:wallpaper"))
 
 
-
 -- Switch display
 hl.bind(main_mod .. " + F13", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-display.sh desk"))
 hl.bind(main_mod .. " + F14", hl.dsp.exec_cmd(vars.scripts_home .. "/switch-display.sh tv"))
