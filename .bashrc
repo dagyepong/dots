@@ -55,7 +55,8 @@ alias fgrep='fgrep --color=auto'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-
+# Add to ~/.bashrc
+alias hermes='pgrep -x ollama > /dev/null || (ollama serve > /dev/null 2>&1 & sleep 1) && ollama run hermes3'
 # Process tracking
 alias psa='ps auxf'
 alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
