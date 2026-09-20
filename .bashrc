@@ -108,10 +108,10 @@ config() {
     declare -g use_glyphs=true
     declare -g use_badges=true
 
-    # Define custom colors (Nord / Emerald Mint Palette)
-    declare -g color_primary="#88c0d0"
-    declare -g color_secondary="#b48ead"
-    declare -g color_neutral="#4c566a"
+    # Define custom colors (Aura Dark Palette)
+    declare -g color_primary="#bd9dff"    # Aura Purple
+    declare -g color_secondary="#ff5c8f"  # Aura Pink
+    declare -g color_neutral="#68a8e4"    # Aura Soft Blue
     declare -g color_global
 
     declare -g glyph_badge_left=""
@@ -190,9 +190,9 @@ render_identity() {
 
     # Rendering logic
     if $use_badges; then
-        make_badge "$glyph $label"
+        make_badge "$glyph$label"
     else
-        make_label "$glyph $label"
+        make_label "$glyph$label"
     fi
 }
 
@@ -234,7 +234,7 @@ render_git() {
 
     # Prepend glyph to label
     if $use_glyphs; then
-        label="$glyph $label"
+        label="$glyph$label"
     fi
 
     # Build format string
@@ -256,13 +256,13 @@ render_prompt() {
     local glyph
 
     # Define glyph
-    if $use_glyphs && $use_badges; then glyph="󱞩"; else glyph="→"; fi
+    if $use_glyphs &&$use_badges; then glyph="󱞩"; else glyph="→"; fi
 
     # Prepend space character to match badge
     if $use_badges; then glyph=" $glyph"; fi
 
     # Use bold glyph
-    if $use_glyphs && $use_badges; then
+    if $use_glyphs &&$use_badges; then
         glyph="\001\033[1m\002$glyph\001\033[0m\002"
     fi
 
@@ -386,7 +386,6 @@ config && init
 export PATH="/home/nana/.local/bin:$PATH"
 export GPG_TTY=$(tty)
 alias tide-island-config-app='QML2_IMPORT_PATH=/usr/lib/qt6/qml /usr/bin/tide-island-config-app'
-# eval "$(starship init bash)" # Commented out to prevent conflict with custom prompt
 
 # Custom greeting function
 greet() {
