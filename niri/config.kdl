@@ -69,9 +69,9 @@ layout {
 
     border {
         width 2
-        active-color "#4a5353"
-        inactive-color "#4a5353"
-        urgent-color "#4a5353"
+        active-color "#ff00ff"
+        inactive-color "#ff00ff"
+        urgent-color "#ff00ff"
     }
 
     shadow {
@@ -90,7 +90,7 @@ layout {
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/autumn.jpg"
+spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/hiddenking.jpg"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-sh-at-startup "vicinae server"    
 spawn-sh-at-startup "xwayland-satellite"
@@ -307,7 +307,7 @@ window-rule {
 // ==============================================================================
 binds {
     Mod+Shift+Slash { show-hotkey-overlay; }
-    Mod+Space {spawn-sh "qs -p ~/.config/quickshell/k4/shell.qml ipc call k4.launcher toggle";}
+    Mod+Space {spawn "rofi" "-show" "drun"; }
     Mod+T hotkey-overlay-title="Open a Terminal: foot" { spawn "foot"; }
     Mod+Shift+Return hotkey-overlay-title="Toggle Scratchpad" { spawn "foot" "--app-id=foot-scratchpad"; }
     Mod+D hotkey-overlay-title="Run an Application: vicinae open" { spawn-sh "vicinae open"; }
