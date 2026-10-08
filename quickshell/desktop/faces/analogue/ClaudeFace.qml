@@ -30,8 +30,8 @@ Instrument {
     reading: face.figure
     note: !ClaudeService.available ? "no usage found"
         : ClaudeService.sessionMeasured
-        ? `of this block · resets in ${ClaudeService.resetsIn}`
-        : `this block · resets in ${ClaudeService.resetsIn}`
+        ? `of this block · ${ClaudeService.resetsIn}`
+        : `this block · ${ClaudeService.resetsIn}`
     filled: true
 
     Gauge {

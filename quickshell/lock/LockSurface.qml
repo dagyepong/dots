@@ -9,25 +9,88 @@
 
 import QtQuick
 import QtQuick.Effects
-import Quickshell
 
 import "../theme"
 import "../services"
-import "../components"
 import "../bar/widgets"
 
-// One screen of the lock: the desktop blurred behind, the battery in the top
-// corner, the clock centred, the password field at the bottom, and the power
-// buttons where the login screen has them. Blurred enough that text on the
-// desktop cannot be read.
+// One screen of the lock: the desktop blurred behind, the island where the
+// bar has it, the clock, and the battery in its corner; while music plays,
+// the clock small at the top and the player in the middle, its cover blurred
+// behind if that is the setting. A key or a click wakes
+// it: the clock rises and the account, the field and the power buttons come
+// in underneath; Escape or a while untouched sends them away again. Blurred
+// enough that text on the desktop cannot be read.
 Item {
     id: root
 
     signal submitted(string password)
 
+    // The output this surface covers, whose own picture it shows.
+    property string output: ""
+
     // Focus lands here and stays.
     function claim(): void {
-        field.forceActiveFocus()
+        account.claim()
+    }
+
+    // 1 while the lock holds, 0 once it is answered: the type goes and the
+    // blur relaxes, so the desktop is what is left when the lock falls.
+    property real held: LockService.leaving ? 0 : 1
+
+    Behavior on held {
+        NumberAnimation { duration: Theme.durationMorph; easing.type: Easing.InOutCubic }
+    }
+
+    // 0 at rest, 1 awake: what only an awake screen shows fades and rises
+    // with it.
+    property real awake: LockService.awake ? 1 : 0
+
+    Behavior on awake {
+        NumberAnimation { duration: Theme.durationMorph; easing.type: Theme.easing }
+    }
+
+    // 1 while something is playing and the lock is set to show it: the clock
+    // steps up and small, and the player takes the middle.
+    readonly property bool music: SettingsService.lockMusic !== "off" && MediaService.available
+    property real musical: root.music ? 1 : 0
+
+    Behavior on musical {
+        NumberAnimation { duration: Theme.durationMorph; easing.type: Theme.easing }
+    }
+
+    // A screen put back to rest takes its half-typed password with it.
+    Connections {
+        target: LockService
+        function onAwakeChanged(): void {
+            if (!LockService.awake)
+                account.clear()
+        }
+    }
+
+    // The pointer moving on an awake screen is a reason to look for a face
+    // again; a click wakes the screen as a key does. Qt sends a hover at the resting
+    // position whenever the scene repaints, so only a pointer that has moved
+    // counts.
+    HoverHandler {
+        property point last: Qt.point(-1, -1)
+
+        onPointChanged: {
+            const at = point.position
+            const moved = last.x >= 0 && Math.abs(at.x - last.x) + Math.abs(at.y - last.y)
+                > Qt.styleHints.startDragDistance
+            if (last.x < 0 || moved)
+                last = at
+            if (moved)
+                LockService.wake()
+        }
+    }
+
+    TapHandler {
+        onTapped: {
+            LockService.rouse()
+            account.claim()
+        }
     }
 
     // ── BACKGROUND ──────────────────────────────────────────────────────────
@@ -41,7 +104,7 @@ Item {
         id: shot
 
         anchors.fill: parent
-        source: LockService.shotSource
+        source: LockService.shotSource(root.output)
         visible: false
         fillMode: Image.PreserveAspectCrop
         asynchronous: false
@@ -53,30 +116,72 @@ Item {
         source: shot
         visible: shot.status === Image.Ready
         blurEnabled: true
-        blur: 1
+        blur: root.held
         // Enough to make text unreadable while the desktop stays recognisable.
         blurMax: SettingsService.lockBlur
         // Barely darkened: a dark desktop dimmed further looks broken. The text
         // has its own shadow and every capsule is opaque, so the background
         // only needs to be blurred.
-        brightness: -0.05
+        brightness: -0.05 * root.held
         saturation: 0
+    }
+
+    // While music plays, its cover can stand in for the desktop: blurred to a
+    // wash of its colours, darkened enough for white type, and gone as the
+    // lock lets go, so the desktop is still what is left. Drawn at a tenth of
+    // the screen, blurred there and stretched, so the blur reaches ten times
+    // as far.
+    Item {
+        id: wash
+
+        width: Math.ceil(root.width / 10)
+        height: Math.ceil(root.height / 10)
+        scale: 10
+        transformOrigin: Item.TopLeft
+        visible: opacity > 0
+        opacity: cover.status === Image.Ready ? root.musical * root.held : 0
+        layer.enabled: true
+        layer.smooth: true
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.durationMorph; easing.type: Theme.easing }
+        }
+
+        Image {
+            id: cover
+
+            anchors.fill: parent
+            source: SettingsService.lockMusicGround === "cover" && root.music ? MediaService.artUrl : ""
+            visible: false
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize.width: 96
+            sourceSize.height: 96
+        }
+
+        MultiEffect {
+            anchors.fill: parent
+            source: cover
+            blurEnabled: true
+            blur: 1
+            blurMax: 24
+            brightness: -0.28
+            saturation: 0.25
+            autoPaddingEnabled: false
+        }
     }
 
     // The lightest of washes, for separation rather than contrast.
     Rectangle {
         anchors.fill: parent
         color: Theme.scrim
-        opacity: 0.18
+        opacity: 0.18 * root.held
     }
 
     // ── STATUS ──────────────────────────────────────────────────────────────
 
-    // The battery in the top corner, and nothing where the island goes, to
-    // match the login screen.
-
-    // A ring chip as on the bar: pure black with no border, since the ring is
-    // the outline.
+    // A ring chip as on the bar, in the bar's corner: pure black with no
+    // border, since the ring is the outline.
     Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 10
@@ -87,6 +192,7 @@ Item {
         radius: Theme.radiusPill
         color: Theme.island
         visible: BatteryService.available
+        opacity: root.held
 
         BatteryWidget {
             anchors.centerIn: parent
@@ -94,312 +200,101 @@ Item {
         }
     }
 
-    // ── CLOCK ───────────────────────────────────────────────────────────────
-
-    SystemClock {
-        id: clock
-        precision: SystemClock.Minutes
+    LockIsland {
+        held: root.held
     }
 
-    // Shadowed rather than dimming the background, which would hide the
-    // desktop.
+    // ── CLOCK ───────────────────────────────────────────────────────────────
+    //
+    // Just above the middle at rest; awake, it rises under the island and
+    // steps back a little for the account. Shadowed rather than dimming the
+    // background, which would hide the desktop.
+
     Item {
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: -60
-        width: face.width
-        height: face.height
+        id: face
+
+        readonly property real restY: Math.round((root.height - clock.height) / 2 - 40)
+        readonly property real awakeY: Math.min(face.restY, 170)
+        readonly property real plainY: face.restY + (face.awakeY - face.restY) * root.awake
+        readonly property real plainScale: 1 - 0.1 * root.awake
+        // With music, where it is awake whether awake or not — below the
+        // island opened for a face — and no taller than 380.
+        readonly property real musicY: face.awakeY
+        readonly property real musicScale: Math.min(0.9, 380 / Math.max(1, clock.height))
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: face.plainY + (face.musicY - face.plainY) * root.musical
+        width: clock.width
+        height: clock.height
+        opacity: root.held
+        scale: face.plainScale + (face.musicScale - face.plainScale) * root.musical
+        transformOrigin: Item.Top
 
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowBlur: 1
-            shadowOpacity: 0.6
-            shadowVerticalOffset: 2
+            shadowOpacity: 0.45
+            shadowVerticalOffset: 3
             shadowColor: Theme.island
         }
 
-    Column {
-        id: face
-
-        spacing: 4
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: Qt.formatDateTime(clock.date, SettingsService.clockFormat)
-            font.family: Theme.fontFamily
-            font.pixelSize: 92
-            font.weight: Font.Light
-            color: Theme.text
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: Qt.formatDateTime(clock.date, "dddd d MMMM")
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeLarge
-            color: Theme.text
-            opacity: 0.75
+        LockClock {
+            id: clock
         }
     }
-    }
 
-    // ── USER ────────────────────────────────────────────────────────────────
+    // ── MUSIC ───────────────────────────────────────────────────────────────
     //
-    // The avatar and name, between the clock and the field. From the account
-    // unless overridden in the settings, which is the same source the login
-    // screen reads. Shadowed like the clock.
-    Item {
-        id: who
+    // In the room between the clock and the account, centred in it.
 
+    Loader {
+        id: music
+
+        readonly property real roomTop: face.musicY + clock.height * face.musicScale
+        readonly property real roomBottom: account.y
+
+        // A short screen has less room than the player: it is drawn smaller
+        // to fit, never under the account.
+        readonly property real fit: music.item
+            ? Math.min(1, Math.max(0, music.roomBottom - music.roomTop - 24) / Math.max(1, music.item.implicitHeight))
+            : 1
+
+        active: root.music || root.musical > 0
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: entry.top
-        anchors.bottomMargin: 26
-        width: identity.width
-        height: identity.height
+        y: Math.round(music.roomTop + (music.roomBottom - music.roomTop - height) / 2)
+        scale: music.fit
+        opacity: root.musical * root.held
+        visible: opacity > 0
 
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowBlur: 0.9
-            shadowOpacity: 0.65
-            shadowVerticalOffset: 2
-            shadowColor: Theme.island
-        }
-
-        Column {
-            id: identity
-
-            spacing: 12
-
-            Avatar {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: 88
-                height: 88
-                source: AccountService.avatar
-                initials: AccountService.initials
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: AccountService.name
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeLarge
-                font.weight: Font.DemiBold
-                color: Theme.text
-            }
+        sourceComponent: LockMedia {
+            lyrics: SettingsService.lockMusic === "lyrics" && SettingsService.lyrics
         }
     }
 
-    // ── PASSWORD ────────────────────────────────────────────────────────────
+    // ── ACCOUNT ─────────────────────────────────────────────────────────────
 
-    // The field holds focus from the start but stays invisible until the first
-    // key, with a prompt shown in its place. Hidden by opacity, not `visible`:
-    // an invisible item cannot hold keyboard focus.
-    Item {
-        id: entry
+    // Invisible at rest by opacity, never `visible`: the field inside holds
+    // the keyboard from the start, so the first key is its first character.
+    LockAccount {
+        id: account
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 104
-        width: 360
-        height: 96
+        anchors.bottomMargin: 60 - 24 * (1 - root.awake)
+        opacity: root.awake * root.held
 
-        readonly property bool typing: field.text !== ""
-            || LockService.authenticating
-            || LockService.failed
-
-        // ── PROMPT ──────────────────────────────────────────────────────────
-
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 12
-            spacing: 10
-            opacity: entry.typing ? 0 : 1
-            visible: opacity > 0
-
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                shadowBlur: 0.8
-                shadowOpacity: 0.7
-                shadowColor: Theme.island
-            }
-
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.durationMedium; easing.type: Theme.easing }
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "󰌌"
-                font.family: Theme.fontMono
-                font.pixelSize: 17
-                color: Theme.text
-                opacity: 0.8
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Type your password to unlock"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeMedium
-                color: Theme.text
-                opacity: 0.8
-            }
-        }
-
-        // ── FIELD ───────────────────────────────────────────────────────────
-
-        Rectangle {
-            id: box
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            width: 320
-            height: 50
-            radius: Theme.radiusPill
-            // Pure black, like the island: over a photograph only an opaque
-            // capsule reads as a surface.
-            color: Theme.island
-            border.width: 1
-            border.color: {
-                if (LockService.failed)
-                    return Theme.indicatorBad
-                return field.activeFocus ? Theme.accent : Theme.islandBorder
-            }
-
-            opacity: entry.typing ? 1 : 0
-            // Scales in from 94%, so it reads as the prompt turning into the
-            // field.
-            scale: entry.typing ? 1 : 0.94
-
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.durationMedium; easing.type: Theme.easing }
-            }
-            Behavior on scale {
-                NumberAnimation { duration: Theme.durationMedium; easing.type: Theme.easing }
-            }
-            Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
-
-            // Shakes on a wrong password; the shake is seen before the text
-            // below.
-            SequentialAnimation {
-                id: refusal
-
-                loops: 2
-                NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"
-                    to: -9; duration: 55; easing.type: Easing.OutCubic }
-                NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"
-                    to: 9; duration: 55; easing.type: Easing.OutCubic }
-                NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"
-                    to: 0; duration: 55; easing.type: Easing.OutCubic }
-            }
-
-            Connections {
-                target: LockService
-                function onFailedChanged(): void {
-                    if (LockService.failed)
-                        refusal.restart()
-                }
-            }
-
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 19
-                anchors.verticalCenter: parent.verticalCenter
-                text: "󰌾"
-                font.family: Theme.fontMono
-                font.pixelSize: 15
-                color: LockService.failed ? Theme.indicatorBad : Theme.textMuted
-
-                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
-            }
-
-            TextInput {
-                id: field
-
-                anchors.left: parent.left
-                anchors.leftMargin: 48
-                anchors.right: parent.right
-                anchors.rightMargin: 48
-                anchors.verticalCenter: parent.verticalCenter
-
-                echoMode: TextInput.Password
-                passwordCharacter: "•"
-                passwordMaskDelay: 0
-                enabled: !LockService.authenticating
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeMedium
-                color: Theme.text
-                selectionColor: Theme.accent
-                selectedTextColor: Theme.accentText
-                clip: true
-
-                onAccepted: {
-                    root.submitted(field.text)
-                    field.clear()
-                }
-
-                // Typing clears the error.
-                onTextChanged: {
-                    if (LockService.failed && field.text !== "")
-                        LockService.failed = false
-                }
-
-                // Escape clears the field rather than leaving part of a
-                // password on screen.
-                Keys.onEscapePressed: field.clear()
-            }
-
-            // A spinner while PAM checks the password.
-            Item {
-                anchors.right: parent.right
-                anchors.rightMargin: 17
-                anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
-                visible: LockService.authenticating
-
-                RingIndicator {
-                    id: spinner
-
-                    anchors.fill: parent
-                    thickness: 2
-                    progress: 0.28
-                    trackColor: "transparent"
-                    fillColor: Theme.accent
-
-                    RotationAnimator {
-                        target: spinner
-                        running: LockService.authenticating
-                        from: 0
-                        to: 360
-                        duration: 900
-                        loops: Animation.Infinite
-                    }
-                }
-            }
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: box.bottom
-            anchors.topMargin: 14
-            text: LockService.message
-            visible: text !== ""
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.indicatorBad
-        }
+        onSubmitted: password => root.submitted(password)
     }
 
     // ── POWER ───────────────────────────────────────────────────────────────
     //
     // Bottom left at the bar's margin, where the login screen has the same
-    // buttons.
+    // buttons, and only while awake.
 
     LockPower {
+        opacity: root.awake * root.held
+        visible: opacity > 0
         anchors.left: parent.left
         anchors.leftMargin: Theme.barTopMargin + 6
         anchors.bottom: parent.bottom

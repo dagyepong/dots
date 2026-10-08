@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -69,8 +70,8 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         radius: Theme.radiusMedium
-        color: Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
     }
 
@@ -181,7 +182,7 @@ FocusScope {
                         anchors.fill: parent
                         radius: width / 2
                         color: day.chosen ? Theme.accent
-                            : (hover.hovered ? Theme.islandSurfaceHover : "transparent")
+                            : (hover.hovered ? Theme.surfaceHoverIn(QsWindow.window) : "transparent")
                         border.color: day.isToday && !day.chosen ? Theme.accent : "transparent"
                         border.width: 1
 

@@ -14,13 +14,11 @@ import "../../theme"
 import "../../services"
 import "../../components"
 
-// Pending update count; the detail lists what is pending, when it was checked,
-// and opens the packages panel. No upgrade button: pacman needs a terminal and
-// a password, which the panel's Update provides.
+// Pending update count; the detail lists the first few pending, when it was
+// checked, and opens the packages panel. No upgrade button: pacman needs a
+// terminal and a password, which the panel's Update provides.
 Item {
     id: root
-
-    property bool compact: false
 
     implicitWidth: holder.implicitWidth
     implicitHeight: holder.implicitHeight
@@ -31,140 +29,89 @@ Item {
     Loader {
         id: holder
         anchors.fill: parent
-        sourceComponent: root.compact ? chip : detail
-    }
-
-    Component {
-        id: chip
-
-        Item {
-            Item {
-                id: mark
-
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: Theme.capsuleHeight
-                height: Theme.capsuleHeight
-
-                RingIndicator {
-                    anchors.fill: parent
-                    thickness: 2.5
-                    progress: 0
-                    trackColor: Theme.indicatorDim
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰏖"
-                        font.family: Theme.fontMono
-                        font.pixelSize: Math.round(Theme.capsuleHeight * 0.38)
-                        color: UpdatesService.count > 0
-                            ? Theme.indicator : Theme.textMuted
-                    }
-                }
-            }
-        }
+        sourceComponent: detail
     }
 
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 10
+        ModuleCard {
+            title: {
+                if (UpdatesService.count === 0)
+                    return "Up to date"
+                return UpdatesService.count === 1
+                    ? "1 update" : `${UpdatesService.count} updates`
+            }
+            // Flag results from the fallback, which reads the last synced
+            // database; checkupdates is current and needs no label.
+            subtitle: {
+                const parts = []
+                if (UpdatesService.tool === "pacman")
+                    parts.push("as of the last sync")
+                if (UpdatesService.age !== "")
+                    parts.push(`checked ${UpdatesService.age}`)
+                return parts.join(" · ")
+            }
+
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰏖"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 18
+                    color: UpdatesService.count > 0 ? Theme.indicator : Theme.textMuted
+                }
+            }
+
+            // The first three, with the version each goes to.
+            Repeater {
+                model: UpdatesService.updates.slice(0, 3)
+
+                CardFact {
+                    required property var modelData
+
+                    name: modelData.name
+                    value: modelData.source === "aur" ? `${modelData.to} · AUR` : modelData.to
+                }
+            }
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 13
+                Layout.preferredHeight: Theme.cardRow
+                spacing: 8
 
-                RingIndicator {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    thickness: 2.5
-                    progress: 0
-                    trackColor: Theme.indicatorDim
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰏖"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 18
-                        color: UpdatesService.count > 0
-                            ? Theme.indicator : Theme.textMuted
-                    }
-                }
-
-                ColumnLayout {
+                Text {
                     Layout.fillWidth: true
-                    spacing: 2
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: {
-                            if (UpdatesService.count === 0)
-                                return "Up to date"
-                            return UpdatesService.count === 1
-                                ? "1 update" : `${UpdatesService.count} updates`
-                        }
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        // Flag results from the fallback, which reads the last
-                        // synced database; checkupdates is current and needs no
-                        // label.
-                        text: {
-                            const parts = []
-                            if (UpdatesService.tool === "pacman")
-                                parts.push("as of the last sync")
-                            if (UpdatesService.age !== "")
-                                parts.push(`checked ${UpdatesService.age}`)
-                            return parts.join(" · ")
-                        }
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
+                    text: UpdatesService.count > 3 ? `and ${UpdatesService.count - 3} more` : ""
+                    elide: Text.ElideRight
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.textMuted
                 }
 
                 PillButton {
-                    Layout.alignment: Qt.AlignVCenter
+                    implicitHeight: Theme.cardRow
                     text: UpdatesService.checking ? "Checking…" : "Check"
                     enabled: !UpdatesService.checking
-                    implicitHeight: 28
                     onClicked: UpdatesService.refresh()
                 }
 
                 // Modules can't reach the island, so this requests the panel,
                 // opened on the updates list.
                 PillButton {
-                    Layout.alignment: Qt.AlignVCenter
+                    implicitHeight: Theme.cardRow
                     text: "Open"
                     active: UpdatesService.count > 0
-                    implicitHeight: 28
                     onClicked: {
                         PackagesService.view = "updates"
                         ModuleService.requestPanel("packages")
                     }
                 }
-            }
-
-            Text {
-                Layout.fillWidth: true
-                visible: UpdatesService.count > 0
-                text: UpdatesService.packages.join("  ")
-                elide: Text.ElideRight
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeLabel
-                color: Theme.textMuted
             }
         }
     }

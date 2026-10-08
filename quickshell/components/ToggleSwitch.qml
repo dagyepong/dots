@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // The knob slides rather than jumping, so the switch shows which way it
@@ -27,8 +28,8 @@ Rectangle {
 
     Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
 
-    color: root.checked ? Theme.accent : Theme.islandSurfaceHover
-    border.color: root.checked ? Theme.accent : Theme.islandBorder
+    color: root.checked ? Theme.accent : Theme.surfaceHoverIn(QsWindow.window)
+    border.color: root.checked ? Theme.accent : Theme.borderIn(QsWindow.window)
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: Theme.durationFast } }

@@ -15,8 +15,9 @@ counts the API returned; the default action sums them for the current 5-hour
 block and the last 7 days. Transcripts only grow, so each file is read from
 its last offset and the totals are cached per hour.
 
-`limits` reports the plan's utilization, which is only exposed in the
-`anthropic-ratelimit-unified-*` response headers.
+`limits` reports the plan's utilization: every limit from the account's usage
+endpoint, or the session and the week from the
+`anthropic-ratelimit-unified-*` response headers when it does not answer.
 """
 
 import calendar
@@ -203,8 +204,10 @@ CREDENTIALS = Path(
     os.environ.get("CLAUDE_CONFIG_DIR") or (HOME / ".claude")
 ) / ".credentials.json"
 
+USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage"
+
 # The cheapest request that gets a response: smallest model, one output token.
-# Only the headers are used.
+# Only the headers are used, when the usage endpoint does not answer.
 LIMITS_ENDPOINT = "https://api.anthropic.com/v1/messages"
 LIMITS_BODY = json.dumps({
     "model": "claude-haiku-4-5",
@@ -213,38 +216,101 @@ LIMITS_BODY = json.dumps({
 })
 LIMITS_TIMEOUT = 12
 
+ACCOUNT = HOME / ".claude.json"
 
-def limits():
-    """Print the 5-hour and 7-day utilization the API reports.
+# The last answer from the usage endpoint, which rate-limits a client that
+# asks often: reused as it is for a few minutes, and for the week per model
+# while the endpoint refuses.
+LIMITS_CACHE = STATE / "claude-limits.json"
+LIMITS_FRESH = 300
+PLANS = {
+    "default_claude_pro": "Pro",
+    "default_claude_max_5x": "Max 5×",
+    "default_claude_max_20x": "Max 20×",
+}
 
-    They arrive as `anthropic-ratelimit-unified-{5h,7d}-utilization` headers,
-    with reset times, on every response, and match what `/usage` prints.
-    Nothing else exposes them, so this sends a minimal request and discards
-    the body; the shell calls it on a slow timer.
 
-    Authenticates with Claude Code's OAuth token from its credentials file,
-    for this one request only; the token is never stored or printed.
-    """
+def plan():
+    """The subscription's name, from Claude Code's account record."""
     try:
-        token = json.loads(CREDENTIALS.read_text())["claudeAiOauth"]["accessToken"]
-    except (OSError, ValueError, KeyError, TypeError):
-        fail(f"No Claude Code credentials at {CREDENTIALS}")
+        account = json.loads(ACCOUNT.read_text()).get("oauthAccount") or {}
+    except (OSError, ValueError):
+        return ""
+    tier = account.get("userRateLimitTier") or account.get("organizationRateLimitTier") or ""
+    return PLANS.get(tier, "")
 
-    result = subprocess.run(
-        [
-            "curl", "-sS", "--max-time", str(LIMITS_TIMEOUT),
-            "-o", os.devnull, "-D", "-",
-            LIMITS_ENDPOINT,
-            "-H", f"authorization: Bearer {token}",
-            "-H", "anthropic-version: 2023-06-01",
-            "-H", "anthropic-beta: oauth-2025-04-20",
-            "-H", "content-type: application/json",
-            "-d", LIMITS_BODY,
-        ],
+
+def curl(*arguments):
+    return subprocess.run(
+        ["curl", "-sS", "--max-time", str(LIMITS_TIMEOUT), *arguments],
         capture_output=True, text=True,
     )
+
+
+def from_usage(token):
+    """Every limit the account has, from the endpoint `/usage` reads.
+
+    Its `limits` list carries the session, the week, and a weekly limit per
+    model where the plan has one, named by the model.
+    """
+    result = curl(
+        USAGE_ENDPOINT,
+        "-H", f"authorization: Bearer {token}",
+        "-H", "anthropic-beta: oauth-2025-04-20",
+    )
     if result.returncode != 0:
-        fail(result.stderr.strip() or "no answer from the API")
+        return None
+    try:
+        entries = json.loads(result.stdout).get("limits")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(entries, list):
+        return None
+
+    def window(entry):
+        try:
+            return {
+                "used": float(entry["percent"]) / 100,
+                "resets": parse_timestamp(entry.get("resets_at") or "") or 0,
+                "status": entry.get("severity", ""),
+            }
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    session = week = None
+    models = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        kind = entry.get("kind")
+        if kind == "session":
+            session = window(entry)
+        elif kind == "weekly_all":
+            week = window(entry)
+        else:
+            model = ((entry.get("scope") or {}).get("model") or {})
+            name = model.get("display_name") or model.get("id")
+            reading = window(entry)
+            if name and reading:
+                models.append({"name": name, **reading})
+    if session is None and week is None:
+        return None
+    return {"session": session, "week": week, "models": models, "claim": "", "status": ""}
+
+
+def from_headers(token):
+    """The session and the week, from the headers of a minimal request."""
+    result = curl(
+        "-o", os.devnull, "-D", "-",
+        LIMITS_ENDPOINT,
+        "-H", f"authorization: Bearer {token}",
+        "-H", "anthropic-version: 2023-06-01",
+        "-H", "anthropic-beta: oauth-2025-04-20",
+        "-H", "content-type: application/json",
+        "-d", LIMITS_BODY,
+    )
+    if result.returncode != 0:
+        return None
 
     headers = {}
     for line in result.stdout.splitlines():
@@ -270,17 +336,58 @@ def limits():
     session = window("5h")
     week = window("7d")
     if session is None and week is None:
-        # A 401, a 429 before the headers, or an API that stopped sending them.
-        fail("no rate limit headers in the response")
-
-    print(json.dumps({
-        "available": True,
+        return None
+    return {
         "session": session,
         "week": week,
+        "models": [],
         # Which of the two the API is currently enforcing against.
         "claim": headers.get("anthropic-ratelimit-unified-representative-claim", ""),
         "status": headers.get("anthropic-ratelimit-unified-status", ""),
-    }))
+    }
+
+
+def limits():
+    """Print the plan's utilization: the session, the week, each model's week.
+
+    Authenticates with Claude Code's OAuth token from its credentials file,
+    for this one request only; the token is never stored, printed or
+    refreshed, since refreshing would sign the running Claude Code out.
+    """
+    try:
+        token = json.loads(CREDENTIALS.read_text())["claudeAiOauth"]["accessToken"]
+    except (OSError, ValueError, KeyError, TypeError):
+        fail(f"No Claude Code credentials at {CREDENTIALS}")
+
+    try:
+        kept = json.loads(LIMITS_CACHE.read_text())
+    except (OSError, ValueError):
+        kept = None
+    if not isinstance(kept, dict) or not isinstance(kept.get("report"), dict):
+        kept = None
+    now = time.time()
+    if kept and now - kept.get("at", 0) < LIMITS_FRESH:
+        print(json.dumps({"available": True, "plan": plan(), **kept["report"]}))
+        return
+
+    report = from_usage(token)
+    if report is not None:
+        try:
+            STATE.mkdir(parents=True, exist_ok=True)
+            LIMITS_CACHE.write_text(json.dumps({"at": now, "report": report}))
+        except OSError as error:
+            print(f"Cannot keep the limits: {error}", file=sys.stderr)
+    else:
+        report = from_headers(token)
+        # The headers carry no week per model; the last known one stands
+        # until it renews.
+        if report is not None and kept:
+            report["models"] = [model for model in kept["report"].get("models", [])
+                                if model.get("resets", 0) > now]
+    if report is None:
+        # A 401, a 429 before any figure, or an API that stopped sending them.
+        fail("no usage figures from the API")
+    print(json.dumps({"available": True, "plan": plan(), **report}))
 
 
 if __name__ == "__main__":

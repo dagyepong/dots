@@ -8,14 +8,14 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
-import QtQuick.Layouts
 
 import "../../theme"
 import "../../services"
 import "../../components"
 
-// The ring is the level and the glyph the output device; the detail is a
-// slider and the two mutes. The ring stays white: volume is a choice, not a
+// The ring is the level and the glyph the output device; the detail is the
+// output's and the microphone's levels, every application playing, and the
+// outputs to choose from. The ring stays white: volume is a choice, not a
 // warning.
 Item {
     id: root
@@ -65,17 +65,15 @@ Item {
     Component {
         id: detail
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 14
+        ModuleCard {
+            title: "Sound"
+            subtitle: AudioService.ready ? AudioService.outputName(AudioService.sink) : "No output"
+            figure: AudioService.muted ? "Muted" : `${AudioService.volume}%`
+            figureColor: AudioService.muted ? Theme.textMuted : Theme.text
 
-            // Same white ring as the chip; the slider follows the palette.
-            RingIndicator {
-                Layout.preferredWidth: 56
-                Layout.preferredHeight: 56
-                Layout.alignment: Qt.AlignVCenter
-                thickness: 3.5
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
                 progress: AudioService.muted ? 0 : AudioService.volume / 100
                 trackColor: Theme.indicatorDim
                 fillColor: Theme.indicator
@@ -84,97 +82,74 @@ Item {
                     anchors.centerIn: parent
                     text: AudioService.icon
                     font.family: Theme.fontMono
-                    font.pixelSize: 20
+                    font.pixelSize: 18
                     color: AudioService.muted ? Theme.textMuted : Theme.indicator
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: AudioService.toggleMute()
                 }
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                spacing: 8
+            CardLevel {
+                glyph: AudioService.icon
+                name: "Volume"
+                value: AudioService.volume
+                dimmed: AudioService.muted
+                available: AudioService.ready
+                onMoved: value => AudioService.setVolume(value)
+                onMarkClicked: AudioService.toggleMute()
+            }
 
-                RowLayout {
-                    Layout.fillWidth: true
+            CardLevel {
+                glyph: AudioService.sourceIcon
+                name: "Microphone"
+                value: AudioService.sourceVolume
+                dimmed: AudioService.sourceMuted
+                available: AudioService.sourceReady
+                onMoved: value => AudioService.setSourceVolume(value)
+                onMarkClicked: AudioService.toggleSourceMute()
+            }
 
-                    Text {
-                        Layout.fillWidth: true
-                        text: "Volume"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
+            CardHeading {
+                visible: AudioService.streams.length > 0
+                text: "Apps"
+            }
 
-                    Text {
-                        text: AudioService.muted ? "Muted" : `${AudioService.volume}%`
-                        font.family: Theme.fontMono
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: AudioService.muted ? Theme.textMuted : Theme.text
-                    }
+            Repeater {
+                model: AudioService.streams
+
+                CardLevel {
+                    id: app
+
+                    required property var modelData
+
+                    picture: AudioService.streamIcon(app.modelData)
+                    glyph: "󰝚"
+                    name: AudioService.streamName(app.modelData)
+                    value: app.modelData.audio ? Math.round(app.modelData.audio.volume * 100) : 0
+                    dimmed: app.modelData.audio ? app.modelData.audio.muted : false
+                    onMoved: value => AudioService.setStreamVolume(app.modelData, value)
+                    onMarkClicked: AudioService.toggleStreamMute(app.modelData)
                 }
+            }
 
-                // The whole strip is the hit area.
-                Item {
-                    id: slider
+            CardHeading {
+                visible: AudioService.outputs.length > 1
+                text: "Output"
+            }
 
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 16
+            Repeater {
+                model: AudioService.outputs.length > 1 ? AudioService.outputs : []
 
-                    UsageBar {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitHeight: sliderMouse.containsMouse ? 6 : 4
-                        progress: AudioService.volume / 100
-                        fillColor: AudioService.muted
-                            ? Theme.indicatorDim : Theme.accent
+                CardChoice {
+                    required property var modelData
 
-                        Behavior on implicitHeight {
-                            NumberAnimation {
-                                duration: Theme.durationFast
-                                easing.type: Theme.easing
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: sliderMouse
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onPressed: event => AudioService.setVolume(
-                            Math.round(event.x / slider.width * 100))
-                        onPositionChanged: event => {
-                            if (pressed)
-                                AudioService.setVolume(Math.max(0, Math.min(100,
-                                    Math.round(event.x / slider.width * 100))))
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 9
-
-                    PillButton {
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 0
-                        text: "Mute"
-                        active: AudioService.muted
-                        implicitHeight: 28
-                        onClicked: AudioService.toggleMute()
-                    }
-
-                    PillButton {
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 0
-                        text: "Mic"
-                        active: AudioService.sourceMuted
-                        implicitHeight: 28
-                        onClicked: AudioService.toggleSourceMute()
-                    }
+                    text: AudioService.outputName(modelData)
+                    chosen: AudioService.sink === modelData
+                    onPicked: AudioService.choose(modelData)
                 }
             }
         }

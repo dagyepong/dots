@@ -50,14 +50,14 @@ Item {
                  { id: "modules", label: Tr.t("The bar") },
                  { id: "workspaces", label: Tr.t("Workspaces") },
                  { id: "notifications", label: Tr.t("Notifications") }],
-          keywords: "bar island notch height margin width full span workspaces unified layout island bar band notification toast do not disturb silence timeout clock time date seconds format beside running modules layout left right split drag catalogue chip icon ring figure hover shape media claude battery timer volume brightness network wifi bluetooth weather stats cpu updates pet recorder",
+          keywords: "bar island notch height margin width full span workspaces unified layout island bar band notification toast do not disturb silence timeout clock time date seconds format beside running modules layout left right split drag catalogue chip icon ring figure hover shape media claude battery timer volume brightness network wifi bluetooth weather stats cpu updates pet capture record screenshot buttons every screen monitors ground glass classic blur transparent translucent codex lyrics lrclib song",
           page: barPage },
 
         { id: "widgets", category: "shell", icon: "󰕮", label: Tr.t("Desktop"),
           blurb: Tr.t("What sits on the wallpaper, under the windows."),
           tabs: [{ id: "modules", label: Tr.t("Module settings") },
                  { id: "widgets", label: Tr.t("The widgets") }],
-          keywords: "widgets desktop wallpaper widget place drag size shape capsule bare outline accent style palette ink tray edit arrange clock calendar notes note sticky theme analogue modern opacity weather location place city github contributions username handwriting edges deck",
+          keywords: "widgets desktop wallpaper widget place drag size shape capsule ground glass classic blur palette ink tray edit arrange clock calendar notes note sticky theme analogue modern opacity weather location place city github contributions username handwriting edges deck pet creature plush paper pixel egg species style spectrum cava visualiser visualizer bars audio music lyrics song",
           page: widgetsPage },
 
         { id: "controls", category: "shell", icon: "󰕰", label: Tr.t("Control Centre"),
@@ -69,7 +69,7 @@ Item {
         { id: "dock", category: "shell", icon: "󱂩", label: Tr.t("Dock"),
           blurb: Tr.t("The dock and the applications kept on it."),
           tabs: [],
-          keywords: "dock apps applications launcher pinned kept favourite favorite running edge bottom left right align icon size autohide reserve taskbar menu windows close",
+          keywords: "dock apps applications launcher pinned kept favourite favorite running edge bottom left right align icon size autohide taskbar menu windows close every screen monitors",
           page: dockPage },
 
         { id: "launcher", category: "shell", icon: "󰍉", label: Tr.t("Launcher"),
@@ -80,22 +80,22 @@ Item {
           keywords: "launcher search apps results calculate run window timer note task board prefix sigil order recent frequency favourite favorite pinned kept clipboard history copy paste images wipe lock",
           page: launcherPage },
 
-        { id: "appearance", category: "desk", icon: "󰔏", label: Tr.t("Appearance"),
+        { id: "appearance", category: "desk", icon: "󰏘", label: Tr.t("Appearance"),
           blurb: Tr.t("Palette, windows, fonts and animations."),
           tabs: [{ id: "theme", label: Tr.t("Theme") },
                  { id: "windows", label: Tr.t("Windows") },
+                 { id: "depth", label: Tr.t("Depth") },
                  { id: "type", label: Tr.t("Type") },
                  { id: "motion", label: Tr.t("Motion") }],
-          keywords: "appearance theme colour color wallpaper transition fade wipe wave circle random greeting fastfetch fa terminal scene lava lamp critters koi invaders shadow rounding blur gaps border opacity glass rules font family sans mono nerd icons typeface animation speed curve easing preset motion",
+          keywords: "appearance theme colour color wallpaper transition fade wipe wave circle random greeting fastfetch fa terminal scene lava lamp critters koi invaders shadow shadows depth ground glass classic rounding blur gaps border opacity glass rules font family sans mono nerd icons typeface animation speed curve easing preset motion game mode performance window layout dwindle master scrolling",
           page: appearancePage },
 
         { id: "monitors", category: "desk", icon: "󰍹", label: Tr.t("Displays"),
           blurb: Tr.t("Screen layout, modes and the laptop lid."),
           tabs: [{ id: "arrangement", label: Tr.t("Arrangement") },
                  { id: "screen", label: Tr.t("The screen") },
-                 { id: "lid", label: Tr.t("The lid") },
-                 { id: "night", label: Tr.t("Night light") }],
-          keywords: "displays monitor screen resolution refresh scale rotate transform vrr mirror extend primary night light blue filter warm temperature gamma hyprsunset lid clamshell laptop close workspaces",
+                 { id: "lid", label: Tr.t("The lid") }],
+          keywords: "displays monitor screen resolution refresh scale rotate transform vrr mirror extend primary lid clamshell laptop close workspaces",
           page: monitorsPage },
 
         { id: "input", category: "desk", icon: "󰍽", label: Tr.t("Input"),
@@ -116,14 +116,14 @@ Item {
           blurb: Tr.t("Your account, the lock screen and idle behaviour."),
           tabs: [{ id: "lock", label: Tr.t("Lock screen") },
                  { id: "idle", label: Tr.t("When you leave") }],
-          keywords: "session lock blur password suspend security idle timeout sleep screen off dpms away never lock after avatar picture name account",
+          keywords: "session lock blur password suspend security idle timeout sleep screen off dpms away never lock after avatar picture name account clock stacked inline flip face unlock howdy camera infrared enrol enroll scan faces recognise music song lyrics cover now playing",
           page: sessionPage },
 
         { id: "system", category: "session", icon: "󰍛", label: Tr.t("System"),
           blurb: Tr.t("Profiles, language, this machine and reset."),
           tabs: [{ id: "profiles", label: Tr.t("Profiles") },
                  { id: "machine", label: Tr.t("This machine") }],
-          keywords: "system about version cpu memory uptime reset defaults language spanish english profile profiles switch rename duplicate delete import export backup file json",
+          keywords: "system about version update updates upgrade changelog commits cpu memory uptime reset defaults language spanish english profile profiles switch rename duplicate delete import export backup file json changed files edited deleted restore wallpapers .new config dotfiles keep mine",
           page: systemPage }
     ]
 
@@ -151,7 +151,6 @@ Item {
         "monitors/arrangement": "shell/displays/#arrangement",
         "monitors/screen": "shell/displays/#the-screen",
         "monitors/lid": "shell/displays/#the-lid",
-        "monitors/night": "shell/displays/#night-light",
         "input": "shell/settings/#the-pages",
         "keys": "shell/keys-and-packages/#changing-a-key",
         "session": "shell/lock-and-login/",

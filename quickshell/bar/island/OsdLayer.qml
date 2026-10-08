@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../../theme"
@@ -46,7 +47,7 @@ Item {
             width: 130
             height: 4
             radius: height / 2
-            color: Theme.islandSurfaceHover
+            color: Theme.surfaceHoverIn(QsWindow.window)
 
             Rectangle {
                 width: Math.max(parent.height, parent.width * Math.min(1, Math.max(0, root.progress)))

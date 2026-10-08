@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // A value nudged with arrows, wrapping at both ends. Compact enough to fit
@@ -25,8 +26,8 @@ Rectangle {
     implicitWidth: 62
     implicitHeight: 26
     radius: Theme.radiusSmall
-    color: Theme.islandSurface
-    border.color: Theme.islandBorder
+    color: Theme.surfaceIn(QsWindow.window)
+    border.color: Theme.borderIn(QsWindow.window)
     border.width: 1
 
     function step(delta: int): void {

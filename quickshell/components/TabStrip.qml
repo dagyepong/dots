@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -47,8 +48,8 @@ Item {
                 height: 26
                 radius: height / 2
                 color: pill.active ? Theme.accent
-                    : (pillMouse.containsMouse ? Theme.islandSurfaceHover : Theme.islandSurface)
-                border.color: pill.active ? Theme.accent : Theme.islandBorder
+                    : (pillMouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window))
+                border.color: pill.active ? Theme.accent : Theme.borderIn(QsWindow.window)
                 border.width: 1
 
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }

@@ -43,6 +43,7 @@ Item {
         github: githubWide,
         stats: statsWide,
         claude: claudeWide,
+        codex: codexWide,
         timer: timerWide,
         pet: petWide,
         media: mediaWide,
@@ -50,7 +51,8 @@ Item {
         calendar: calendarWide,
         notes: notesWide,
         tasks: tasksWide,
-        photo: photoWide
+        photo: photoWide,
+        spectrum: spectrumWide
     })
 
     Loader {
@@ -271,6 +273,55 @@ Item {
         }
     }
 
+    Component {
+        id: codexWide
+
+        WidgetFace {
+
+            ink: root.ink
+            label: "Codex"
+            reading: CodexService.figure
+            note: !CodexService.available ? "no usage found"
+                : CodexService.fullest ? `of the ${CodexService.fullestName}`
+                : "until Codex runs again"
+            extraShare: 0.42
+
+            CodexMark {
+                anchors.centerIn: parent
+                width: 32
+                height: 32
+                color: CodexService.tint
+            }
+
+            extra: [
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    spacing: 8
+                    visible: CodexService.measured
+
+                    UsageBar {
+
+                        trackColor: root.ink.raised
+                        width: parent.width
+                        progress: CodexService.gauge
+                        fillColor: CodexService.tint
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: CodexService.windowLine(CodexService.fullest)
+                        horizontalAlignment: Text.AlignRight
+                        elide: Text.ElideRight
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: root.ink.muted
+                    }
+                }
+            ]
+        }
+    }
+
     // ── DETAILS ─────────────────────────────────────────────────────────────
 
     Component {
@@ -340,7 +391,9 @@ Item {
                     anchors.fill: parent
 
                     Repeater {
-                        model: weather.hoursAhead
+                        model: ScriptModel {
+                            values: weather.hoursAhead
+                        }
 
                         Item {
                             id: block
@@ -420,7 +473,9 @@ Item {
                     spacing: 2
 
                     Repeater {
-                        model: UpdatesService.available ? UpdatesService.packages.slice(0, 4) : []
+                        model: ScriptModel {
+                            values: UpdatesService.available ? UpdatesService.packages.slice(0, 4) : []
+                        }
 
                         Text {
                             required property var modelData
@@ -466,7 +521,10 @@ Item {
                     spacing: 3
 
                     Repeater {
-                        model: BluetoothService.connectedDevices.slice(0, 3)
+                        model: ScriptModel {
+                            values: BluetoothService.connectedDevices.slice(0, 3)
+                            comparisonMode: ObjectComparison.Identity
+                        }
 
                         Text {
                             required property var modelData
@@ -583,9 +641,12 @@ Item {
             ClippingRectangle {
                 anchors.fill: parent
                 radius: width * Theme.pictureCorner
-                color: root.ink.raised
+                // None behind a picture: a player may send its logo on transparency.
+                color: wideArt.visible ? "transparent" : root.ink.raised
 
                 Image {
+                    id: wideArt
+
                     anchors.fill: parent
                     source: MediaService.artUrl
                     visible: source != "" && status === Image.Ready
@@ -905,7 +966,10 @@ Item {
                     spacing: 2
 
                     Repeater {
-                        model: TasksService.queue.slice(0, 3)
+                        model: ScriptModel {
+                            values: TasksService.queue.slice(0, 3)
+                            objectProp: "key"
+                        }
 
                         TaskRow {
                             required property var modelData
@@ -947,5 +1011,12 @@ Item {
         id: githubWide
 
         GithubFace { ink: root.ink; family: "4x2" }
+    }
+
+    // The bars in a capsule; see `SpectrumFace`.
+    Component {
+        id: spectrumWide
+
+        SpectrumFace { ink: root.ink; row: root.row; family: "4x2" }
     }
 }

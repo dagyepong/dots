@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../../theme"
 import "../../../services"
@@ -118,7 +119,9 @@ Item {
                 (page.height - (root.rows - 1) * Theme.centreGutter) / root.rows
 
             Repeater {
-                model: page.slice
+                model: ScriptModel {
+                    values: page.slice
+                }
 
                 QuickTile {
                     id: tile
@@ -248,7 +251,7 @@ Item {
                     height: 6
                     radius: 3
                     color: dot.index === pager.currentIndex ? Theme.text
-                        : (spot.containsMouse ? Theme.textMuted : Theme.islandBorder)
+                        : (spot.containsMouse ? Theme.textMuted : Theme.borderIn(QsWindow.window))
 
                     Behavior on color { ColorAnimation { duration: Theme.durationFast } }
                 }

@@ -27,9 +27,13 @@ Singleton {
     property int watchers: 0
     property bool available: false
 
-    // Query on construction: the bar needs `available` before the module
-    // exists to subscribe. Only reached while the module is enabled.
-    Component.onCompleted: root.refresh()
+    // Query on construction, once the settings have been read: the bar needs
+    // `available` before the module exists to subscribe, and a query before
+    // the place is known is a reading for wherever the IP says.
+    Component.onCompleted: {
+        if (SettingsService.arrived)
+            root.refresh()
+    }
 
     property string place: ""
     property string region: ""
@@ -45,6 +49,12 @@ Singleton {
 
     // So the card can show how old the reading is.
     property date readAt: new Date(0)
+
+    // The place setting the reading was asked for. A reading for any other
+    // is wrong rather than old, and is fetched again whoever is watching.
+    property string readFor: ""
+    readonly property string wanted: SettingsService.weatherPlace.trim()
+    readonly property bool stale: root.readFor !== root.wanted
 
     readonly property SystemClock clock: SystemClock {
         precision: SystemClock.Minutes
@@ -74,9 +84,9 @@ Singleton {
 
     function subscribe(): void {
         root.watchers += 1
-        // Only if never read or older than ten minutes.
+        // Only if never read, read for another place or older than ten minutes.
         const minutes = (new Date().getTime() - root.readAt.getTime()) / 60000
-        if (!root.available || minutes > 10)
+        if (!root.available || root.stale || minutes > 10)
             root.refresh()
     }
 
@@ -84,7 +94,25 @@ Singleton {
         root.watchers = Math.max(0, root.watchers - 1)
     }
 
+    // A query already running was started with the place it had then, so
+    // another asked for meanwhile runs when it ends.
+    property bool again: false
+    // The place the running query was started with, for `readFor`.
+    property string asked: ""
+    property real askedAt: 0
+
     function refresh(): void {
+        if (!SettingsService.arrived)
+            return
+        // A run that never reported back in half a minute is given up on.
+        const waiting = root.unsettled > 0 && Date.now() - root.askedAt < 30000
+        if (root.query.running || waiting) {
+            root.again = true
+            return
+        }
+        root.asked = root.wanted
+        root.askedAt = Date.now()
+        root.unsettled = 2
         root.query.running = true
     }
 
@@ -100,8 +128,11 @@ Singleton {
         target: SettingsService
 
         function onWeatherPlaceChanged(): void {
-            if (root.watchers > 0)
-                root.refresh()
+            root.refresh()
+        }
+
+        function onArrivedChanged(): void {
+            root.refresh()
         }
     }
 
@@ -110,41 +141,60 @@ Singleton {
     readonly property Process query: Process {
         command: {
             const line = [Quickshell.shellPath("scripts/weather.py")]
-            const place = SettingsService.weatherPlace.trim()
-            return place === "" ? line : line.concat([place])
+            return root.wanted === "" ? line : line.concat([root.wanted])
         }
+        onExited: root.settle()
         stdout: StdioCollector {
             onStreamFinished: {
-                let report = null
-                try {
-                    report = JSON.parse(text)
-                } catch (error) {
-                    console.warn("Cannot parse the weather report:", error)
-                    return
-                }
-                // Flagged separately: the last good reading stays on the card,
-                // so otherwise an unknown place would look like no change.
-                root.placeUnknown = report.reason === "place"
-                if (report.available !== true) {
-                    // Keep the last good reading.
-                    if (!root.available)
-                        root.available = false
-                    return
-                }
-                root.place = report.place
-                root.region = report.region
-                root.temperature = report.temperature
-                root.feelsLike = report.feelsLike
-                root.description = report.description
-                root.glyph = report.glyph
-                root.humidity = report.humidity
-                root.wind = report.wind
-                root.low = report.low
-                root.high = report.high
-                root.hourly = report.hourly ?? []
-                root.readAt = new Date()
-                root.available = true
+                root.take(text)
+                root.settle()
             }
         }
+    }
+
+    // A run is over once it has exited and its output has been read, in
+    // whichever order those arrive; only then does a queued one start, so
+    // the reading is recorded against the place it was asked for.
+    property int unsettled: 0
+
+    function settle(): void {
+        root.unsettled = Math.max(0, root.unsettled - 1)
+        if (root.unsettled > 0 || !root.again)
+            return
+        root.again = false
+        Qt.callLater(root.refresh)
+    }
+
+    function take(text: string): void {
+        let report = null
+        try {
+            report = JSON.parse(text)
+        } catch (error) {
+            console.warn("Cannot parse the weather report:", error)
+            return
+        }
+        // Flagged separately: the last good reading stays on the card,
+        // so otherwise an unknown place would look like no change.
+        root.placeUnknown = report.reason === "place"
+        if (report.available !== true) {
+            // Keep the last good reading.
+            if (!root.available)
+                root.available = false
+            return
+        }
+        root.place = report.place
+        root.region = report.region
+        root.temperature = report.temperature
+        root.feelsLike = report.feelsLike
+        root.description = report.description
+        root.glyph = report.glyph
+        root.humidity = report.humidity
+        root.wind = report.wind
+        root.low = report.low
+        root.high = report.high
+        root.hourly = report.hourly ?? []
+        root.readAt = new Date()
+        root.readFor = root.asked
+        root.available = true
     }
 }

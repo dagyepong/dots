@@ -21,6 +21,7 @@ from its own config directory.
 import colorsys
 import configparser
 import glob
+import hashlib
 import json
 import os
 import re
@@ -36,8 +37,14 @@ import greeting
 XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
 XDG_DATA_HOME = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
 XDG_STATE_HOME = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+XDG_CACHE_HOME = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
 
 WALLPAPERS_DIR = os.path.join(XDG_DATA_HOME, "wallpapers")
+# Animated wallpapers: videos, played by mpvpaper over the still awww shows.
+ANIMATED_DIR = os.path.join(WALLPAPERS_DIR, "animated")
+# One frame of each video, for the palette and for everything that draws the
+# wallpaper as a picture (the lock, the overview, the arranging desk).
+POSTERS_DIR = os.path.join(XDG_CACHE_HOME, "impasto", "posters")
 STATE_DIR = os.path.join(XDG_STATE_HOME, "quickshell")
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
 TERMINAL_PALETTE_FILE = os.path.join(STATE_DIR, "kitty-palette.conf")
@@ -396,8 +403,13 @@ CAVA_GRADIENT_DIM = 0.60
 CURRENT_WALLPAPER_LINK = os.path.join(STATE_DIR, "current-wallpaper")
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
+MOTION_EXTENSIONS = (".mp4", ".webm", ".mkv", ".mov", ".gif")
 
-DEFAULT_STATE = {"activeTheme": "adaptive", "currentWallpaper": ""}
+# Paused when nothing of the wallpaper shows, and under a fullscreen window.
+MPVPAPER_FLAGS = ["--auto-pause", "--auto-mode", "full"]
+MPV_OPTIONS = "no-audio loop hwdec=auto panscan=1.0"
+
+DEFAULT_STATE = {"activeTheme": "adaptive", "currentWallpaper": "", "currentMotion": ""}
 
 # Fallback accent when an image yields nothing usable.
 NEUTRAL_ACCENT = {"hex": "#89B4FA", "r": 137, "g": 180, "b": 250}
@@ -424,11 +436,23 @@ def save_state(state):
         sys.stderr.write(f"Cannot save state: {error}\n")
 
 
+def get_current_motion():
+    motion = load_state().get("currentMotion") or ""
+    return motion if os.path.isfile(motion) else ""
+
+
 def get_current_wallpaper():
     state = load_state()
     stored = state.get("currentWallpaper")
     if stored and os.path.isfile(stored):
         return stored
+
+    # A poster is cache and may have been cleared.
+    motion = get_current_motion()
+    if motion:
+        poster = poster_of(motion)
+        if poster:
+            return poster
 
     # Ask the running daemon before giving up; the state file may predate it.
     if shutil.which("awww"):
@@ -453,6 +477,99 @@ def list_wallpapers():
         if os.path.isfile(path) and name.lower().endswith(IMAGE_EXTENSIONS):
             entries.append({"name": pretty_name(name), "path": path})
     return entries
+
+
+def list_animated():
+    # Made here so there is a folder to drop the first video into.
+    try:
+        os.makedirs(ANIMATED_DIR, exist_ok=True)
+    except OSError:
+        return []
+    entries = []
+    for name in sorted(os.listdir(ANIMATED_DIR)):
+        path = os.path.join(ANIMATED_DIR, name)
+        if name.startswith(".") or not os.path.isfile(path):
+            continue
+        if not name.lower().endswith(MOTION_EXTENSIONS):
+            continue
+        poster = poster_of(path)
+        if poster:
+            entries.append({"name": pretty_name(name), "path": path, "poster": poster})
+    return entries
+
+
+def is_motion(path):
+    return path.lower().endswith(MOTION_EXTENSIONS)
+
+
+def poster_of(video):
+    """The video's first frame, the still standing in for it, made once.
+
+    The video starts on that frame, so the handover from the still does not
+    jump.
+    """
+    try:
+        status = os.stat(video)
+    except OSError:
+        return ""
+    key = hashlib.sha1(f"{video}\0{status.st_mtime_ns}\0{status.st_size}".encode()).hexdigest()[:16]
+    poster = os.path.join(POSTERS_DIR, f"{key}.png")
+    if os.path.isfile(poster):
+        return poster
+
+    if not shutil.which("ffmpeg"):
+        sys.stderr.write("ffmpeg not found; a video wallpaper needs it for its palette\n")
+        return ""
+    os.makedirs(POSTERS_DIR, exist_ok=True)
+    try:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video, "-frames:v", "1", poster],
+                       capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as error:
+        sys.stderr.write(f"ffmpeg failed: {error}\n")
+        return ""
+    return poster if os.path.isfile(poster) and os.path.getsize(poster) > 0 else ""
+
+
+# The name the waiting shell runs under, so a video still waiting to start
+# is stopped with the ones already playing.
+MOTION_TAG = "impasto-motion"
+
+
+def stop_motion():
+    for pattern in (["-f", MOTION_TAG], ["-x", "mpvpaper"]):
+        try:
+            subprocess.run(["pkill", *pattern], capture_output=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
+def start_motion(video, delay=0.0):
+    """Play `video` on every output from its start, after `delay`.
+
+    Detached, so it outlives the script and a shell reload. The delay lets
+    awww's transition to the poster finish before the video covers it.
+    """
+    if not shutil.which("mpvpaper"):
+        sys.stderr.write("mpvpaper not found; the video's poster stands in for it\n")
+        return False
+    command = ["mpvpaper", *MPVPAPER_FLAGS, "--mpv-options", MPV_OPTIONS, "ALL", video]
+    try:
+        subprocess.Popen(["sh", "-c", 'sleep "$1"; shift; exec "$@"', MOTION_TAG,
+                          f"{delay:g}", *command],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError as error:
+        sys.stderr.write(f"mpvpaper failed: {error}\n")
+        return False
+    return True
+
+
+def motion_running():
+    try:
+        return subprocess.run(["pgrep", "-x", "mpvpaper"], capture_output=True,
+                              timeout=5).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def pretty_name(filename):
@@ -3469,8 +3586,8 @@ THUNAR_ACTIONS = (
      "Open in VSCodium",
      "codium %F", ("directories", "text-files", "other-files")),
     ("impasto-wallpaper", "preferences-desktop-wallpaper", "Set as Wallpaper",
-     "Use this picture as the wallpaper and theme the desktop from it",
-     "qs ipc call wallpaper set %f", ("image-files",)),
+     "Use this picture or video as the wallpaper and theme the desktop from it",
+     "qs ipc call wallpaper set %f", ("image-files", "video-files")),
     ("impasto-copy-path", "edit-copy", "Copy Path",
      "Copy the full path of the selection to the clipboard",
      "sh -c 'printf %s \"$1\" | wl-copy' impasto %f",
@@ -3842,10 +3959,26 @@ WALLPAPER_TRANSITIONS = ("none", "simple", "fade", "left", "right", "top", "bott
                          "wipe", "wave", "grow", "center", "any", "outer")
 
 
-def set_wallpaper(image_path, transition="wipe"):
-    if not os.path.isfile(image_path):
-        sys.stderr.write(f"Wallpaper not found: {image_path}\n")
+def set_wallpaper(chosen, transition="wipe"):
+    """Show a picture, or a video over its poster.
+
+    Either way awww shows a still, so the transition, the palette and every
+    picture of the wallpaper work on one kind of file.
+    """
+    if not os.path.isfile(chosen):
+        sys.stderr.write(f"Wallpaper not found: {chosen}\n")
         return False
+
+    motion = ""
+    image_path = chosen
+    if is_motion(chosen):
+        image_path = poster_of(chosen)
+        if not image_path:
+            return False
+        motion = chosen
+
+    # The old video goes first, so the transition runs from its poster.
+    stop_motion()
 
     if shutil.which("awww"):
         if transition not in WALLPAPER_TRANSITIONS:
@@ -3853,12 +3986,21 @@ def set_wallpaper(image_path, transition="wipe"):
         command = ["awww", "img", image_path, "--transition-type", transition,
                    "--transition-duration", "1"]
         try:
-            subprocess.run(command, capture_output=True, timeout=15)
+            result = subprocess.run(command, capture_output=True, timeout=15)
         except (OSError, subprocess.SubprocessError) as error:
             sys.stderr.write(f"awww failed: {error}\n")
+            return False
+        if result.returncode != 0:
+            stderr = result.stderr.decode(errors="replace").strip()
+            sys.stderr.write(f"awww failed: {stderr or f'exit {result.returncode}'}\n")
+            return False
+
+    if motion:
+        start_motion(motion, delay=1)
 
     state = load_state()
     state["currentWallpaper"] = image_path
+    state["currentMotion"] = motion
     save_state(state)
     link_current_wallpaper(image_path)
     extract_colors(image_path)
@@ -3892,6 +4034,14 @@ def restore_wallpaper():
         found = re.match(r"\s*:\s*([^:]+):", line)
         if found and not re.search(r"image:\s*/", line):
             blank.append(found.group(1).strip())
+
+    # mpvpaper plays on the outputs there were when it started, so a new one
+    # restarts it; so does a login, when it is not running at all.
+    motion = get_current_motion()
+    if motion and (blank or not motion_running()):
+        stop_motion()
+        start_motion(motion)
+
     if not blank:
         return 0
 
@@ -3915,7 +4065,8 @@ def set_theme(theme_id):
 
 
 def main():
-    actions = ("list-wallpapers | get-current | get-state | set-wallpaper <path> [transition] | "
+    actions = ("list-wallpapers | list-animated | get-current | get-state | "
+               "set-wallpaper <path> [transition] | "
                "restore | extract-colors [path] | set-theme <id> | "
                "push-terminal-palette <json> | push-terminal-font <family> | "
                "apply-vscodium [json] | apply-thunar | apply-vesktop")
@@ -3928,11 +4079,14 @@ def main():
 
     if action == "list-wallpapers":
         print(json.dumps(list_wallpapers()))
+    elif action == "list-animated":
+        print(json.dumps(list_animated()))
     elif action == "get-current":
         print(get_current_wallpaper())
     elif action == "get-state":
         state = load_state()
         state["currentWallpaper"] = get_current_wallpaper()
+        state["currentMotion"] = get_current_motion()
         print(json.dumps(state))
     elif action == "extract-colors":
         print(json.dumps(extract_colors(argument or get_current_wallpaper())))

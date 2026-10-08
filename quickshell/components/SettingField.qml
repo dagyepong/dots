@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -54,7 +55,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             radius: Theme.radiusSmall
             color: Theme.island
-            border.color: input.activeFocus ? Theme.accent : Theme.islandBorder
+            border.color: input.activeFocus ? Theme.accent : Theme.borderIn(QsWindow.window)
             border.width: 1
 
             Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }

@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -47,8 +48,8 @@ ColumnLayout {
         implicitWidth: Math.max(24, capText.implicitWidth + 14)
         implicitHeight: 22
         radius: Theme.radiusSmall - 2
-        color: Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Text {
@@ -123,7 +124,7 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 1
-        color: Theme.islandBorder
+        color: Theme.borderIn(QsWindow.window)
     }
 
     // ── LIST ────────────────────────────────────────────────────────────────
@@ -157,7 +158,9 @@ ColumnLayout {
                 width: list.width
 
                 Repeater {
-                    model: root.entries
+                    model: ScriptModel {
+                        values: root.entries
+                    }
 
                     Item {
                         id: entry
@@ -186,7 +189,7 @@ ColumnLayout {
                             visible: !entry.modelData.heading
                             anchors.fill: parent
                             radius: Theme.radiusSmall
-                            color: rowHover.hovered ? Theme.islandSurface : "transparent"
+                            color: rowHover.hovered ? Theme.surfaceIn(QsWindow.window) : "transparent"
 
                             Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 

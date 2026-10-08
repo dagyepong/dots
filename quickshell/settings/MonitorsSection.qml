@@ -1,7 +1,7 @@
 // ╭──────────────────────────────────────────────────────────────────────────╮
 // │                                                                          │
 // │   M O N I T O R S   S E C T I O N                                        │
-// │   displays · arrangement, lid and night light                            │
+// │   displays · arrangement, the screen and the lid                         │
 // │                                                                          │
 // │   github.com/andreumassanet/impasto                                      │
 // │                                                                          │
@@ -66,6 +66,9 @@ SettingsSection {
             r => r.width === screen.width && r.height === screen.height)
         return group ? group.refreshes : []
     }
+
+    // One screen plugged in, lit or not: nothing to arrange or choose between.
+    readonly property bool single: root.monitors.length < 2
 
     readonly property bool lastLit:
         root.monitors.filter(m => !m.disabled).length <= 1
@@ -165,10 +168,11 @@ SettingsSection {
             }
 
             SettingRow {
-                visible: root.monitors.length > 1
                 label: Tr.t("Arrangement")
                 reading: root.mirrored
                     ? Tr.t("Every screen shows the primary's") : Tr.t("Extended across all of them")
+                locked: root.single
+                reason: Tr.t("Only one screen is plugged in")
 
                 SegmentedControl {
                     options: [
@@ -181,9 +185,10 @@ SettingsSection {
             }
 
             SettingRow {
-                visible: root.monitors.length > 1
-                label: Tr.t("The island is on")
-                reading: MonitorService.effectivePrimaryName
+                label: Tr.t("The main screen")
+                reading: Tr.t("Where anything with no screen of its own goes, and what mirroring copies.")
+                locked: root.single
+                reason: Tr.t("Only one screen is plugged in")
 
                 SegmentedControl {
                     options: root.screenOptions
@@ -221,8 +226,9 @@ SettingsSection {
         spacing: root.spacing
         visible: root.tab === "screen"
 
+        // A chooser, not a setting: with one screen it has nothing to offer.
         SettingGroup {
-            visible: root.monitors.length > 1
+            visible: !root.single
             title: Tr.t("Which screen")
 
             SettingRow {
@@ -382,11 +388,11 @@ SettingsSection {
             }
 
             SettingRow {
-                visible: (root.currentRefreshes?.length ?? 0) > 1
                 label: Tr.t("Refresh rate")
                 reading: `${(root.current?.refresh ?? 0).toFixed(2)} Hz`
-                locked: root.currentOff
-                reason: Tr.t("The screen is off")
+                locked: root.currentOff || (root.currentRefreshes?.length ?? 0) < 2
+                reason: root.currentOff
+                    ? Tr.t("The screen is off") : Tr.t("The only rate at this resolution")
 
                 Row {
                     spacing: 6
@@ -515,43 +521,6 @@ SettingsSection {
                     color: Theme.textMuted
                 }
             }
-        }
-    }
-
-
-    // ── NIGHT LIGHT ─────────────────────────────────────────────────────────
-    //
-    // A gamma ramp through hyprsunset. The switch mirrors the control centre
-    // tile (both read `SunsetService`); the temperature is only set here.
-
-    SettingGroup {
-        visible: root.tab === "night"
-        title: Tr.t("Night light")
-        note: Tr.t("Warmer colours for the evening.")
-        hint: Tr.t("It adjusts the gamma ramp, so screenshots keep their original colours. There is no schedule: it stays on until you turn it off.")
-
-        SettingRow {
-            label: Tr.t("Warm the screen")
-            locked: !SunsetService.available
-            reason: Tr.t("Needs hyprsunset, which is not installed")
-
-            ToggleSwitch {
-                checked: SunsetService.on
-                onToggled: SunsetService.toggle()
-            }
-        }
-
-        SettingSlider {
-            label: Tr.t("Colour temperature")
-            value: SettingsService.nightTemperature
-            from: SunsetService.warmest
-            to: SunsetService.coolest
-            stepSize: 100
-            unit: " K"
-            locked: !SunsetService.available
-            reason: Tr.t("Needs hyprsunset, which is not installed")
-            onMoved: value => SettingsService.set(
-                "nightTemperature", Math.round(value / 100) * 100)
         }
     }
 }

@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../../theme"
 import "../../../services"
 
@@ -29,6 +30,7 @@ Item {
     required property Item board
 
     signal panelRequested(string panel)
+    signal settingsRequested()
     signal dismissed()
 
     readonly property string key: root.modelData
@@ -102,6 +104,7 @@ Item {
         size: root.size
         enabled: !root.editing
         onPanelRequested: panel => root.panelRequested(panel)
+        onSettingsRequested: root.settingsRequested()
         onDismissed: root.dismissed()
     }
 
@@ -229,7 +232,7 @@ Item {
         height: 20
         radius: 10
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
         visible: opacity > 0
         opacity: root.dressed ? 1 : 0
@@ -263,7 +266,7 @@ Item {
         height: 20
         radius: 10
         color: Theme.island
-        border.color: resize.active ? Theme.accent : Theme.islandBorder
+        border.color: resize.active ? Theme.accent : Theme.borderIn(QsWindow.window)
         border.width: resize.active ? 2 : 1
         visible: opacity > 0
         opacity: root.dressed || resize.active ? 1 : 0

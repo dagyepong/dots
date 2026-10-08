@@ -17,10 +17,13 @@ import "."
 
 // Picks one MPRIS player and exposes it flatly: the one that is playing,
 // otherwise the first controllable one, so a paused track stays on the island.
+// A player with nothing in it does not count: a browser keeps one registered,
+// stopped and without a title, after the tab that played has gone.
 Singleton {
     id: root
 
     readonly property var players: Mpris.players.values
+        .filter(player => player.isPlaying || (player.trackTitle ?? "") !== "")
 
     readonly property MprisPlayer active: {
         const playing = root.players.find(player => player.isPlaying)

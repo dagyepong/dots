@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -217,8 +218,8 @@ FocusScope {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: Theme.radiusMedium
-                                color: Theme.islandSurface
-                                border.color: lane.receiving ? Theme.accent : Theme.islandBorder
+                                color: Theme.surfaceIn(QsWindow.window)
+                                border.color: lane.receiving ? Theme.accent : Theme.borderIn(QsWindow.window)
                                 border.width: 1
 
                                 Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
@@ -269,7 +270,10 @@ FocusScope {
                                 anchors.topMargin: 10
                                 clip: true
                                 spacing: 6
-                                model: lane.cards
+                                model: ScriptModel {
+                                    values: lane.cards
+                                    objectProp: "key"
+                                }
                                 boundsBehavior: Flickable.StopAtBounds
 
                                 // New, at the top of the first lane: an empty
@@ -286,7 +290,7 @@ FocusScope {
                                         anchors.fill: parent
                                         anchors.bottomMargin: 6
                                         radius: Theme.radiusSmall
-                                        color: freshMouse.containsMouse ? Theme.islandSurfaceHover : Theme.island
+                                        color: freshMouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : Theme.island
                                         border.color: parent.current ? Theme.accent : Theme.hairline
                                         border.width: 1
 
@@ -376,7 +380,7 @@ FocusScope {
                                         anchors.fill: parent
                                         radius: Theme.radiusSmall
                                         color: cardHover.hovered && !card.held
-                                            ? Theme.islandSurfaceHover : Theme.island
+                                            ? Theme.surfaceHoverIn(QsWindow.window) : Theme.island
                                         border.color: card.current ? Theme.accent : Theme.hairline
                                         border.width: 1
                                         opacity: card.held ? 0.35 : 1
@@ -652,7 +656,7 @@ FocusScope {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
-                    color: Theme.islandBorder
+                    color: Theme.borderIn(QsWindow.window)
                 }
 
                 // The task's notes.

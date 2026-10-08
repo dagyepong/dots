@@ -29,6 +29,7 @@ Item {
     property bool active: true
 
     signal panelRequested(string panel)
+    signal settingsRequested()
     signal dismissed()
 
     readonly property var shape: ControlsService.parse(root.size)
@@ -47,7 +48,9 @@ Item {
         clock: clockBlock,
         games: gamesBlock,
         notes: notesBlock,
-        tasks: tasksBlock
+        tasks: tasksBlock,
+        session: sessionBlock,
+        shortcuts: shortcutsBlock
     })
 
     Loader {
@@ -79,8 +82,10 @@ Item {
                 value: AudioService.volume
                 available: AudioService.ready
                 dimmed: AudioService.muted
+                expandable: true
                 onMoved: value => AudioService.setVolume(value)
                 onIconClicked: AudioService.toggleMute()
+                onExpandClicked: root.panelRequested("sound")
             }
         }
     }
@@ -88,6 +93,8 @@ Item {
     Component {
         id: brightnessBlock
         Item {
+            Component.onCompleted: BrightnessService.refresh()
+
             SliderRow {
                 anchors.centerIn: parent
                 width: parent.width
@@ -96,8 +103,29 @@ Item {
                 value: BrightnessService.percent
                 from: 1
                 available: BrightnessService.available
+                // A page only when there is more than one screen to set.
+                expandable: BrightnessService.several
                 onMoved: value => BrightnessService.setPercent(value)
+                onExpandClicked: root.panelRequested("brightness")
             }
+        }
+    }
+
+    Component {
+        id: sessionBlock
+        ButtonsBlock {
+            kind: "session"
+            onRan: root.dismissed()
+        }
+    }
+
+    Component {
+        id: shortcutsBlock
+        ButtonsBlock {
+            kind: "shortcuts"
+            blockKey: root.blockKey
+            onPanelRequested: panel => root.panelRequested(panel)
+            onSettingsRequested: root.settingsRequested()
         }
     }
 

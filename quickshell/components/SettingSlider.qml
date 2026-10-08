@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import QtQuick.Controls
 
@@ -81,7 +82,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 height: 4
                 radius: 2
-                color: Theme.islandSurfaceHover
+                color: Theme.surfaceHoverIn(QsWindow.window)
 
                 Rectangle {
                     anchors.left: parent.left

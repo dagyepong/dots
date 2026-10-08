@@ -8,10 +8,12 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Effects
 
 import "../theme"
 import "../services"
+import "../components"
 
 // One module on the desktop grid, in one of the four families.
 //
@@ -23,7 +25,7 @@ import "../services"
 Item {
     id: root
 
-    // The row key, from the surface's Repeater over `DesktopService.keys`.
+    // The row key, from the surface's Repeater over `DesktopService.keysOn`.
     required property string modelData
 
     // The surface the grid is measured against, passed in rather than found
@@ -31,16 +33,47 @@ Item {
     // shadows an id of the same name.
     required property Item board
 
+    // The screen this board is on, which a drag never leaves.
+    required property string screenName
+
     readonly property string key: root.modelData
 
     // Briefly null between the row's removal and the delegate's destruction.
     readonly property var row: DesktopService.entryOf(root.key)
 
     readonly property string moduleId: root.row ? root.row.id : ""
+
+    // A reading that polls keeps polling while a widget shows it, as a piece
+    // on the bar does. Held by the id watched, since the row goes before the
+    // delegate does.
+    property string watching: ""
+
+    function rewatch(): void {
+        if (root.moduleId === "" || root.moduleId === root.watching)
+            return
+        if (root.watching !== "")
+            ModuleService.watch(root.watching, false)
+        root.watching = root.moduleId
+        ModuleService.watch(root.watching, true)
+    }
+
+    onModuleIdChanged: root.rewatch()
+    Component.onCompleted: root.rewatch()
+    Component.onDestruction: {
+        if (root.watching !== "")
+            ModuleService.watch(root.watching, false)
+    }
     readonly property string family: DesktopService.familyOf(root.row)
-    readonly property string style: DesktopService.styleOf(root.row)
     readonly property var ink: DesktopService.inkFor(root.row)
     readonly property real solidity: DesktopService.opacityOf(root.row) / 100
+    // The outline fades out over the last fifth, so at zero nothing of the
+    // capsule is left but what it holds.
+    readonly property color rim: Qt.rgba(root.ink.border.r, root.ink.border.g, root.ink.border.b,
+                                         root.ink.border.a * Math.min(1, root.solidity * 5))
+
+    // Notes, photos and the spectrum have no capsule and draw on the
+    // wallpaper with a shadow.
+    readonly property bool onPicture: DesktopService.bare(root.row)
 
     readonly property var box: DesktopService.geometry(
         root.row ?? ({}), root.board.width, root.board.height)
@@ -49,10 +82,6 @@ Item {
     readonly property bool held: DesktopService.dragging === root.key
     readonly property bool selected: DesktopService.selected === root.key
     readonly property bool hovered: hover.hovered
-
-    // Two of the four styles draw a capsule; the other two draw on the
-    // wallpaper with a shadow.
-    readonly property bool onPicture: root.style === "bare" || root.style === "outline"
 
     width: root.box.width
     height: root.box.height
@@ -63,7 +92,7 @@ Item {
     Binding {
         target: root
         property: "x"
-        value: root.box.x
+        value: root.box.x + DesktopService.insets.left
         when: !drag.active
         restoreMode: Binding.RestoreBindingOrValue
     }
@@ -100,56 +129,148 @@ Item {
     // badge is not hidden by a neighbour.
     z: root.held ? 2 : (root.selected ? 1 : 0)
 
-    // ── CAPSULE ─────────────────────────────────────────────────────────────
+    // ── SHADOW ──────────────────────────────────────────────────────────────
     //
-    // The island's black unless the desktop or the row sets another ink; the
-    // accent style paints it in the accent. The border keeps its own alpha, so
-    // a translucent capsule still has an edge.
-    Rectangle {
-        anchors.fill: parent
-        visible: !root.onPicture
-        radius: Theme.desktopRadius
-        color: Qt.rgba(root.ink.ground.r, root.ink.ground.g, root.ink.ground.b,
-                       root.solidity)
-        border.color: root.ink.border
-        border.width: root.style === "accent" ? 0 : 1
+    // At the windows' numbers, since a widget sits on the desk as a window
+    // does; on its own setting (`widgetShadow`). Under a capsule that lets
+    // the wallpaper through — glass, or solid below full opacity — the
+    // capsule's own shape is cut out of it, so it falls outside and does not
+    // show through.
+    Item {
+        id: cast
 
-        Behavior on color { ColorAnimation { duration: Theme.durationMedium } }
+        readonly property int reach: Theme.shadowRange + 4
+        readonly property bool cut: !Theme.deskSolid || root.solidity < 1
+
+        visible: SettingsService.widgetShadow && !root.onPicture
+            && (!Theme.deskSolid || root.solidity > 0)
+        x: -cast.reach
+        y: -cast.reach
+        width: root.width + 2 * cast.reach
+        height: root.height + 2 * cast.reach
+
+        layer.enabled: cast.visible && cast.cut
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskInverted: true
+            maskSource: cutout
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1
+        }
+
+        Item {
+            anchors.fill: parent
+            opacity: Theme.shadowOpacity
+
+            layer.enabled: cast.visible
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: 1
+                blurMax: Theme.shadowRange - Theme.shadowSpread
+            }
+
+            Rectangle {
+                x: cast.reach - Theme.shadowSpread
+                y: cast.reach - Theme.shadowSpread
+                width: root.width + 2 * Theme.shadowSpread
+                height: root.height + 2 * Theme.shadowSpread
+                radius: Theme.desktopRadius + Theme.shadowSpread
+                color: Theme.shadowColor
+            }
+        }
+
+        Item {
+            id: cutout
+
+            anchors.fill: parent
+            visible: false
+            layer.enabled: cast.cut
+
+            Rectangle {
+                x: cast.reach
+                y: cast.reach
+                width: root.width
+                height: root.height
+                radius: Theme.desktopRadius
+            }
+        }
     }
 
-    // Outline style: the edge only, in the text colour so it reads on the
-    // wallpaper.
-    Rectangle {
-        anchors.fill: parent
-        visible: root.style === "outline"
-        radius: Theme.desktopRadius
-        color: "transparent"
-        border.color: Qt.rgba(root.ink.text.r, root.ink.text.g, root.ink.text.b, 0.55)
-        border.width: 1.5
-    }
-
-    // Disabled while arranging so dragging does not press buttons. `enabled`
-    // rather than an overlay item, which would take the drag as well.
-    Face {
-        anchors.fill: parent
-        moduleId: root.moduleId
-        family: root.family
-        theme: DesktopService.themeOf(root.row)
-        ink: root.ink
-        row: root.row
-        enabled: !root.editing
-    }
+    // ── CAPSULE ─────────────────────────────────────────────────────────────
 
     // Without a capsule the contents get a drop shadow to stay readable on the
-    // wallpaper. `layer.enabled` rather than a MultiEffect `source`: a
-    // Repeater's delegate never renders into another item's source.
-    layer.enabled: root.onPicture
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowBlur: 1
-        shadowOpacity: 0.6
-        shadowVerticalOffset: 2
-        shadowColor: Theme.island
+    // wallpaper. A sticker brings its own ground, so its shadow is the
+    // widgets' shadow setting instead: the die-cut shape lifted off the
+    // desk, at the windows' numbers. `layer.enabled` rather than a
+    // MultiEffect `source`: a Repeater's delegate never renders into another
+    // item's source. Not the spectrum, which is drawn as it is on an edge,
+    // and whose layer would be drawn again on every one of cava's frames.
+    readonly property bool sticker: DesktopService.themeOf(root.row) === "sticker"
+        && root.moduleId !== "notes" && root.moduleId !== "spectrum"
+
+    // The layer holds the ground and the face and nothing else, grown by
+    // `reach` on every side: a layer is clipped to its item, and the arranging
+    // outline, badge and handle sit outside the widget, as do the corners of
+    // a tilted sticker.
+    Item {
+        id: body
+
+        readonly property int reach: Theme.shadowRange
+
+        anchors.fill: parent
+        anchors.margins: -reach
+        layer.enabled: root.sticker ? SettingsService.widgetShadow
+            : root.onPicture && root.moduleId !== "spectrum"
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowBlur: 1
+            blurMax: root.sticker ? Theme.shadowRange : 32
+            shadowOpacity: root.sticker ? Theme.shadowOpacity : 0.6
+            shadowVerticalOffset: root.sticker ? Theme.shadowSpread : 2
+            shadowColor: Theme.island
+        }
+
+        Item {
+            x: body.reach
+            y: body.reach
+            width: root.width
+            height: root.height
+
+            // The desk's ground (`Theme.deskStyle`, the bar's unless set apart):
+            // solid black at the widget's opacity, or glass with its rim and edge. The border
+            // keeps its own alpha, so a translucent capsule still has an edge.
+            Rectangle {
+                id: capsule
+
+                anchors.fill: parent
+                visible: !root.onPicture
+                radius: Theme.desktopRadius
+                color: Theme.deskSolid
+                    ? Qt.rgba(root.ink.ground.r, root.ink.ground.g, root.ink.ground.b, root.solidity)
+                    : Theme.groundOf(Theme.deskStyle)
+                border.color: Theme.deskSolid ? root.rim : Theme.rimOf(Theme.deskStyle)
+                border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.durationMedium } }
+            }
+
+            GlassSheen {
+                shape: capsule
+                visible: Theme.deskGlass && !root.onPicture
+            }
+
+            // Disabled while arranging so dragging does not press buttons. `enabled`
+            // rather than an overlay item, which would take the drag as well.
+            Face {
+                anchors.fill: parent
+                moduleId: root.moduleId
+                family: root.family
+                theme: DesktopService.themeOf(root.row)
+                ink: root.ink
+                row: root.row
+                enabled: !root.editing
+            }
+        }
     }
 
     // ── ARRANGING ───────────────────────────────────────────────────────────
@@ -176,7 +297,7 @@ Item {
         onTapped: eventPoint => {
             const point = root.board.mapFromItem(null,
                 eventPoint.scenePosition.x, eventPoint.scenePosition.y)
-            DesktopService.openMenu(root.key, point.x, point.y)
+            DesktopService.openMenu(root.key, root.screenName, point.x, point.y)
         }
     }
 
@@ -196,10 +317,14 @@ Item {
 
         enabled: root.editing
         target: root
+
+        // This board and no further. A widget belongs to the screen it was put
+        // on, and the way to move one to another screen is to take it off here
+        // and put it back there, where the card already is.
         xAxis.minimum: 0
-        xAxis.maximum: Math.max(0, root.board.width - root.width)
+        xAxis.maximum: Math.max(0, root.parent.width - root.width)
         yAxis.minimum: 0
-        yAxis.maximum: Math.max(0, root.board.height - root.height)
+        yAxis.maximum: Math.max(0, root.parent.height - root.height)
 
         onActiveChanged: {
             if (drag.active) {
@@ -211,31 +336,40 @@ Item {
             DesktopService.landing = null
             DeckService.receiving = ""
             // Dropped on the tray, it is removed; a note dropped on a screen
-            // edge joins that edge's deck; otherwise it goes to the cell under
-            // the pointer. `place` falls back to the nearest free cell or the
+            // edge joins that edge's deck, and a spectrum becomes the bars
+            // along it; otherwise it goes to the cell under the pointer. `place` falls back to the nearest free cell or the
             // original one, and the binding above moves it there.
             const pointer = root.board.mapFromItem(
                 null, drag.centroid.scenePosition.x, drag.centroid.scenePosition.y)
-            if (DesktopService.overTray(pointer.x, pointer.y)) {
+            if (DesktopService.overTray(root.screenName, pointer.x, pointer.y)) {
                 DesktopService.remove(root.key)
                 return
             }
             const edge = root.edgeUnder(pointer.x, pointer.y)
-            if (edge !== "") {
-                DesktopService.noteToEdge(root.key, edge)
+            if (edge !== "" && root.moduleId === "spectrum") {
+                DesktopService.spectrumToEdge(root.key, root.screenName, edge)
                 return
             }
-            DesktopService.place(root.key,
-                DesktopService.cellX(root.x), DesktopService.cellY(root.y))
+            if (edge !== "") {
+                DesktopService.noteToEdge(root.key, root.screenName, edge)
+                return
+            }
+            DesktopService.place(root.key, root.screenName,
+                DesktopService.cellX(root.screenName, root.x - DesktopService.insets.left),
+                DesktopService.cellY(root.screenName, root.y))
         }
     }
 
-    // A note held against a screen edge is headed for that edge's deck; the
-    // deck's surface highlights it.
+    // A note held against a screen edge is headed for that edge's deck, and
+    // a spectrum for the bars along it when it has none; the deck's surface
+    // highlights it.
     function edgeUnder(x: real, y: real): string {
-        if (root.moduleId !== "notes")
+        if (root.moduleId !== "notes" && root.moduleId !== "spectrum")
             return ""
-        return DeckService.edgeAt(x, y, root.board.width, root.board.height)
+        const edge = DesktopService.edgeAt(x, y, root.board.width, root.board.height)
+        if (root.moduleId === "spectrum" && !DesktopService.spectrumTakes(root.screenName, edge))
+            return ""
+        return edge
     }
 
     // Shows the landing cell while dragging. None over the tray (removal) or
@@ -245,7 +379,7 @@ Item {
             return
         const pointer = root.board.mapFromItem(
             null, drag.centroid.scenePosition.x, drag.centroid.scenePosition.y)
-        if (DesktopService.overTray(pointer.x, pointer.y)) {
+        if (DesktopService.overTray(root.screenName, pointer.x, pointer.y)) {
             DesktopService.landing = null
             DeckService.receiving = ""
             return
@@ -253,19 +387,28 @@ Item {
         const edge = root.edgeUnder(pointer.x, pointer.y)
         if (edge !== "") {
             DesktopService.landing = null
+            DeckService.receivingScreen = root.screenName
             DeckService.receiving = edge
             return
         }
         DeckService.receiving = ""
-        const spot = DesktopService.nearestFree(
-            DesktopService.cellX(root.x), DesktopService.cellY(root.y),
-            root.family, root.key)
+        const spot = DesktopService.nearestFree(root.screenName,
+            DesktopService.cellX(root.screenName, root.x - DesktopService.insets.left),
+            DesktopService.cellY(root.screenName, root.y), root.family, root.key)
         DesktopService.landing = spot
-            ? { col: spot.col, row: spot.row, family: root.family } : null
+            ? { screen: root.screenName, col: spot.col, row: spot.row, family: root.family } : null
     }
 
     onXChanged: root.aim()
     onYChanged: root.aim()
+
+    // Dragged or resized, it keeps the card on this screen until it is let go.
+    Binding {
+        target: DesktopService
+        property: "inHand"
+        value: true
+        when: drag.active || resize.active
+    }
 
     // The wheel cycles through the module's families, as in the control centre.
     // One step per notch with a cooldown: touchpads send an event per pixel.
@@ -318,7 +461,7 @@ Item {
         height: 24
         radius: 12
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
         visible: opacity > 0
         opacity: root.dressed ? 1 : 0
@@ -357,7 +500,7 @@ Item {
         height: 24
         radius: 12
         color: Theme.island
-        border.color: resize.active ? Theme.accent : Theme.islandBorder
+        border.color: resize.active ? Theme.accent : Theme.borderIn(QsWindow.window)
         border.width: resize.active ? 2 : 1
         visible: opacity > 0
         opacity: root.dressed || resize.active ? 1 : 0
@@ -413,8 +556,9 @@ Item {
                     return
                 const pointer = root.board.mapFromItem(null,
                     resize.centroid.scenePosition.x, resize.centroid.scenePosition.y)
-                const cols = (pointer.x - root.box.x + Theme.desktopGutter) / DesktopService.stride
-                const rows = (pointer.y - root.box.y + Theme.desktopGutter) / DesktopService.stride
+                const stride = DesktopService.strideOn(root.screenName)
+                const cols = (pointer.x - root.box.x + Theme.desktopGutter) / stride
+                const rows = (pointer.y - root.box.y + Theme.desktopGutter) / stride
                 const next = DesktopService.familyNearest(
                     root.moduleId, cols, rows, DesktopService.themeOf(root.row))
                 if (next !== root.family)

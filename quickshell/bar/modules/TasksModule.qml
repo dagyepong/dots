@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -39,49 +40,57 @@ Item {
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 6
+        ModuleCard {
+            title: "Tasks"
+            subtitle: root.pending === 0
+                ? (TasksService.count === 0 ? "Nothing on the board" : "All done")
+                : TasksService.summary
+            // The count to do, in red while any is late.
+            figure: root.pending > 0 ? `${root.pending}` : ""
+            figureColor: root.late > 0 ? Theme.red : Theme.text
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
 
                 Text {
+                    anchors.centerIn: parent
                     text: "󰄲"
                     font.family: Theme.fontMono
                     font.pixelSize: 20
-                    color: root.late > 0 ? Theme.red : Theme.accent
+                    color: root.late > 0 ? Theme.red : Theme.indicator
+                }
+            }
+
+            // Soonest first. The tick completes a task in place; the rest of
+            // the row opens it.
+            Repeater {
+                model: ScriptModel {
+                    values: TasksService.queue.slice(0, 3)
+                    objectProp: "key"
                 }
 
-                ColumnLayout {
+                TaskRow {
+                    required property var modelData
+
                     Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "Tasks"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: root.pending === 0
-                            ? (TasksService.count === 0 ? "Nothing on the board" : "All done")
-                            : `${root.pending} to do · ${TasksService.summary}`
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: root.late > 0 ? Theme.red : Theme.textMuted
-                    }
+                    Layout.preferredHeight: Theme.cardRow
+                    task: modelData
+                    onOpened: root.openOn(modelData.key)
                 }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.cardRow
+                spacing: 8
+
+                Item { Layout.fillWidth: true }
 
                 PillButton {
+                    implicitHeight: Theme.cardRow
                     text: "New"
                     icon: "󰐕"
                     onClicked: {
@@ -91,23 +100,10 @@ Item {
                 }
 
                 PillButton {
+                    implicitHeight: Theme.cardRow
                     text: "Open"
                     icon: "󰄲"
                     onClicked: root.openOn("")
-                }
-            }
-
-            // Soonest first. The tick completes a task in place; the rest of
-            // the row opens it.
-            Repeater {
-                model: TasksService.queue.slice(0, 3)
-
-                TaskRow {
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    task: modelData
-                    onOpened: root.openOn(modelData.key)
                 }
             }
         }

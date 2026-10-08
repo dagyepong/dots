@@ -8,7 +8,6 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
-import QtQuick.Layouts
 
 import "../../theme"
 import "../../services"
@@ -48,79 +47,40 @@ Item {
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 12
+        ModuleCard {
+            title: "Battery"
+            // The estimate is blank for a minute or two after the cable
+            // changes, so the state stands on its own until it arrives.
+            subtitle: BatteryService.estimate !== ""
+                ? `${BatteryService.stateWord} · ${BatteryService.estimate}`
+                : BatteryService.stateWord
+            figure: `${BatteryService.percent}%`
+            figureColor: ModuleService.tintOf("battery")
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 13
-
-                BatteryWidget {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    size: 44
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: `${BatteryService.percent}%`
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        // The estimate is blank for a minute or two after the
-                        // cable changes, so the state line stands on its own
-                        // until it arrives.
-                        text: BatteryService.estimate !== ""
-                            ? `${BatteryService.stateWord}  ·  ${BatteryService.estimate}`
-                            : BatteryService.stateWord
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
-                }
+            mark: BatteryWidget {
+                anchors.fill: parent
+                size: Theme.cardMark
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 14
+            CardFact {
+                name: BatteryService.charging ? "Going in" : "Coming out"
+                value: BatteryService.watts > 0 ? `${BatteryService.watts.toFixed(1)} W` : "—"
+            }
 
-                Figure {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    label: "POWER"
-                    value: BatteryService.watts > 0
-                        ? `${BatteryService.watts.toFixed(1)} W`
-                        : "—"
-                    note: BatteryService.charging ? "going in" : "coming out"
-                }
+            CardFact {
+                name: "Energy"
+                value: BatteryService.energyCapacity > 0
+                    ? `${BatteryService.energy.toFixed(1)} of ${BatteryService.energyCapacity.toFixed(1)} Wh`
+                    : `${BatteryService.energy.toFixed(1)} Wh`
+            }
 
-                Figure {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    label: BatteryService.healthKnown ? "HEALTH" : "CHARGE"
-                    // Cells that don't report health get what they do report,
-                    // not a guess.
-                    value: BatteryService.healthKnown
-                        ? `${BatteryService.health}%`
-                        : `${BatteryService.energy.toFixed(1)} Wh`
-                    note: BatteryService.energyCapacity > 0
-                        ? `of ${BatteryService.energyCapacity.toFixed(1)} Wh full`
-                        : ""
-                }
+            // Cells that don't report health get nothing here, not a guess.
+            CardLimit {
+                visible: BatteryService.healthKnown
+                name: "Health"
+                fraction: BatteryService.health / 100
+                tint: BatteryService.health < 60 ? Theme.indicatorWarn : Theme.indicatorGood
+                note: "of new"
             }
         }
     }

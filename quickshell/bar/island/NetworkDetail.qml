@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -27,13 +28,16 @@ ColumnLayout {
 
     property string expanded: ""
 
-    spacing: 12
+    spacing: Theme.cardGap
 
     Component.onCompleted: NetworkService.scan(false)
 
+    // The heading a module's card has (`ModuleCard`), with the back arrow in
+    // front of it when there is somewhere to go back to.
     RowLayout {
         Layout.fillWidth: true
-        spacing: 10
+        Layout.preferredHeight: Theme.cardMark
+        spacing: 12
 
         IconButton {
             icon: "󰅁"
@@ -42,11 +46,30 @@ ColumnLayout {
             onClicked: root.back()
         }
 
-        ColumnLayout {
-            spacing: 1
+        RingIndicator {
+            Layout.preferredWidth: Theme.cardMark
+            Layout.preferredHeight: Theme.cardMark
+            thickness: 3
+            progress: 0
+            trackColor: Theme.indicatorDim
 
             Text {
+                anchors.centerIn: parent
+                text: NetworkService.icon
+                font.family: Theme.fontMono
+                font.pixelSize: 18
+                color: NetworkService.radioOn ? Theme.indicator : Theme.textMuted
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+
+            Text {
+                Layout.fillWidth: true
                 text: "Wi-Fi"
+                elide: Text.ElideRight
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeMedium
                 font.weight: Font.DemiBold
@@ -54,16 +77,16 @@ ColumnLayout {
             }
 
             Text {
+                Layout.fillWidth: true
                 text: NetworkService.radioOn
                     ? (NetworkService.scanning ? "Scanning…" : NetworkService.connectionName)
                     : "Radio off"
+                elide: Text.ElideRight
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeLabel
+                font.pixelSize: Theme.fontSizeSmall
                 color: Theme.textMuted
             }
         }
-
-        Item { Layout.fillWidth: true }
 
         Text {
             visible: NetworkService.radioOn
@@ -111,7 +134,10 @@ ColumnLayout {
         visible: NetworkService.networks.length > 0
         clip: true
         spacing: 4
-        model: NetworkService.networks
+        model: ScriptModel {
+            values: NetworkService.networks
+            objectProp: "ssid"
+        }
         boundsBehavior: Flickable.StopAtBounds
 
         delegate: Rectangle {
@@ -125,8 +151,8 @@ ColumnLayout {
             height: entry.open ? 88 : 48
             radius: Theme.radiusMedium
             color: entry.modelData.active || entryMouse.containsMouse || entry.open
-                ? Theme.islandSurfaceHover : Theme.islandSurface
-            border.color: entry.modelData.active ? Theme.accent : Theme.islandBorder
+                ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window)
+            border.color: entry.modelData.active ? Theme.accent : Theme.borderIn(QsWindow.window)
             border.width: 1
             clip: true
 
@@ -211,7 +237,7 @@ ColumnLayout {
                         Layout.preferredHeight: 30
                         radius: Theme.radiusSmall
                         color: Theme.island
-                        border.color: password.activeFocus ? Theme.accent : Theme.islandBorder
+                        border.color: password.activeFocus ? Theme.accent : Theme.borderIn(QsWindow.window)
                         border.width: 1
 
                         TextInput {

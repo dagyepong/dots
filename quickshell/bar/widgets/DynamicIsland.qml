@@ -9,10 +9,12 @@
 
 import QtQuick
 
+import Quickshell
 import "../../theme"
 import "../../services"
 import "../island"
 import "../modules"
+import "../../components"
 
 // One capsule that changes shape to fit whatever it shows. IslandState picks
 // the layer, this sizes the capsule for it, and a Loader swaps the contents;
@@ -27,6 +29,11 @@ Rectangle {
     readonly property alias state: islandState
     readonly property bool expanded: islandState.expanded
 
+    // The island is drawn on every screen; one of them is the one being
+    // worked on (`Bar.live`) and the rest are this shape at rest. Only the
+    // live one opens anything, and `IslandState` is where that is enforced.
+    property bool active: true
+
     // While a note is open the island is the note: paper to the edge, with no
     // rim or padding.
     readonly property bool paper: islandState.openPanel === "notes" && NotesService.opened !== ""
@@ -34,20 +41,26 @@ Rectangle {
     readonly property color paperColor: NotesService.paperOf(root.paperNote ? root.paperNote.tint : "yellow")
     // A module detail brings its own margins.
     readonly property int panelPad: root.paper
-        ? 0 : (islandState.openPanel === "module" ? 4 : Theme.panelPadding)
+        ? 0 : (islandState.openPanel === "module" ? Theme.cardInset : Theme.panelPadding)
 
     // For the bar: attached, the notch fillets have to light with the island.
     readonly property bool hovered: hover.hovered
-    // Lit where a click does something: the clock at rest and the glance. Not
-    // at rest in the one-capsule style, where the band and the island are one
-    // shape and cannot light separately; not over panels, which have their
+    // Lit where a click does something: the clock at rest. Not at rest in the
+    // one-capsule style, where the band and the island are one shape and
+    // cannot light separately; not the glance, which is drawn on the black
+    // with a player's controls of its own; not over panels, which have their
     // own controls; and not while `landing` from one.
     readonly property bool lit: hover.hovered && !root.landing
-        && ((islandState.layer === islandState.layerModules && !root.hosted)
-            || islandState.layer === islandState.layerSummary)
-    readonly property color surfaceColor: root.lit
-        ? Theme.islandSurfaceHover
-        : (SettingsService.islandAttached ? Theme.island : Theme.islandSurface)
+        && islandState.layer === islandState.layerModules && !root.hosted
+    // Solid, a floating island at rest is a shade off the black; on glass it
+    // is the capsules' ground, since a lighter veil reads as another material.
+    readonly property color surfaceColor: {
+        if (!Theme.solid)
+            return root.lit ? Theme.islandGroundLit : Theme.islandGround
+        if (root.lit)
+            return Theme.islandSurfaceHover
+        return SettingsService.islandAttached ? Theme.islandGround : Theme.islandSurface
+    }
 
     // ── HOSTED ──────────────────────────────────────────────────────────────
     //
@@ -76,8 +89,16 @@ Rectangle {
         launcher:   { width: LauncherService.panelWidth,
                       height: LauncherService.panelHeight },
         wifi:       { width: 420,  height: 500 },
+        // The control centre's volume, opened out.
+        sound:      { width: AudioService.panelWidth, height: AudioService.panelHeight },
+        microphone: { width: AudioService.panelWidth, height: AudioService.microphoneHeight },
+        nightlight: { width: SunsetService.panelWidth, height: SunsetService.panelHeight },
+        brightness: { width: BrightnessService.panelWidth, height: BrightnessService.panelHeight },
         bluetooth:  { width: 420,  height: 500 },
         session:    { width: 720,  height: 180 },
+        // A program asking for root (`PolkitService`).
+        auth:       { width: 460,  height: 236 },
+        machines:   { width: 860,  height: 580 },
         // A row per creature, plus one for the next egg.
         pet:        { width: 560,  height: 205 + 62 * PetService.family.length },
         // The shelf of cards, or the game being played at its own size.
@@ -91,6 +112,8 @@ Rectangle {
         keys:       { width: ShortcutService.sheetWidth, height: ShortcutService.sheetHeight },
         packages:   { width: PackagesService.panelWidth, height: PackagesService.panelHeight },
         module:     root.moduleSize,
+        // A tray item's menu, a row per entry.
+        tray:       { width: TrayService.menuWidth, height: TrayService.menuHeight },
         overview:   { width: 1560, height: 72 + root.overviewRows * 190 }
     })
 
@@ -115,7 +138,10 @@ Rectangle {
                         height: ModuleService.summaryHeight,
                         padding: 0 },
         osd:          { width: 260, height: Theme.capsuleHeight, padding: 10 },
-        notification: { width: 430, height: 68,                  padding: 13 },
+        // Taller when the notification brings buttons.
+        notification: { width: NotificationService.toastWidth,
+                        height: NotificationService.toastHeight,
+                        padding: NotificationService.toastPadding },
         panel:        { width: root.panelWidth, height: root.panelHeight, padding: Theme.panelPadding }
     })
 
@@ -142,17 +168,24 @@ Rectangle {
         palette: appearancePanel,
         launcher: launcherPanel,
         wifi: networkDetail,
+        sound: soundDetail,
+        microphone: microphoneDetail,
+        nightlight: nightLightDetail,
+        brightness: brightnessDetail,
         bluetooth: bluetoothDetail,
         stats: statsPanel,
         overview: overviewPanel,
         session: sessionPanel,
+        auth: authPanel,
+        machines: machinesPanel,
         pet: petPanel,
         games: gamesPanel,
         notes: notesPanel,
         board: boardPanel,
         keys: keysPanel,
         packages: packagesPanel,
-        module: moduleDetail
+        module: moduleDetail,
+        tray: trayMenu
     })
 
     function open(panel: string): void {
@@ -171,8 +204,17 @@ Rectangle {
             root.open(panel)
     }
 
+    // Under everything the island holds; a note's paper is not glass.
+    GlassSheen {
+        shape: root
+        visible: Theme.glass && !root.paper && !root.hosted
+        edges: !SettingsService.islandAttached
+    }
+
     IslandState {
         id: islandState
+
+        active: root.active
     }
 
     // ── GLANCE ──────────────────────────────────────────────────────────────
@@ -197,6 +239,7 @@ Rectangle {
         && (collapsedLoader.item?.busy ?? false)
 
     readonly property bool canSummarise: SettingsService.islandSummary
+        && root.active
         && !root.summaryHeld
         && !root.landing
         && ModuleService.openId === ""
@@ -293,16 +336,23 @@ Rectangle {
         ? Theme.radiusLarge
         : Math.min(root.height / 2, Theme.radiusLarge + 4)
 
-    color: islandState.expanded
-        ? (root.paper ? root.paperColor : Theme.island)
-        : root.surfaceColor
-    border.color: Theme.islandBorder
+    // In one capsule the band behind is the ground and covers the island
+    // whole; a see-through island painted over it would double the glass.
+    color: {
+        if (root.paper)
+            return root.paperColor
+        if (root.hosted && !Theme.solid)
+            return "transparent"
+        return islandState.expanded ? Theme.islandGround : root.surfaceColor
+    }
+    border.color: Theme.islandRim
 
     // No hairline in the one-capsule style: at rest the island's edges run
     // through the band's interior, and while growing the band is the outer
-    // edge. `Bar.qml` draws the outline over both.
+    // edge. `Bar.qml` draws the outline over both. Attached, `Bar.qml` draws
+    // it too, down the fillets and open along the screen edge.
     readonly property bool inBand: root.hosted
-    border.width: root.paper || root.inBand ? 0 : 1
+    border.width: root.paper || root.inBand || SettingsService.islandAttached ? 0 : 1
     clip: true
 
     // Attached, the upper corners go square: the curve is added outside the
@@ -437,12 +487,17 @@ Rectangle {
     }
 
     // Swallows clicks on the panel background so they do not reach the
-    // dismiss area covering the rest of the bar.
+    // dismiss area covering the rest of the bar. On the control centre's
+    // margin the right button arranges it, as it does between its blocks.
     MouseArea {
         anchors.fill: parent
         enabled: islandState.expanded
         acceptedButtons: Qt.AllButtons
         z: -1
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton && islandState.openPanel === "controls")
+                ControlsService.edit(!ControlsService.editing)
+        }
     }
 
     // ── LAYERS ──────────────────────────────────────────────────────────────
@@ -526,8 +581,33 @@ Rectangle {
     }
 
     Component {
+        id: soundDetail
+        SoundDetail { onBack: root.open("controls") }
+    }
+
+    Component {
+        id: microphoneDetail
+        MicrophoneDetail { onBack: root.open("controls") }
+    }
+
+    Component {
+        id: brightnessDetail
+        BrightnessDetail { onBack: root.open("controls") }
+    }
+
+    Component {
+        id: nightLightDetail
+        NightLightDetail { onBack: root.open("controls") }
+    }
+
+    Component {
         id: bluetoothDetail
         BluetoothDetail { onBack: root.open("controls") }
+    }
+
+    Component {
+        id: trayMenu
+        TrayMenuPanel { onClosed: root.close() }
     }
 
     Component {
@@ -543,6 +623,16 @@ Rectangle {
     Component {
         id: sessionPanel
         SessionPanel { onClosed: root.close() }
+    }
+
+    Component {
+        id: authPanel
+        AuthPanel {}
+    }
+
+    Component {
+        id: machinesPanel
+        MachinesPanel { onClosed: root.close() }
     }
 
     Component {

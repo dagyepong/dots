@@ -1,13 +1,14 @@
 // ╭──────────────────────────────────────────────────────────────────────────╮
 // │                                                                          │
 // │   A P P E A R A N C E   P A N E L                                        │
-// │   wallpaper and palette picker                                           │
+// │   animated wallpaper, wallpaper and palette picker                       │
 // │                                                                          │
 // │   github.com/andreumassanet/impasto                                      │
 // │                                                                          │
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import Quickshell.Widgets
 
@@ -15,24 +16,31 @@ import "../../theme"
 import "../../services"
 import "../../components"
 
-// The wallpapers and the palettes, each as a strip (`Carousel`): the tile in
-// the middle large, its neighbours stepping away. Left and Right slide, Enter
-// applies. The palettes are the page below the wallpapers: Down and Up switch,
-// as does the second shortcut, and the chevron in the footer does it with the
-// pointer.
+// The animated wallpapers, the wallpapers and the palettes, each as a strip
+// (`Carousel`): the tile in the middle large, its neighbours stepping away.
+// Left and Right slide, Enter applies. Three pages top to bottom: Up and Down
+// move between them, the second shortcut opens on the palettes, and the
+// chevrons in the footer do it with the pointer.
 //
-// The wallpaper directory is rescanned whenever the panel opens, so there is
-// no refresh button.
+// The wallpaper directories are rescanned whenever the panel opens, so there
+// is no refresh button.
 FocusScope {
     id: root
 
     signal closed()
     signal panelRequested(string panel)
 
-    // `wallpaper` or `palette`. Bound to the name the panel was opened under,
-    // so the shortcut and the arrows both slide a panel that is already open.
+    // `wallpaper` or `palette`: the name the panel was opened under, so the
+    // shortcut slides a panel that is already open. `shown` is the page on
+    // screen, which can also be `animated`, a page with no name of its own.
     property string page: "wallpaper"
-    readonly property bool onPalette: root.page === "palette"
+    property string shown: root.page
+    onPageChanged: root.shown = root.page
+
+    readonly property var pages: ["animated", "wallpaper", "palette"]
+    readonly property int shownIndex: root.pages.indexOf(root.shown)
+    readonly property bool onPalette: root.shown === "palette"
+    readonly property bool onAnimated: root.shown === "animated"
 
     readonly property int gap: 12
     readonly property int tileWidth: 160
@@ -41,9 +49,11 @@ FocusScope {
     readonly property int daub: 12
     readonly property int loadReach: 8
 
-    readonly property Carousel strip: root.onPalette ? palettes : wallpapers
+    readonly property Carousel strip:
+        root.onPalette ? palettes : root.onAnimated ? animations : wallpapers
 
     readonly property var centredWallpaper: WallpaperService.wallpapers[wallpapers.current] ?? null
+    readonly property var centredAnimation: WallpaperService.animated[animations.current] ?? null
     readonly property var centredPalette: ThemeService.availableThemes[palettes.current] ?? null
 
     Component.onCompleted: {
@@ -55,32 +65,46 @@ FocusScope {
     // applied instead of sliding there from the first tile. `settle` follows
     // the list when the scan returns a moment after opening.
     readonly property int appliedWallpaper: Math.max(0, WallpaperService.wallpapers.findIndex(
-        entry => entry.path === WallpaperService.currentWallpaper))
+        entry => entry.path === WallpaperService.chosen))
+    readonly property int appliedAnimation: Math.max(0, WallpaperService.animated.findIndex(
+        entry => entry.path === WallpaperService.chosen))
     readonly property int activePalette: Math.max(0, ThemeService.availableThemes.findIndex(
         entry => entry.id === ThemeService.activeId))
 
     function settle(): void {
         wallpapers.goTo(root.appliedWallpaper)
+        animations.goTo(root.appliedAnimation)
         palettes.goTo(root.activePalette)
     }
 
     Connections {
         target: WallpaperService
         function onWallpapersChanged(): void { root.settle() }
-        function onCurrentWallpaperChanged(): void { root.settle() }
+        function onAnimatedChanged(): void { root.settle() }
+        function onChosenChanged(): void { root.settle() }
     }
 
     function apply(): void {
         if (root.onPalette) {
             if (root.centredPalette)
                 ThemeService.setTheme(root.centredPalette.id)
+        } else if (root.onAnimated) {
+            if (root.centredAnimation)
+                WallpaperService.apply(root.centredAnimation.path)
         } else if (root.centredWallpaper) {
             WallpaperService.apply(root.centredWallpaper.path)
         }
     }
 
-    function turn(page: string): void {
-        root.panelRequested(page === "palette" ? "palette" : "appearance")
+    // The page `delta` away, up or down. The two named pages go through the
+    // island, so its name follows; the animated one is this panel's own.
+    function turn(delta: int): void {
+        const index = root.shownIndex + delta
+        if (index < 0 || index >= root.pages.length)
+            return
+        root.shown = root.pages[index]
+        if (root.shown !== "animated")
+            root.panelRequested(root.shown === "palette" ? "palette" : "appearance")
     }
 
     // Five daubs, in the board's order: the accent and the four status hues.
@@ -95,8 +119,8 @@ FocusScope {
 
     Keys.onLeftPressed: root.strip.step(-1)
     Keys.onRightPressed: root.strip.step(1)
-    Keys.onDownPressed: root.turn("palette")
-    Keys.onUpPressed: root.turn("wallpaper")
+    Keys.onDownPressed: root.turn(1)
+    Keys.onUpPressed: root.turn(-1)
     Keys.onReturnPressed: root.apply()
     Keys.onEnterPressed: root.apply()
     Keys.onPressed: event => {
@@ -119,8 +143,8 @@ FocusScope {
 
         // ── STRIPS ──────────────────────────────────────────────────────────
 
-        // Both live here, the hidden one parked a strip's height above or
-        // below, so turning the page slides them past each other.
+        // All three live here, each parked a strip's height per page away
+        // from the one shown, so turning the page slides them past each other.
         Item {
             id: pages
 
@@ -133,8 +157,8 @@ FocusScope {
 
                 width: pages.width
                 height: pages.height
-                y: root.onPalette ? -pages.height : 0
-                opacity: root.onPalette ? 0 : 1
+                y: (1 - root.shownIndex) * pages.height
+                opacity: root.shownIndex === 1 ? 1 : 0
                 current: root.appliedWallpaper
                 model: WallpaperService.wallpapers
                 tileWidth: root.tileWidth
@@ -150,14 +174,14 @@ FocusScope {
                     id: tile
 
                     readonly property bool applied:
-                        tile.modelData.path === WallpaperService.currentWallpaper
+                        tile.modelData.path === WallpaperService.chosen
 
                     ClippingRectangle {
                         anchors.fill: parent
                         contentUnderBorder: true
                         radius: Theme.radiusMedium
-                        color: Theme.islandSurface
-                        border.color: tile.centred ? Theme.accent : Theme.islandBorder
+                        color: Theme.surfaceIn(QsWindow.window)
+                        border.color: tile.centred ? Theme.accent : Theme.borderIn(QsWindow.window)
                         border.width: tile.centred ? 2 : 1
 
                         Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
@@ -182,11 +206,76 @@ FocusScope {
             }
 
             Carousel {
+                id: animations
+
+                width: pages.width
+                height: pages.height
+                y: (0 - root.shownIndex) * pages.height
+                opacity: root.onAnimated ? 1 : 0
+                current: root.appliedAnimation
+                model: WallpaperService.animated
+                tileWidth: root.tileWidth
+                tileHeight: root.tileHeight
+                centreScale: root.centreScale
+                gap: root.gap
+                onActivated: root.apply()
+
+                Behavior on y { NumberAnimation { duration: Theme.durationMorph; easing.type: Theme.easing } }
+                Behavior on opacity { NumberAnimation { duration: Theme.durationMorph; easing.type: Theme.easing } }
+
+                // Each tile is the video's poster, the frame it starts from.
+                delegate: CarouselTile {
+                    id: clip
+
+                    readonly property bool applied:
+                        clip.modelData.path === WallpaperService.chosen
+
+                    ClippingRectangle {
+                        anchors.fill: parent
+                        contentUnderBorder: true
+                        radius: Theme.radiusMedium
+                        color: Theme.surfaceIn(QsWindow.window)
+                        border.color: clip.centred ? Theme.accent : Theme.borderIn(QsWindow.window)
+                        border.width: clip.centred ? 2 : 1
+
+                        Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
+
+                        Image {
+                            anchors.fill: parent
+                            source: Math.abs(clip.distance) <= root.loadReach
+                                ? `file://${clip.modelData.poster}` : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            sourceSize.width: 320
+                            sourceSize.height: 200
+                        }
+
+                        AppliedMark { visible: clip.applied }
+                    }
+                }
+            }
+
+            // With no videos yet, where to put them.
+            Text {
+                x: (pages.width - width) / 2
+                y: animations.y + (pages.height - height) / 2
+                width: pages.width - 4 * root.gap
+                visible: WallpaperService.animated.length === 0
+                opacity: animations.opacity
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: Tr.t("No animated wallpapers yet. Videos in ~/.local/share/wallpapers/animated show up here.")
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.textMuted
+            }
+
+            Carousel {
                 id: palettes
 
                 width: pages.width
                 height: pages.height
-                y: root.onPalette ? 0 : pages.height
+                y: (2 - root.shownIndex) * pages.height
                 opacity: root.onPalette ? 1 : 0
                 current: root.activePalette
                 model: ThemeService.availableThemes
@@ -207,8 +296,8 @@ FocusScope {
                     Rectangle {
                         anchors.fill: parent
                         radius: Theme.radiusMedium
-                        color: card.hovered ? Theme.islandSurfaceHover : Theme.islandSurface
-                        border.color: card.centred ? Theme.accent : Theme.islandBorder
+                        color: card.hovered ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window)
+                        border.color: card.centred ? Theme.accent : Theme.borderIn(QsWindow.window)
                         border.width: card.centred ? 2 : 1
 
                         Behavior on color { ColorAnimation { duration: Theme.durationFast } }
@@ -264,8 +353,8 @@ FocusScope {
 
             Text {
                 Layout.fillWidth: true
-                text: root.onPalette
-                    ? (root.centredPalette?.badge ?? "")
+                text: root.onPalette ? (root.centredPalette?.badge ?? "")
+                    : root.onAnimated ? (root.centredAnimation?.name ?? "")
                     : (root.centredWallpaper?.name ?? "")
                 elide: Text.ElideRight
                 font.family: Theme.fontFamily
@@ -284,25 +373,42 @@ FocusScope {
                 color: Theme.textMuted
             }
 
-            // Switches strips with the pointer.
-            Text {
-                text: root.onPalette ? "󰅃" : "󰅀"
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeRegular
-                color: door.containsMouse ? Theme.text : Theme.textMuted
-
-                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
-
-                MouseArea {
-                    id: door
-
-                    anchors.fill: parent
-                    anchors.margins: -6
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.turn(root.onPalette ? "wallpaper" : "palette")
-                }
+            // Switch pages with the pointer: up, and down, where there is one.
+            Door {
+                glyph: "󰅃"
+                visible: root.shownIndex > 0
+                onClicked: root.turn(-1)
             }
+
+            Door {
+                glyph: "󰅀"
+                visible: root.shownIndex < root.pages.length - 1
+                onClicked: root.turn(1)
+            }
+        }
+    }
+
+    component Door: Text {
+        id: door
+
+        property string glyph: ""
+        signal clicked()
+
+        text: door.glyph
+        font.family: Theme.fontMono
+        font.pixelSize: Theme.fontSizeRegular
+        color: doorMouse.containsMouse ? Theme.text : Theme.textMuted
+
+        Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+        MouseArea {
+            id: doorMouse
+
+            anchors.fill: parent
+            anchors.margins: -6
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: door.clicked()
         }
     }
 

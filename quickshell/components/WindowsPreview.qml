@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Effects
 import Quickshell.Widgets
 
@@ -51,7 +52,7 @@ Item {
         anchors.fill: parent
         radius: 6
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
         contentUnderBorder: true
 
@@ -212,7 +213,7 @@ Item {
             radius: root.corner
             color: Theme.surface
             border.width: root.borderWidth
-            border.color: Theme.islandBorder
+            border.color: Theme.borderIn(QsWindow.window)
             contentUnderBorder: true
             opacity: root.inactiveOpacity
 

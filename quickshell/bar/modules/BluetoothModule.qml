@@ -20,132 +20,73 @@ import "../../components"
 Item {
     id: root
 
-    property bool compact: false
-
     implicitWidth: holder.implicitWidth
     implicitHeight: holder.implicitHeight
 
     Loader {
         id: holder
         anchors.fill: parent
-        sourceComponent: root.compact ? chip : detail
-    }
-
-    Component {
-        id: chip
-
-        Item {
-            Item {
-                id: mark
-
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: Theme.capsuleHeight
-                height: Theme.capsuleHeight
-
-                RingIndicator {
-                    anchors.fill: parent
-                    thickness: 2.5
-                    progress: 0
-                    trackColor: Theme.indicatorDim
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: BluetoothService.icon
-                        font.family: Theme.fontMono
-                        font.pixelSize: Math.round(Theme.capsuleHeight * 0.4)
-                        color: BluetoothService.enabled
-                            ? Theme.indicator : Theme.textMuted
-                    }
-                }
-            }
-        }
+        sourceComponent: detail
     }
 
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 12
+        ModuleCard {
+            title: BluetoothService.summary
+            subtitle: {
+                if (!BluetoothService.enabled)
+                    return "Adapter off"
+                const count = BluetoothService.connectedDevices.length
+                if (count === 0)
+                    return "On · nothing connected"
+                return count === 1
+                    ? "On · 1 device connected"
+                    : `On · ${count} devices connected`
+            }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 13
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
 
-                RingIndicator {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    thickness: 2.5
-                    progress: 0
-                    trackColor: Theme.indicatorDim
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: BluetoothService.icon
-                        font.family: Theme.fontMono
-                        font.pixelSize: 18
-                        color: BluetoothService.enabled
-                            ? Theme.indicator : Theme.textMuted
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: BluetoothService.summary
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: {
-                            if (!BluetoothService.enabled)
-                                return "Adapter off"
-                            const count = BluetoothService.connectedDevices.length
-                            if (count === 0)
-                                return "On · nothing connected"
-                            return count === 1
-                                ? "On · 1 device connected"
-                                : `On · ${count} devices connected`
-                        }
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    text: BluetoothService.icon
+                    font.family: Theme.fontMono
+                    font.pixelSize: 18
+                    color: BluetoothService.enabled ? Theme.indicator : Theme.textMuted
                 }
             }
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 14
+                Layout.preferredHeight: Theme.cardRow
+                spacing: 10
 
-                Figure {
+                Text {
                     Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    label: "DEVICES"
-                    value: `${BluetoothService.connectedDevices.length}`
-                    note: "pairing lives in the control centre"
+                    text: "Bluetooth"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.textMuted
                 }
 
-                PillButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "Bluetooth"
-                    active: BluetoothService.enabled
-                    implicitHeight: 28
-                    onClicked: BluetoothService.toggle()
+                ToggleSwitch {
+                    checked: BluetoothService.enabled
+                    onToggled: BluetoothService.toggle()
                 }
+            }
+
+            CardFact {
+                name: "Devices"
+                value: `${BluetoothService.connectedDevices.length} connected`
+            }
+
+            CardFact {
+                name: "Pairing"
+                value: "in the control centre"
             }
         }
     }

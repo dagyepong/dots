@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -19,8 +20,6 @@ import "../../components"
 // the network.
 Item {
     id: root
-
-    property bool compact: false
 
     implicitWidth: holder.implicitWidth
     implicitHeight: holder.implicitHeight
@@ -39,158 +38,86 @@ Item {
     Loader {
         id: holder
         anchors.fill: parent
-        sourceComponent: root.compact ? chip : detail
+        sourceComponent: detail
     }
 
-    Component {
-        id: chip
-
-        Item {
-            Item {
-                id: mark
-
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: Theme.capsuleHeight
-                height: Theme.capsuleHeight
-
-                RingIndicator {
-                    anchors.fill: parent
-                    thickness: 2.5
-                    progress: 0
-                    trackColor: Theme.indicatorDim
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: WeatherService.available ? WeatherService.glyph : "󰅤"
-                        font.family: Theme.fontMono
-                        font.pixelSize: Math.round(Theme.capsuleHeight * 0.42)
-                        color: Theme.indicator
-                    }
-                }
-            }
-        }
-    }
-
+    // The condition is the mark and the temperature the figure; under them,
+    // the next hours.
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 10
-            spacing: 8
+        ModuleCard {
+            title: WeatherService.place
+            subtitle: {
+                const parts = []
+                if (WeatherService.description !== "")
+                    parts.push(WeatherService.description)
+                parts.push(`feels ${WeatherService.feelsLike}°`)
+                if (WeatherService.age !== "")
+                    parts.push(WeatherService.age)
+                return parts.join(" · ")
+            }
+            figure: `${WeatherService.temperature}°`
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 13
-
-                Text {
-                    text: WeatherService.glyph
-                    font.family: Theme.fontMono
-                    font.pixelSize: 30
-                    color: Theme.indicator
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: WeatherService.place
-                            elide: Text.ElideRight
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-
-                        Text {
-                            text: `${WeatherService.temperature}°`
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: {
-                            const parts = []
-                            if (WeatherService.description !== "")
-                                parts.push(WeatherService.description)
-                            parts.push(`feels ${WeatherService.feelsLike}°`)
-                            if (WeatherService.age !== "")
-                                parts.push(WeatherService.age)
-                            return parts.join(" · ")
-                        }
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
-                }
+            mark: Text {
+                anchors.fill: parent
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: WeatherService.glyph
+                font.family: Theme.fontMono
+                font.pixelSize: 30
+                color: Theme.indicator
             }
 
             // Columns divide the width by hand: a RowLayout sizes from its
             // children's implicit widths and packs them to the left.
-            Item {
+            Row {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: root.hoursAhead.length > 0
+                Layout.preferredHeight: 50
 
-                Row {
-                    anchors.fill: parent
+                Repeater {
+                    model: ScriptModel {
+                        values: root.hoursAhead
+                    }
 
-                    Repeater {
-                        model: root.hoursAhead
+                    Item {
+                        id: block
 
-                        Item {
-                            id: block
+                        required property var modelData
 
-                            required property var modelData
+                        width: parent.width / Math.max(1, root.hoursAhead.length)
+                        height: parent.height
 
-                            width: parent.width / Math.max(1, root.hoursAhead.length)
-                            height: parent.height
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 1
 
-                            Column {
-                                anchors.centerIn: parent
-                                spacing: 1
-
-                                Text {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: {
-                                        const hour = `${block.modelData.hour}`.padStart(2, "0")
-                                        return block.modelData.tomorrow
-                                            ? `${hour}:00⁺` : `${hour}:00`
-                                    }
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontSizeLabel
-                                    color: Theme.textMuted
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: {
+                                    const hour = `${block.modelData.hour}`.padStart(2, "0")
+                                    return block.modelData.tomorrow
+                                        ? `${hour}:00⁺` : `${hour}:00`
                                 }
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeLabel
+                                color: Theme.textMuted
+                            }
 
-                                Text {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: block.modelData.glyph
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 15
-                                    color: Theme.indicator
-                                }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: block.modelData.glyph
+                                font.family: Theme.fontMono
+                                font.pixelSize: 15
+                                color: Theme.indicator
+                            }
 
-                                Text {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: `${block.modelData.temperature}°`
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontSizeLabel
-                                    color: Theme.text
-                                }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: `${block.modelData.temperature}°`
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeLabel
+                                color: Theme.text
                             }
                         }
                     }

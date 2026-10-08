@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // A window arriving on a tiny screen with the preset's curve and duration:
@@ -42,7 +43,7 @@ Item {
         anchors.fill: parent
         radius: 5
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
         clip: true
 

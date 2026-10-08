@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Shapes
 
 import "../theme"
@@ -19,7 +20,7 @@ Item {
 
     property real progress: 0
     property real thickness: 3
-    property color trackColor: Theme.islandBorder
+    property color trackColor: Theme.borderIn(QsWindow.window)
     property color fillColor: Theme.accent
 
     // Sweep duration. Slow values (charge, countdown) use the shell's easing;

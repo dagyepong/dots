@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -26,7 +27,7 @@ Item {
     property string day: ""
     property var ink: ({
         text: Theme.text, muted: Theme.textMuted, accent: Theme.accent,
-        accentText: Theme.accentText, raised: Theme.islandSurfaceHover,
+        accentText: Theme.accentText, raised: Theme.surfaceHoverIn(QsWindow.window),
         red: Theme.red, rule: Theme.hairline
     })
 
@@ -119,7 +120,10 @@ Item {
             clip: true
             spacing: 4
             boundsBehavior: Flickable.StopAtBounds
-            model: root.due
+            model: ScriptModel {
+                values: root.due
+                objectProp: "key"
+            }
 
             delegate: TaskRow {
                 required property var modelData

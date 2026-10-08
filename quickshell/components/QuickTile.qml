@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -34,8 +35,8 @@ Rectangle {
     radius: Theme.radiusMedium
     opacity: root.available ? 1 : 0.45
 
-    color: mouse.containsMouse ? Theme.islandSurfaceHover : Theme.islandSurface
-    border.color: root.active ? Theme.accent : Theme.islandBorder
+    color: mouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window)
+    border.color: root.active ? Theme.accent : Theme.borderIn(QsWindow.window)
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: Theme.durationFast } }
@@ -52,7 +53,7 @@ Rectangle {
             Layout.preferredHeight: 34
             Layout.alignment: Qt.AlignVCenter
             radius: width / 2
-            color: root.active ? Theme.accent : Theme.islandSurfaceHover
+            color: root.active ? Theme.accent : Theme.surfaceHoverIn(QsWindow.window)
 
             Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 

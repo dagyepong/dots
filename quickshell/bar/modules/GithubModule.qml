@@ -14,7 +14,7 @@ import "../../theme"
 import "../../services"
 import "../../components"
 
-// Yearly count, streak, yesterday and the contribution grid. Desktop only
+// Yearly count, streak and the contribution grid. Desktop only
 // (`bar: false` in the catalogue). Shows the reading's age, since it comes
 // from the network.
 Item {
@@ -35,73 +35,36 @@ Item {
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 8
+        ModuleCard {
+            title: GithubService.user !== "" ? GithubService.user : "GitHub"
+            subtitle: {
+                const parts = ["contributions this year"]
+                if (GithubService.streak > 0)
+                    parts.push(`${GithubService.streak}-day streak`)
+                if (GithubService.age !== "")
+                    parts.push(GithubService.age)
+                return parts.join(" · ")
+            }
+            figure: GithubService.totalLabel
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 13
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
 
                 Text {
+                    anchors.centerIn: parent
                     text: "󰊤"
                     font.family: Theme.fontMono
-                    font.pixelSize: 28
+                    font.pixelSize: 20
                     color: Theme.indicator
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: GithubService.user !== ""
-                                ? GithubService.user : "GitHub"
-                            elide: Text.ElideRight
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-
-                        Text {
-                            text: `${GithubService.totalLabel}`
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: {
-                            const parts = ["contributions this year"]
-                            if (GithubService.streak > 0)
-                                parts.push(`${GithubService.streak}-day streak`)
-                            if (GithubService.age !== "")
-                                parts.push(GithubService.age)
-                            return parts.join(" · ")
-                        }
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
                 }
             }
 
             ContributionGrid {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: GithubService.cardGrid
                 weeks: GithubService.weeks
                 // As many recent weeks as fit the island; the full year is the
                 // widget's.

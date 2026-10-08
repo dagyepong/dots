@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import QtQuick.Controls
 
@@ -22,19 +23,27 @@ Item {
     property int value: 0
     property int from: 0
     property int to: 100
+
+    // What the reading is counted in.
+    property string unit: "%"
     property bool available: true
     property bool dimmed: false
 
+    // A chevron at the end that opens more, as Wi-Fi's tile does. The drag
+    // stops short of it.
+    property bool expandable: false
+
     signal moved(int value)
     signal iconClicked()
+    signal expandClicked()
 
     implicitHeight: 40
 
     Rectangle {
         anchors.fill: parent
         radius: height / 2
-        color: Theme.islandSurface
-        border.color: slider.hovered ? Theme.islandBorder : "transparent"
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: slider.hovered ? Theme.borderIn(QsWindow.window) : "transparent"
         border.width: 1
         opacity: root.available ? 1 : 0.45
 
@@ -47,7 +56,7 @@ Item {
             anchors.bottom: parent.bottom
             width: Math.max(parent.height, parent.width * slider.position)
             radius: parent.radius
-            color: root.dimmed ? Theme.islandSurfaceHover : Theme.accent
+            color: root.dimmed ? Theme.surfaceHoverIn(QsWindow.window) : Theme.accent
             opacity: root.dimmed ? 1 : 0.9
 
             Behavior on width {
@@ -81,11 +90,21 @@ Item {
             // Theme.text rather than accentText: the fill only reaches the
             // reading at 100%.
             Text {
-                text: `${root.value}%`
+                text: `${root.value}${root.unit}`
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Font.DemiBold
                 color: root.dimmed ? Theme.textMuted : Theme.text
+            }
+
+            Text {
+                visible: root.expandable
+                text: "󰅂"
+                font.family: Theme.fontMono
+                font.pixelSize: 13
+                color: more.containsMouse ? Theme.text : Theme.textMuted
+
+                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
             }
         }
 
@@ -93,12 +112,25 @@ Item {
         Slider {
             id: slider
             anchors.fill: parent
+            anchors.rightMargin: root.expandable ? 32 : 0
             from: root.from
             to: root.to
             value: root.value
             enabled: root.available
             opacity: 0
             onMoved: root.moved(Math.round(slider.value))
+        }
+
+        MouseArea {
+            id: more
+
+            anchors.right: parent.right
+            width: 32
+            height: parent.height
+            visible: root.expandable
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.expandClicked()
         }
     }
 }

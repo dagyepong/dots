@@ -11,11 +11,13 @@ import QtQuick
 import QtQuick.Dialogs
 import QtQuick.Effects
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Widgets
 
 import "../theme"
 import "../services"
 import "../components"
+import "../lock"
 
 // The lock screen and the idle policy. The shell locks through
 // ext-session-lock and shows the blurred desktop behind the lock. The blur
@@ -27,6 +29,35 @@ SettingsSection {
     // The visible part; set by `SettingsPanel`.
     property string tab: ""
 
+    // One line on face unlock: what is missing, what is happening, or how
+    // many faces there are.
+    readonly property string faceReading: {
+        if (!FaceService.known)
+            return Tr.t("Checking…")
+        if (!FaceService.camera)
+            return ""
+        if (!FaceService.installed)
+            return Tr.t("Not set up")
+        if (!FaceService.wired)
+            return Tr.t("Half set up")
+        if (FaceService.busy === "adding")
+            return Tr.t("Adding a face…")
+        if (FaceService.busy === "removing")
+            return Tr.t("Removing…")
+        switch (FaceService.outcome) {
+        case "added": return Tr.t("Face added")
+        case "no face": return Tr.t("No face seen — try with more light")
+        case "several faces": return Tr.t("More than one face in view")
+        case "too dark": return Tr.t("Too dark for the camera")
+        case "failed": return Tr.t("The face was not added")
+        }
+        const count = FaceService.faces.length
+        if (!FaceService.listed)
+            return ""
+        return count === 0 ? Tr.t("No face yet")
+            : Tr.t(count === 1 ? "%1 face" : "%1 faces").arg(count)
+    }
+
     FileDialog {
         id: picker
 
@@ -34,8 +65,7 @@ SettingsSection {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: {
             const url = String(picker.selectedFile)
-            SettingsService.set("userAvatar",
-                url.startsWith("file://") ? url.slice(7) : url)
+            AccountService.setPicture(url.startsWith("file://") ? url.slice(7) : url)
         }
     }
 
@@ -47,10 +77,12 @@ SettingsSection {
         visible: root.tab === "lock"
         spacing: root.spacing
 
+        onVisibleChanged: if (visible) FaceService.refresh()
+
         SettingGroup {
             title: Tr.t("You")
-            note: Tr.t("Left empty, both come from your account, as on the login screen.")
-            hint: Tr.t("The name defaults to the account's full name (set with chfn) and the picture to ~/.face or AccountsService. Click the picture or drop an image on the card to change it.")
+            note: Tr.t("Your account's name and picture, on the lock and login screens.")
+            hint: Tr.t("The name is your account's full name, and the picture is kept where the login screen reads it too, made square. Click the picture or drop an image on the card to change it.")
 
             // Click the picture to choose a file, or drop an image on the row.
             Item {
@@ -119,12 +151,17 @@ SettingsSection {
                         Layout.alignment: Qt.AlignVCenter
                         label: Tr.t("Picture")
                         reading: {
-                            if (SettingsService.userAvatar !== "")
-                                return SettingsService.userAvatar
-                            if (AccountService.systemAvatar !== "")
-                                return `${AccountService.systemAvatar} ${Tr.t("— the account's own")}`
-                            return Tr.t("Click it, or drop an image here")
+                            if (AccountService.busy === "picture")
+                                return Tr.t("Saving…")
+                            if (AccountService.failedKind === "picture")
+                                return Tr.t("The picture was not changed")
+                            if (AccountService.avatar === "")
+                                return Tr.t("Click it, or drop an image here")
+                            if (SettingsService.userAvatar !== "" || !AccountService.shared)
+                                return Tr.t("The lock screen only, until ./setup system")
+                            return Tr.t("On the lock and login screens")
                         }
+                        alarm: AccountService.failedKind === "picture"
                     }
 
                     PillButton {
@@ -134,7 +171,9 @@ SettingsSection {
                         implicitWidth: 92
                         implicitHeight: 30
                         visible: SettingsService.userAvatar !== ""
-                        onClicked: SettingsService.set("userAvatar", "")
+                            || (AccountService.shared && AccountService.systemAvatar !== "")
+                        enabled: AccountService.busy === ""
+                        onClicked: AccountService.clearPicture()
                     }
                 }
 
@@ -147,17 +186,238 @@ SettingsSection {
                         if (event.urls.length === 0)
                             return
                         const url = String(event.urls[0])
-                        SettingsService.set("userAvatar",
-                            url.startsWith("file://") ? url.slice(7) : url)
+                        AccountService.setPicture(url.startsWith("file://") ? url.slice(7) : url)
                     }
                 }
             }
 
+            // The account's full name where AccountsService can change it;
+            // otherwise a name for the lock screen alone, as before.
             SettingField {
                 label: Tr.t("Name")
-                placeholder: AccountService.systemName
-                value: SettingsService.userName
-                onEdited: text => SettingsService.set("userName", text)
+                placeholder: AccountService.user
+                // While it is written, what was typed, so the field never
+                // jumps back to the old name under the hand.
+                value: AccountService.busy === "name" || AccountService.namePause.running
+                    ? AccountService.pendingName
+                    : SettingsService.userName !== "" || !AccountService.accounts
+                    ? SettingsService.userName : AccountService.fullName
+                onEdited: text => AccountService.setName(text)
+            }
+        }
+
+        // Each tile is the lock's own clock, drawn small over the wallpaper.
+        SettingGroup {
+            title: Tr.t("Clock")
+            note: Tr.t("The login screen always draws it stacked.")
+            hint: Tr.t("The login screen runs before anyone has signed in, so it cannot read your settings.")
+
+            SettingTiles {
+                label: Tr.t("Style")
+
+                Repeater {
+                    model: [
+                        { id: "stacked", label: "Stacked" },
+                        { id: "inline", label: "Inline" },
+                        { id: "flip", label: "Flip" }
+                    ]
+
+                    PreviewTile {
+                        id: clockTile
+
+                        required property var modelData
+
+                        stageHeight: 120
+                        caption: Tr.t(clockTile.modelData.label)
+                        selected: SettingsService.lockClock === clockTile.modelData.id
+                        onPicked: SettingsService.set("lockClock", clockTile.modelData.id)
+
+                        Image {
+                            id: clockGround
+
+                            anchors.fill: parent
+                            source: WallpaperService.currentWallpaper
+                                ? `file://${WallpaperService.currentWallpaper}` : ""
+                            fillMode: Image.PreserveAspectCrop
+                            visible: false
+                            asynchronous: true
+                            sourceSize.width: 320
+                        }
+
+                        MultiEffect {
+                            anchors.fill: parent
+                            source: clockGround
+                            visible: clockGround.status === Image.Ready
+                            blurEnabled: true
+                            blur: 1
+                            blurMax: 16
+                        }
+
+                        LockClock {
+                            anchors.centerIn: parent
+                            style: clockTile.modelData.id
+                            at: new Date(2026, 0, 1, 9, 41)
+                            scale: clockTile.modelData.id === "stacked" ? 0.17
+                                : clockTile.modelData.id === "flip" ? 0.16 : 0.2
+                        }
+                    }
+                }
+            }
+        }
+
+        // What is playing, on the lock. Each tile is the lock drawn small:
+        // the clock, and under it nothing, the cover, or the cover and lines.
+        SettingGroup {
+            title: Tr.t("Music")
+            note: Tr.t("Only while something is playing.")
+            hint: Tr.t("The lyrics follow the Lyrics switch on the Bar & Island page, and are looked up on lrclib.net.")
+
+            SettingTiles {
+                label: Tr.t("Show")
+
+                Repeater {
+                    model: [
+                        { id: "off", label: "Nothing" },
+                        { id: "player", label: "The player" },
+                        { id: "lyrics", label: "With lyrics" }
+                    ]
+
+                    PreviewTile {
+                        id: musicTile
+
+                        required property var modelData
+
+                        stageHeight: 120
+                        caption: Tr.t(musicTile.modelData.label)
+                        selected: SettingsService.lockMusic === musicTile.modelData.id
+                        onPicked: SettingsService.set("lockMusic", musicTile.modelData.id)
+
+                        Image {
+                            id: musicGround
+
+                            anchors.fill: parent
+                            source: WallpaperService.currentWallpaper
+                                ? `file://${WallpaperService.currentWallpaper}` : ""
+                            fillMode: Image.PreserveAspectCrop
+                            visible: false
+                            asynchronous: true
+                            sourceSize.width: 320
+                        }
+
+                        MultiEffect {
+                            anchors.fill: parent
+                            source: musicGround
+                            visible: musicGround.status === Image.Ready
+                            blurEnabled: true
+                            blur: 1
+                            blurMax: 16
+                        }
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: musicTile.modelData.id === "off" ? 38 : 10
+                            text: "9:41"
+                            font.family: Theme.fontDisplay
+                            font.pixelSize: musicTile.modelData.id === "off" ? 30 : 16
+                            font.weight: Font.Bold
+                            color: Theme.text
+                        }
+
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 44
+                            visible: musicTile.modelData.id !== "off"
+                            spacing: 10
+
+                            Rectangle {
+                                width: 44
+                                height: 44
+                                radius: 8
+                                color: Theme.accent
+                            }
+
+                            Column {
+                                visible: musicTile.modelData.id === "lyrics"
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 5
+
+                                Repeater {
+                                    model: [0.35, 1, 0.35]
+
+                                    Rectangle {
+                                        required property real modelData
+                                        required property int index
+
+                                        width: index === 1 ? 52 : 40
+                                        height: 4
+                                        radius: 2
+                                        color: Theme.text
+                                        opacity: modelData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingTiles {
+                label: Tr.t("Behind it")
+                visible: SettingsService.lockMusic !== "off"
+
+                Repeater {
+                    model: [
+                        { id: "cover", label: "The cover" },
+                        { id: "desktop", label: "The desktop" }
+                    ]
+
+                    PreviewTile {
+                        id: groundTile
+
+                        required property var modelData
+
+                        readonly property bool onCover: groundTile.modelData.id === "cover"
+
+                        stageHeight: 120
+                        caption: Tr.t(groundTile.modelData.label)
+                        selected: SettingsService.lockMusicGround === groundTile.modelData.id
+                        onPicked: SettingsService.set("lockMusicGround", groundTile.modelData.id)
+
+                        // The cover playing now, or the wallpaper standing in.
+                        Image {
+                            id: behind
+
+                            anchors.fill: parent
+                            source: groundTile.onCover && MediaService.artUrl !== ""
+                                ? MediaService.artUrl
+                                : (WallpaperService.currentWallpaper
+                                    ? `file://${WallpaperService.currentWallpaper}` : "")
+                            fillMode: Image.PreserveAspectCrop
+                            visible: false
+                            asynchronous: true
+                            sourceSize.width: groundTile.onCover ? 48 : 320
+                        }
+
+                        MultiEffect {
+                            anchors.fill: parent
+                            source: behind
+                            visible: behind.status === Image.Ready
+                            blurEnabled: true
+                            blur: 1
+                            blurMax: groundTile.onCover ? 32 : 16
+                            brightness: groundTile.onCover ? -0.28 : -0.05
+                            saturation: groundTile.onCover ? 0.25 : 0
+                        }
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 44
+                            height: 44
+                            radius: 8
+                            color: Theme.accent
+                        }
+                    }
+                }
             }
         }
 
@@ -231,6 +491,163 @@ SettingsSection {
                             color: Theme.textMuted
                         }
                     }
+                }
+            }
+        }
+
+        // Face unlock: what the machine has, the faces howdy keeps, and trying
+        // one the way the lock does. Everything that needs root goes through
+        // FaceService's helper, which asks for the password itself.
+        SettingGroup {
+            title: Tr.t("Face unlock")
+            note: Tr.t("The lock screen only, with the infrared camera.")
+            hint: Tr.t("howdy keeps the faces where only root can read them, so adding or removing one asks for your password. The login screen, sudo and polkit still ask for the password.")
+
+            SettingRow {
+                label: Tr.t("Face unlock")
+                reading: root.faceReading
+                alarm: FaceService.outcome !== "" && FaceService.outcome !== "added"
+                locked: FaceService.known && !FaceService.camera
+                reason: Tr.t("Needs an infrared camera")
+
+                PillButton {
+                    visible: FaceService.known && FaceService.camera
+                    text: !FaceService.installed ? Tr.t("Set up")
+                        : !FaceService.wired ? Tr.t("Finish setting up")
+                        : Tr.t("Add a face")
+                    icon: "󰄀"
+                    active: true
+                    enabled: FaceService.busy === "" && !FaceService.installer.running
+                    implicitWidth: 136
+                    implicitHeight: 30
+                    onClicked: {
+                        if (!FaceService.installed)
+                            FaceService.install("face")
+                        else if (!FaceService.wired)
+                            FaceService.install("system")
+                        else
+                            FaceService.add()
+                    }
+                }
+            }
+
+            // The scan, the lock's own ring. The password dialog comes first,
+            // and the camera only once it is answered.
+            SettingBlock {
+                visible: FaceService.busy === "adding"
+
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: 176
+
+                    FaceRing {
+                        id: scanRing
+
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 8
+                        diameter: 108
+                        scanning: FaceService.busy === "adding"
+                        shown: 1
+                    }
+
+                    Padlock {
+                        anchors.centerIn: scanRing
+                        scale: 1.5
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        text: Tr.t("Confirm with your password, then look at the camera")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMedium
+                        color: Theme.text
+                    }
+                }
+            }
+
+            SettingBlock {
+                visible: FaceService.ready && FaceService.faces.length > 0
+                    && FaceService.busy !== "adding"
+
+                Text {
+                    text: Tr.t("FACES")
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeLabel
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 0.6
+                    color: Theme.textMuted
+                }
+
+                Repeater {
+                    model: ScriptModel {
+                        values: FaceService.faces
+                        objectProp: "id"
+                    }
+
+                    RowLayout {
+                        id: kept
+
+                        required property var modelData
+                        required property int index
+
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Text {
+                            text: "󰄀"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 14
+                            color: Theme.accent
+                        }
+
+                        // howdy names an unlabelled model "Model #n"; the
+                        // page counts them instead.
+                        Text {
+                            Layout.fillWidth: true
+                            text: /^Model #\d+$/.test(kept.modelData.label)
+                                ? Tr.t("Face %1").arg(kept.index + 1) : kept.modelData.label
+                            elide: Text.ElideRight
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.text
+                        }
+
+                        Text {
+                            text: Qt.formatDate(new Date(kept.modelData.added.replace(" ", "T")), "d MMM yyyy")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.textMuted
+                        }
+
+                        PillButton {
+                            text: Tr.t("Remove")
+                            enabled: FaceService.busy === ""
+                            implicitHeight: 26
+                            onClicked: FaceService.remove(kept.modelData.id)
+                        }
+                    }
+                }
+            }
+
+            // The lock's own conversation, so a match here is a match there.
+            SettingRow {
+                visible: FaceService.ready && FaceService.faces.length > 0
+                    && FaceService.busy !== "adding"
+                label: Tr.t("Try it")
+                reading: FaceService.trial === "looking" ? Tr.t("Looking…")
+                    : FaceService.trial === "matched" ? Tr.t("Recognised")
+                    : FaceService.trial === "missed" ? Tr.t("Not recognised") : ""
+                alarm: FaceService.trial === "missed"
+
+                PillButton {
+                    text: Tr.t("Try")
+                    icon: "󰄄"
+                    enabled: FaceService.trial !== "looking" && FaceService.busy === ""
+                    implicitWidth: 112
+                    implicitHeight: 30
+                    onClicked: FaceService.tryFace()
                 }
             }
         }

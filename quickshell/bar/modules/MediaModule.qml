@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import Quickshell.Widgets
 
@@ -89,7 +90,8 @@ Item {
                     width: chipRoot.artSize
                     height: chipRoot.artSize
                     radius: width / 2
-                    color: Theme.islandSurfaceHover
+                    // None behind a picture: a player may send its logo on transparency.
+                    color: chipArt.visible ? "transparent" : Theme.surfaceHoverIn(QsWindow.window)
 
                     Image {
                         id: chipArt
@@ -117,102 +119,57 @@ Item {
 
     // ── DETAIL ──────────────────────────────────────────────────────────────
 
-    // No wrapper: this detail takes the island's full width, which a Loader
-    // provides by resizing its item. Three bands: now playing, progress,
-    // transport.
+    // The artwork is the mark, the track the heading; then progress, hidden
+    // for streams, which have no length, and transport with the spectrum.
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 10
-            spacing: 10
+        ModuleCard {
+            // Opened, the player asks for the lyrics, and opens out round
+            // them once they come (`DetailFace`).
+            Component.onCompleted: LyricsService.subscribe()
+            Component.onDestruction: LyricsService.release()
 
-            // ── NOW PLAYING ─────────────────────────────────────────────────
+            title: MediaService.title !== "" ? MediaService.title : MediaService.identity
+            subtitle: MediaService.artist !== "" ? MediaService.artist : MediaService.identity
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 13
+            // ClippingRectangle, because `clip` is rectangular and would
+            // square the artwork's corners.
+            mark: ClippingRectangle {
+                anchors.fill: parent
+                radius: width * Theme.pictureCorner
+                // None behind a picture: a player may send its logo on transparency.
+                color: art.visible ? "transparent" : Theme.surfaceHoverIn(QsWindow.window)
 
-                ClippingRectangle {
-                    Layout.preferredWidth: 52
-                    Layout.preferredHeight: 52
-                    radius: width * Theme.pictureCorner
-                    color: Theme.islandSurfaceHover
-
-                    Image {
-                        id: art
-                        anchors.fill: parent
-                        source: MediaService.artUrl
-                        visible: source != "" && status === Image.Ready
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        sourceSize.width: 104
-                        sourceSize.height: 104
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: !art.visible
-                        text: "󰎇"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 22
-                        color: Theme.indicator
-                    }
+                Image {
+                    id: art
+                    anchors.fill: parent
+                    source: MediaService.artUrl
+                    visible: source != "" && status === Image.Ready
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    sourceSize.width: 2 * Theme.cardMark
+                    sourceSize.height: 2 * Theme.cardMark
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    // The spectrum sits on the title's line; centred on the
-                    // artwork it would fall between the two lines of text.
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: MediaService.title !== "" ? MediaService.title : MediaService.identity
-                            elide: Text.ElideRight
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-
-                        Spectrum {
-                            Layout.preferredHeight: 18
-                            Layout.alignment: Qt.AlignVCenter
-                            barWidth: 3
-                            minimum: 2
-                            active: MediaService.playing
-                            barColor: Theme.indicator
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: MediaService.artist !== "" ? MediaService.artist : MediaService.identity
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    visible: !art.visible
+                    text: "󰎇"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 20
+                    color: Theme.indicator
                 }
             }
 
             // ── PROGRESS ────────────────────────────────────────────────────
 
-            // Hidden for streams, which have no length. The whole strip is the
-            // hit area; the handle appears only on hover.
+            // The whole strip is the hit area; the handle appears on hover.
             Item {
                 id: seek
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 20
+                Layout.preferredHeight: Theme.cardRow
                 visible: MediaService.seekable
 
                 readonly property real trackLeft: elapsedLabel.width + 10
@@ -283,7 +240,7 @@ Item {
             // ── TRANSPORT ───────────────────────────────────────────────────
 
             // Centred with anchors: spacers only centre when both sides are
-            // equally wide. Round buttons with no background until hovered.
+            // equally wide. The spectrum sits on the right, out of their way.
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
@@ -322,6 +279,16 @@ Item {
                         opacity: enabled ? 1 : 0.3
                         onClicked: MediaService.next()
                     }
+                }
+
+                Spectrum {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: 18
+                    barWidth: 3
+                    minimum: 2
+                    active: MediaService.playing
+                    barColor: Theme.indicator
                 }
             }
         }

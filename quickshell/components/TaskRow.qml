@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 import "../services"
 
@@ -22,7 +23,7 @@ Item {
     property var task: null
     property var ink: ({
         text: Theme.text, muted: Theme.textMuted, accent: Theme.accent,
-        accentText: Theme.accentText, raised: Theme.islandSurfaceHover, red: Theme.red
+        accentText: Theme.accentText, raised: Theme.surfaceHoverIn(QsWindow.window), red: Theme.red
     })
 
     // Whether the day is written at the end of the line.

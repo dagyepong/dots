@@ -13,6 +13,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+import "../theme"
+
 // Night light through hyprsunset, which sets the gamma ramp. Unlike a screen
 // shader, that stays out of screenshots and survives `hyprctl reload`.
 //
@@ -41,6 +43,24 @@ Singleton {
             return "Needs hyprsunset"
         return root.on ? `${root.temperature} K` : "Daylight"
     }
+
+    // Warmths to pick with one press, on the night light's page.
+    readonly property var presets: [
+        { label: "Candle",  kelvin: 2500 },
+        { label: "Warm",    kelvin: 3500 },
+        { label: "Soft",    kelvin: 4500 },
+        { label: "Neutral", kelvin: 5500 }
+    ]
+
+    function setTemperature(kelvin: int): void {
+        SettingsService.set("nightTemperature", Math.round(kelvin / 100) * 100)
+    }
+
+    // The night light's page, declared since the island takes its size
+    // before the panel exists: a heading, the warmth, and the presets.
+    readonly property int panelWidth: 440
+    readonly property int panelHeight: 2 * Theme.panelPadding + Theme.detailHeader
+        + Theme.detailSection(1) + Theme.detailSection(root.presets.length)
 
     readonly property Process probe: Process {
         command: ["sh", "-c", "command -v hyprsunset"]

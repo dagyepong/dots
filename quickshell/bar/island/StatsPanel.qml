@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -57,7 +58,9 @@ ColumnLayout {
                     spacing: 3
 
                     Repeater {
-                        model: StatsService.cores
+                        model: ScriptModel {
+                            values: StatsService.cores
+                        }
 
                         Rectangle {
                             required property real modelData
@@ -65,7 +68,7 @@ ColumnLayout {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 20
                             radius: 2
-                            color: Theme.islandSurfaceHover
+                            color: Theme.surfaceHoverIn(QsWindow.window)
 
                             Rectangle {
                                 anchors.left: parent.left
@@ -114,7 +117,7 @@ ColumnLayout {
                         Layout.preferredHeight: 4
                         Layout.alignment: Qt.AlignVCenter
                         radius: 2
-                        color: Theme.islandSurfaceHover
+                        color: Theme.surfaceHoverIn(QsWindow.window)
 
                         Rectangle {
                             width: parent.width * StatsService.swapFraction
@@ -214,7 +217,9 @@ ColumnLayout {
                     }
 
                     Repeater {
-                        model: StatsService.disks
+                        model: ScriptModel {
+                            values: StatsService.disks
+                        }
 
                         ColumnLayout {
                             id: disk
@@ -251,7 +256,7 @@ ColumnLayout {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 5
                                 radius: 2.5
-                                color: Theme.islandSurfaceHover
+                                color: Theme.surfaceHoverIn(QsWindow.window)
 
                                 Rectangle {
                                     width: parent.width * disk.fraction

@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -41,8 +42,8 @@ ColumnLayout {
         Layout.fillWidth: true
         implicitHeight: list.implicitHeight
         radius: Theme.radiusMedium
-        color: root.bare ? "transparent" : Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: root.bare ? "transparent" : Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: root.bare ? 0 : 1
 
         ColumnLayout {

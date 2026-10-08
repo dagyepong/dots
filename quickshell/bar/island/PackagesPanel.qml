@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -40,11 +41,6 @@ ColumnLayout {
     Component.onDestruction: {
         UpdatesService.release()
         PackagesService.query = ""
-    }
-
-    onRowsChanged: {
-        list.currentIndex = 0
-        list.positionViewAtBeginning()
     }
 
     function move(delta: int): void {
@@ -135,7 +131,7 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 1
-        color: Theme.islandBorder
+        color: Theme.borderIn(QsWindow.window)
     }
 
     // ── ROWS ────────────────────────────────────────────────────────────────
@@ -176,7 +172,16 @@ ColumnLayout {
             anchors.fill: parent
             clip: true
             spacing: 2
-            model: root.rows
+            model: ScriptModel {
+                values: root.rows
+
+                // Back to the top once the rows have landed, not when the list
+                // changes: a row inserted above the selection would shift it.
+                onValuesChanged: {
+                    list.currentIndex = 0
+                    list.positionViewAtBeginning()
+                }
+            }
             boundsBehavior: Flickable.StopAtBounds
             currentIndex: 0
 
@@ -195,7 +200,7 @@ ColumnLayout {
                 width: ListView.view.width
                 height: PackagesService.rowHeight
                 radius: Theme.radiusSmall
-                color: row.selected ? Theme.islandSurfaceHover : "transparent"
+                color: row.selected ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
@@ -221,7 +226,7 @@ ColumnLayout {
                         Layout.preferredWidth: 26
                         Layout.preferredHeight: 26
                         radius: width / 2
-                        color: Theme.islandSurfaceHover
+                        color: Theme.surfaceHoverIn(QsWindow.window)
 
                         Text {
                             anchors.centerIn: parent
@@ -373,7 +378,7 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 1
-        color: Theme.islandBorder
+        color: Theme.borderIn(QsWindow.window)
     }
 
     // ── STATUS LINE ─────────────────────────────────────────────────────────

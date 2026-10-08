@@ -18,9 +18,12 @@ import "../theme"
 Item {
     id: root
 
-    property color color: Theme.island
+    property color color: Theme.islandGround
     // Mirrored, for the notch's left side.
     property bool mirrored: false
+    // How far down the glass's light from the top reaches in the shape the
+    // fillet flares from (`GlassSheen`); 0 for none.
+    property real sheenReach: 0
 
     implicitWidth: Theme.radiusNotch * 2
     implicitHeight: Theme.radiusNotch * 2
@@ -55,5 +58,38 @@ Item {
 
             PathLine { x: 0; y: 0 }
         }
+
+        ShapePath {
+            strokeWidth: 0
+            fillColor: "transparent"
+            fillGradient: root.sheenReach > 0 ? sheen : null
+
+            startX: 0
+            startY: 0
+
+            PathLine { x: root.width; y: 0 }
+
+            PathAngleArc {
+                centerX: root.width
+                centerY: root.height
+                radiusX: root.width
+                radiusY: root.height
+                startAngle: -90
+                sweepAngle: -90
+            }
+
+            PathLine { x: 0; y: 0 }
+        }
+    }
+
+    LinearGradient {
+        id: sheen
+
+        x1: 0
+        y1: 0
+        x2: 0
+        y2: root.sheenReach
+        GradientStop { position: 0; color: Theme.glassSheen }
+        GradientStop { position: 1; color: "transparent" }
     }
 }

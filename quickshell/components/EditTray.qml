@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // The card shown while arranging, shared by the desktop and the control
@@ -59,6 +60,13 @@ Item {
     property bool receiving: false
 
     readonly property alias card: card
+
+    // Whether a gesture has hold of the pointer here: the card moved by its
+    // edge or its grip, stretched by its corner, or its bar scrubbed. The
+    // desktop's card uses it to stay on the screen it is on for as long as
+    // the hand is down (`desktop/Tray.qml`).
+    readonly property bool holding:
+        mover.active || carry.active || stretch.active || scrub.active
 
     // Wide enough to take hold of the card by its edge.
     readonly property int pad: 24
@@ -168,7 +176,7 @@ Item {
             Math.max(2 * root.pad, root.height - 2 * Theme.desktopGutter))
         radius: Theme.radiusLarge
         color: Theme.island
-        border.color: root.receiving ? Theme.accent : Theme.islandBorder
+        border.color: root.receiving ? Theme.accent : Theme.borderIn(QsWindow.window)
         border.width: root.receiving ? 2 : 1
 
         Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
@@ -359,7 +367,7 @@ Item {
             height: 24
             radius: 12
             color: Theme.island
-            border.color: carry.active ? Theme.accent : Theme.islandBorder
+            border.color: carry.active ? Theme.accent : Theme.borderIn(QsWindow.window)
             border.width: carry.active ? 2 : 1
 
             Text {
@@ -413,7 +421,7 @@ Item {
             height: 24
             radius: 12
             color: Theme.island
-            border.color: stretch.active ? Theme.accent : Theme.islandBorder
+            border.color: stretch.active ? Theme.accent : Theme.borderIn(QsWindow.window)
             border.width: stretch.active ? 2 : 1
 
             // A corner bracket, as on a widget.

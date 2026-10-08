@@ -14,7 +14,7 @@ import "../../services"
 import "../../components"
 
 // A note on the desktop, in any of the four families: the same paper the deck
-// draws. The widget draws no capsule for notes (`DesktopService.styleOf`); the
+// draws. The widget draws no capsule for notes (`DesktopService.bare`); the
 // paper gets the bare style's shadow.
 //
 // Read-only: the desktop never takes the keyboard, so a click opens the note in

@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -35,9 +36,9 @@ Rectangle {
 
     color: root.filled
         ? (mouse.containsMouse ? Theme.accentHover : Theme.accent)
-        : (mouse.containsMouse ? Theme.islandSurfaceHover : Theme.islandSurface)
+        : (mouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window))
     border.color: root.filled ? Theme.accent
-        : (mouse.containsMouse ? Theme.accent : Theme.islandBorder)
+        : (mouse.containsMouse ? Theme.accent : Theme.borderIn(QsWindow.window))
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: Theme.durationFast } }

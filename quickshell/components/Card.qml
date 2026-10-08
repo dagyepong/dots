@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // The rounded surface every control centre section uses. `bare` drops the
@@ -22,8 +23,8 @@ Rectangle {
     property bool bare: false
 
     radius: Theme.radiusMedium
-    color: root.bare ? "transparent" : Theme.islandSurface
-    border.color: Theme.islandBorder
+    color: root.bare ? "transparent" : Theme.surfaceIn(QsWindow.window)
+    border.color: Theme.borderIn(QsWindow.window)
     border.width: root.bare ? 0 : 1
 
     Behavior on color { ColorAnimation { duration: Theme.paletteTransition } }

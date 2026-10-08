@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -34,57 +35,33 @@ Item {
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 8
+        ModuleCard {
+            title: "Games"
+            subtitle: GamesService.totalPlays === 0
+                ? "Nothing played yet"
+                : `${GamesService.totalPlays} ${GamesService.totalPlays === 1 ? "round" : "rounds"}`
+                    + ` · ${GamesService.catalogue.length} ${GamesService.catalogue.length === 1 ? "game" : "games"}`
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
 
                 Text {
+                    anchors.centerIn: parent
                     text: "󰊗"
                     font.family: Theme.fontMono
                     font.pixelSize: 20
-                    color: Theme.accent
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "Games"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        text: GamesService.totalPlays === 0
-                            ? "Nothing played yet"
-                            : `${GamesService.totalPlays} ${GamesService.totalPlays === 1 ? "round" : "rounds"}`
-                                + ` · ${GamesService.catalogue.length} ${GamesService.catalogue.length === 1 ? "game" : "games"}`
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
-                }
-
-                PillButton {
-                    text: "Play"
-                    icon: "󰐊"
-                    onClicked: ModuleService.requestPanel("games")
+                    color: Theme.indicator
                 }
             }
 
-            // The last three, most recent first.
+            // The last three, most recent first, with their bests.
             Repeater {
-                model: GamesService.ranked.slice(0, 3)
+                model: ScriptModel {
+                    values: GamesService.ranked.slice(0, 3)
+                }
 
                 RowLayout {
                     id: row
@@ -92,14 +69,15 @@ Item {
                     required property var modelData
 
                     Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.cardRow
                     spacing: 10
 
                     Text {
-                        Layout.preferredWidth: 18
+                        Layout.preferredWidth: 16
                         horizontalAlignment: Text.AlignHCenter
                         text: row.modelData.icon
                         font.family: Theme.fontMono
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fontSizeRegular
                         color: GamesService.tintOf(row.modelData.id)
                     }
 
@@ -115,13 +93,25 @@ Item {
                     Text {
                         text: `${GamesService.bestOf(row.modelData.id)} ${row.modelData.unit}`
                         font.family: Theme.fontMono
-                        font.pixelSize: Theme.fontSizeLabel
+                        font.pixelSize: Theme.fontSizeSmall
                         color: Theme.textMuted
                     }
                 }
             }
 
-            Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.cardRow
+
+                Item { Layout.fillWidth: true }
+
+                PillButton {
+                    implicitHeight: Theme.cardRow
+                    text: "Play"
+                    icon: "󰐊"
+                    onClicked: ModuleService.requestPanel("games")
+                }
+            }
         }
     }
 }

@@ -42,6 +42,7 @@ Item {
         github: githubSquare,
         stats: statsSquare,
         claude: claudeSquare,
+        codex: codexSquare,
         timer: timerSquare,
         pet: petSquare,
         games: gamesSquare,
@@ -260,6 +261,27 @@ Item {
     }
 
     Component {
+        id: codexSquare
+
+        WidgetFace {
+
+            ink: root.ink
+            label: "Codex"
+            reading: CodexService.figure
+            note: !CodexService.available ? "no usage found"
+                : CodexService.fullest ? `of the ${CodexService.fullestName}`
+                : "until Codex runs again"
+
+            CodexMark {
+                anchors.centerIn: parent
+                width: 32
+                height: 32
+                color: root.ink.text
+            }
+        }
+    }
+
+    Component {
         id: timerSquare
 
         WidgetFace {
@@ -357,9 +379,12 @@ Item {
             ClippingRectangle {
                 anchors.fill: parent
                 radius: width * Theme.pictureCorner
-                color: root.ink.raised
+                // None behind a picture: a player may send its logo on transparency.
+                color: squareArt.visible ? "transparent" : root.ink.raised
 
                 Image {
+                    id: squareArt
+
                     anchors.fill: parent
                     source: MediaService.artUrl
                     visible: source != "" && status === Image.Ready

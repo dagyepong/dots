@@ -18,7 +18,9 @@ singleton BatteryService     1.0 services/BatteryService.qml
 singleton BrightnessService  1.0 services/BrightnessService.qml
 singleton OsdService         1.0 services/OsdService.qml
 singleton MediaService       1.0 services/MediaService.qml
+singleton LyricsService      1.0 services/LyricsService.qml
 singleton NotificationService 1.0 services/NotificationService.qml
+singleton FaceService        1.0 services/FaceService.qml
 singleton LockService        1.0 services/LockService.qml
 singleton WeatherService     1.0 services/WeatherService.qml
 singleton SessionService     1.0 services/SessionService.qml
@@ -30,6 +32,7 @@ singleton CavaService        1.0 services/CavaService.qml
 singleton CompositorService  1.0 services/CompositorService.qml
 singleton BluetoothService   1.0 services/BluetoothService.qml
 singleton ClaudeService      1.0 services/ClaudeService.qml
+singleton CodexService       1.0 services/CodexService.qml
 singleton UpdatesService     1.0 services/UpdatesService.qml
 singleton PetService         1.0 services/PetService.qml
 singleton ModuleService      1.0 services/ModuleService.qml
@@ -47,11 +50,17 @@ singleton PickerService      1.0 services/PickerService.qml
 singleton CaptureService     1.0 services/CaptureService.qml
 singleton RecorderService    1.0 services/RecorderService.qml
 singleton ClipboardService   1.0 services/ClipboardService.qml
+singleton EmojiService       1.0 services/EmojiService.qml
+singleton PolkitService      1.0 services/PolkitService.qml
+singleton VmService          1.0 services/VmService.qml
+singleton TrayService        1.0 services/TrayService.qml
+singleton PrivacyService     1.0 services/PrivacyService.qml
 singleton SunsetService      1.0 services/SunsetService.qml
 singleton IdleService        1.0 services/IdleService.qml
 singleton GithubService      1.0 services/GithubService.qml
 singleton PackagesService    1.0 services/PackagesService.qml
 singleton ProfileService     1.0 services/ProfileService.qml
+singleton VersionService     1.0 services/VersionService.qml
 
 Card             1.0 components/Card.qml
 ColorSwatch      1.0 components/ColorSwatch.qml
@@ -64,13 +73,23 @@ ContributionGrid 1.0 components/ContributionGrid.qml
 Sparkline        1.0 components/Sparkline.qml
 Spectrum         1.0 components/Spectrum.qml
 NotchFillet      1.0 components/NotchFillet.qml
+NotchOutline     1.0 components/NotchOutline.qml
 ClaudeMark       1.0 components/ClaudeMark.qml
+CodexMark        1.0 components/CodexMark.qml
 PaletteBoard     1.0 components/PaletteBoard.qml
 PetFace          1.0 components/PetFace.qml
 PetFamily        1.0 components/PetFamily.qml
 PetShelf         1.0 components/PetShelf.qml
 UsageBar         1.0 components/UsageBar.qml
 Figure           1.0 components/Figure.qml
+ModuleCard       1.0 components/ModuleCard.qml
+TopRowEditor     1.0 components/TopRowEditor.qml
+GlassSheen       1.0 components/GlassSheen.qml
+CardLimit        1.0 components/CardLimit.qml
+CardFact         1.0 components/CardFact.qml
+CardLevel        1.0 components/CardLevel.qml
+CardChoice       1.0 components/CardChoice.qml
+CardHeading      1.0 components/CardHeading.qml
 Stepper          1.0 components/Stepper.qml
 StatCard         1.0 components/StatCard.qml
 SliderRow        1.0 components/SliderRow.qml
@@ -83,13 +102,14 @@ BarPreview       1.0 components/BarPreview.qml
 WindowsPreview   1.0 components/WindowsPreview.qml
 SettingsHero     1.0 components/SettingsHero.qml
 Avatar           1.0 components/Avatar.qml
+TrayIcon         1.0 components/TrayIcon.qml
 SettingField     1.0 components/SettingField.qml
 GroupHeading     1.0 components/GroupHeading.qml
 TabStrip         1.0 components/TabStrip.qml
 LidPreview       1.0 components/LidPreview.qml
 MotionPreview    1.0 components/MotionPreview.qml
 IslandMotionPreview 1.0 components/IslandMotionPreview.qml
-StyleSwatch      1.0 components/StyleSwatch.qml
+GroundSwatch     1.0 components/GroundSwatch.qml
 EditTray         1.0 components/EditTray.qml
 Sticky           1.0 components/Sticky.qml
 PopMenu          1.0 components/PopMenu.qml
@@ -98,6 +118,7 @@ Bar              1.0 bar/Bar.qml
 Deck             1.0 deck/Deck.qml
 DynamicIsland    1.0 bar/widgets/DynamicIsland.qml
 WorkspacesWidget 1.0 bar/widgets/WorkspacesWidget.qml
+TrayWidget       1.0 bar/widgets/TrayWidget.qml
 BatteryWidget    1.0 bar/widgets/BatteryWidget.qml
 BarZone          1.0 bar/widgets/BarZone.qml
 BarChip          1.0 bar/widgets/BarChip.qml
@@ -106,6 +127,7 @@ IslandState      1.0 bar/island/IslandState.qml
 IslandRest       1.0 bar/island/IslandRest.qml
 IslandSummary    1.0 bar/island/IslandSummary.qml
 DetailFace       1.0 bar/island/DetailFace.qml
+LyricsDetail     1.0 bar/island/LyricsDetail.qml
 OsdLayer         1.0 bar/island/OsdLayer.qml
 TimerWidget      1.0 bar/widgets/TimerWidget.qml
 NotificationLayer 1.0 bar/island/NotificationLayer.qml
@@ -120,6 +142,7 @@ ClockModule      1.0 bar/modules/ClockModule.qml
 MediaModule      1.0 bar/modules/MediaModule.qml
 TimerModule      1.0 bar/modules/TimerModule.qml
 ClaudeModule     1.0 bar/modules/ClaudeModule.qml
+CodexModule      1.0 bar/modules/CodexModule.qml
 BatteryModule    1.0 bar/modules/BatteryModule.qml
 VolumeModule     1.0 bar/modules/VolumeModule.qml
 BrightnessModule 1.0 bar/modules/BrightnessModule.qml
@@ -151,6 +174,7 @@ ProfilesPart          1.0 settings/ProfilesPart.qml
 ControlsSection       1.0 settings/ControlsSection.qml
 FontPicker            1.0 settings/FontPicker.qml
 LayoutPicker          1.0 settings/LayoutPicker.qml
+WorkspaceStyles       1.0 settings/WorkspaceStyles.qml
 ShortcutRow           1.0 settings/ShortcutRow.qml
 
 MediaCard        1.0 bar/island/controls/MediaCard.qml
@@ -168,7 +192,10 @@ GameBoard        1.0 bar/island/games/GameBoard.qml
 NotificationList 1.0 bar/island/controls/NotificationList.qml
 AppearanceCard   1.0 bar/island/controls/AppearanceCard.qml
 WeatherCard      1.0 bar/island/controls/WeatherCard.qml
-PowerRow         1.0 bar/island/controls/PowerRow.qml
+TopButtons       1.0 bar/island/controls/TopButtons.qml
+TopRowInspector  1.0 bar/island/controls/TopRowInspector.qml
+ButtonsBlock     1.0 bar/island/controls/ButtonsBlock.qml
+GridSize         1.0 bar/island/controls/GridSize.qml
 Block            1.0 bar/island/controls/Block.qml
 BlockFace        1.0 bar/island/controls/BlockFace.qml
 TogglesBlock     1.0 bar/island/controls/TogglesBlock.qml
@@ -178,4 +205,14 @@ ClockBlock       1.0 bar/island/controls/ClockBlock.qml
 GamesBlock       1.0 bar/island/controls/GamesBlock.qml
 ControlsTray     1.0 bar/island/controls/ControlsTray.qml
 NetworkDetail    1.0 bar/island/NetworkDetail.qml
+SoundDetail      1.0 bar/island/SoundDetail.qml
+DetailHeading    1.0 bar/island/DetailHeading.qml
+DetailSection    1.0 bar/island/DetailSection.qml
+LevelRow         1.0 bar/island/LevelRow.qml
+DetailChoice     1.0 bar/island/DetailChoice.qml
+MicrophoneDetail 1.0 bar/island/MicrophoneDetail.qml
+NightLightDetail 1.0 bar/island/NightLightDetail.qml
+BrightnessDetail 1.0 bar/island/BrightnessDetail.qml
+TrayMenuPanel    1.0 bar/island/TrayMenuPanel.qml
 BluetoothDetail  1.0 bar/island/BluetoothDetail.qml
+Commands         1.0 Commands.qml

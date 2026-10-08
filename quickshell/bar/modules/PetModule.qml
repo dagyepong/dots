@@ -64,154 +64,103 @@ Item {
         }
     }
 
+    // The pet is the mark and its level the figure; then progress to the
+    // next level, feeding and play, and the shelf.
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 10
+        ModuleCard {
+            // Hatched pets show their name, then their species.
+            title: PetService.titleOf(PetService.pet)
+            subtitle: PetService.moodLine
+            figure: PetService.hatched ? `Lv ${PetService.level}` : ""
+
+            mark: Item {
+                anchors.fill: parent
+
+                PetFace {
+                    id: bigFace
+
+                    anchors.centerIn: parent
+                    size: Theme.cardMark
+                    lively: true
+
+                    // Idle bob; a hop pauses it for its own length.
+                    SequentialAnimation {
+                        id: bob
+                        running: !hop.running && PetService.mood !== "asleep" && Theme.lively
+                        loops: Animation.Infinite
+
+                        NumberAnimation {
+                            target: bigFace; property: "anchors.verticalCenterOffset"
+                            to: -2; duration: 1400; easing.type: Easing.InOutSine
+                        }
+                        NumberAnimation {
+                            target: bigFace; property: "anchors.verticalCenterOffset"
+                            to: 0; duration: 1400; easing.type: Easing.InOutSine
+                        }
+                    }
+
+                    SequentialAnimation {
+                        id: hop
+
+                        NumberAnimation {
+                            target: bigFace; property: "anchors.verticalCenterOffset"
+                            to: -10; duration: 130; easing.type: Easing.OutQuad
+                        }
+                        NumberAnimation {
+                            target: bigFace; property: "anchors.verticalCenterOffset"
+                            to: 0; duration: 190; easing.type: Easing.OutBounce
+                        }
+                    }
+
+                    Connections {
+                        target: PetService
+                        function onPlayed(): void { hop.restart() }
+                        function onCelebrated(level: int): void { hop.restart() }
+                        function onBrought(index: int): void { hop.restart() }
+                    }
+                }
+            }
+
+            CardLimit {
+                name: "Next level"
+                fraction: PetService.progress
+                tint: bigFace.coat
+                note: `${PetService.xp}/${PetService.threshold}`
+            }
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 14
+                Layout.preferredHeight: Theme.cardRow
+                spacing: 9
 
-                Item {
-                    Layout.preferredWidth: 68
-                    Layout.preferredHeight: 68
-                    Layout.alignment: Qt.AlignVCenter
-
-                    PetFace {
-                        id: bigFace
-
-                        anchors.centerIn: parent
-                        size: 60
-                        lively: true
-
-                        // Idle bob; a hop pauses it for its own length.
-                        SequentialAnimation {
-                            id: bob
-                            running: !hop.running && PetService.mood !== "asleep"
-                            loops: Animation.Infinite
-
-                            NumberAnimation {
-                                target: bigFace; property: "anchors.verticalCenterOffset"
-                                to: -2; duration: 1400; easing.type: Easing.InOutSine
-                            }
-                            NumberAnimation {
-                                target: bigFace; property: "anchors.verticalCenterOffset"
-                                to: 0; duration: 1400; easing.type: Easing.InOutSine
-                            }
-                        }
-
-                        SequentialAnimation {
-                            id: hop
-
-                            NumberAnimation {
-                                target: bigFace; property: "anchors.verticalCenterOffset"
-                                to: -10; duration: 130; easing.type: Easing.OutQuad
-                            }
-                            NumberAnimation {
-                                target: bigFace; property: "anchors.verticalCenterOffset"
-                                to: 0; duration: 190; easing.type: Easing.OutBounce
-                            }
-                        }
-
-                        Connections {
-                            target: PetService
-                            function onPlayed(): void { hop.restart() }
-                            function onCelebrated(level: int): void { hop.restart() }
-                            function onBrought(index: int): void { hop.restart() }
-                        }
-                    }
+                PillButton {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    implicitHeight: Theme.cardRow
+                    text: PetService.canFeed ? "Feed" : "Fed"
+                    enabled: PetService.canFeed
+                    onClicked: PetService.feed()
                 }
 
-                ColumnLayout {
+                PillButton {
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: 6
-
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        Text {
-                            Layout.fillWidth: true
-                            // Hatched pets show their name, then their species.
-                            text: PetService.titleOf(PetService.pet)
-                            elide: Text.ElideRight
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeMedium
-                            font.weight: Font.DemiBold
-                            color: Theme.text
-                        }
-
-                        Text {
-                            visible: PetService.hatched
-                            text: `Lv ${PetService.level}`
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.textMuted
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: PetService.moodLine
-                        elide: Text.ElideRight
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        UsageBar {
-                            Layout.fillWidth: true
-                            progress: PetService.progress
-                            fillColor: bigFace.coat
-                        }
-
-                        Text {
-                            text: `${PetService.xp}/${PetService.threshold}`
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeLabel
-                            color: Theme.textMuted
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 9
-
-                        PillButton {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 0
-                            text: PetService.canFeed ? "Feed" : "Fed"
-                            enabled: PetService.canFeed
-                            opacity: PetService.canFeed ? 1 : 0.45
-                            implicitHeight: 28
-                            onClicked: PetService.feed()
-                        }
-
-                        PillButton {
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: 0
-                            text: PetService.canPlay ? "Play" : "Played"
-                            enabled: PetService.canPlay
-                            opacity: PetService.canPlay ? 1 : 0.45
-                            implicitHeight: 28
-                            onClicked: PetService.play()
-                        }
-                    }
+                    Layout.preferredWidth: 0
+                    implicitHeight: Theme.cardRow
+                    text: PetService.canPlay ? "Play" : "Played"
+                    enabled: PetService.canPlay
+                    onClicked: PetService.play()
                 }
             }
 
             // ── SHELF ───────────────────────────────────────────────────────
 
             PetShelf {
+                id: shelf
+
                 Layout.fillWidth: true
+                Layout.preferredHeight: shelf.slot
             }
         }
     }

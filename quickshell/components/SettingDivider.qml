@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // Drawn by the lower of two rows in a `SettingGroup`, and only when there is
@@ -17,5 +18,5 @@ Rectangle {
     visible: parent !== null && parent.y > 0
     width: parent ? parent.width : 0
     height: 1
-    color: Theme.islandBorder
+    color: Theme.borderIn(QsWindow.window)
 }

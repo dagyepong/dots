@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // Square icon button, transparent until hovered.
@@ -27,9 +28,9 @@ Rectangle {
     radius: Theme.radiusSmall
 
     color: root.active ? Theme.accent
-        : (mouse.containsMouse ? Theme.islandSurfaceHover : "transparent")
+        : (mouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : "transparent")
     border.color: root.active ? Theme.accent
-        : (mouse.containsMouse ? Theme.islandBorder : "transparent")
+        : (mouse.containsMouse ? Theme.borderIn(QsWindow.window) : "transparent")
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: Theme.durationFast } }

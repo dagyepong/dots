@@ -1,7 +1,7 @@
 // ╭──────────────────────────────────────────────────────────────────────────╮
 // │                                                                          │
-// │   P O W E R   R O W                                                      │
-// │   session actions · destructive ones ask twice                           │
+// │   T O P   B U T T O N S                                                  │
+// │   one side of the control centre's top row · session and panels          │
 // │                                                                          │
 // │   github.com/andreumassanet/impasto                                      │
 // │                                                                          │
@@ -9,22 +9,24 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../../theme"
 import "../../../services"
-import "../../../components"
 
-// Built from SessionService's list, so an action is a row of data.
-// Actions that end the session arm on the first click (red, labelled) and run
-// on the second. Lock and suspend run at once.
+// Small buttons, from `ControlsService.topCatalogue`: a session action runs
+// (one that ends the session arms on the first click, red and labelled, and
+// runs on the second), a door opens its panel or the settings.
 RowLayout {
     id: root
 
+    property var entries: []
     property string armed: ""
 
-    // The panel closes on any action. Lock in particular captures the screen,
-    // which would otherwise include the panel.
-    signal ran(string action)
+    // The panel closes on any session action; lock would photograph it.
+    signal ran()
+    signal panelRequested(string panel)
+    signal settingsRequested()
 
     spacing: 4
 
@@ -34,13 +36,13 @@ RowLayout {
     }
 
     Repeater {
-        model: SessionService.actions
+        model: root.entries
 
         Rectangle {
             id: button
 
             required property var modelData
-            readonly property bool isArmed: root.armed === button.modelData.id
+            readonly property bool isArmed: root.armed !== "" && root.armed === button.modelData.id
 
             Layout.preferredWidth: button.isArmed ? label.implicitWidth + 34 : 32
             Layout.preferredHeight: 28
@@ -49,10 +51,10 @@ RowLayout {
             color: {
                 if (button.isArmed)
                     return Theme.red
-                return mouse.containsMouse ? Theme.islandSurfaceHover : "transparent"
+                return mouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
             }
             border.color: button.isArmed ? Theme.red
-                : (mouse.containsMouse ? Theme.islandBorder : "transparent")
+                : (mouse.containsMouse ? Theme.borderIn(QsWindow.window) : "transparent")
             border.width: 1
 
             Behavior on Layout.preferredWidth {
@@ -78,7 +80,7 @@ RowLayout {
                 Text {
                     id: label
                     visible: button.isArmed
-                    text: button.modelData.label
+                    text: Tr.t(button.modelData.label)
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
@@ -92,14 +94,22 @@ RowLayout {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    if (!button.modelData.destructive || button.isArmed) {
-                        root.armed = ""
-                        root.disarm.stop()
-                        SessionService.run(button.modelData.id)
-                        root.ran(button.modelData.id)
+                    const entry = button.modelData
+                    if (!entry.session) {
+                        if (entry.panel === "")
+                            root.settingsRequested()
+                        else
+                            root.panelRequested(entry.panel)
                         return
                     }
-                    root.armed = button.modelData.id
+                    if (!entry.destructive || button.isArmed) {
+                        root.armed = ""
+                        root.disarm.stop()
+                        SessionService.run(entry.id)
+                        root.ran()
+                        return
+                    }
+                    root.armed = entry.id
                     root.disarm.restart()
                 }
             }

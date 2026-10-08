@@ -69,6 +69,9 @@ Singleton {
 
     readonly property string totalLabel: root.grouped(root.total)
 
+    // The graph's height on the module's card: seven 9 px days, 3 px apart.
+    readonly property int cardGrid: 7 * 9 + 6 * 3
+
     function subscribe(): void {
         root.watchers += 1
         // Refresh on subscribe only if the reading is missing or stale.

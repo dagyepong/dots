@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -42,13 +43,13 @@ RowLayout {
             implicitHeight: root.slot
             radius: width / 2
             color: slot.out
-                ? Theme.islandSurface
-                : (slotMouse.containsMouse ? Theme.islandSurfaceHover : "transparent")
+                ? Theme.surfaceIn(QsWindow.window)
+                : (slotMouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : "transparent")
             border.width: 1
             // The active pet in white; sleepers outlined, empty slots faint.
             border.color: slot.out
                 ? Theme.indicator
-                : (slot.filled ? Theme.islandBorder : Theme.hairline)
+                : (slot.filled ? Theme.borderIn(QsWindow.window) : Theme.hairline)
 
             Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 

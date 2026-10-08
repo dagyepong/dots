@@ -45,11 +45,10 @@ Item {
     // the request goes up to the dock.
     signal menuRequested(string key)
 
-    // The dot lane is on the screen-edge side, so the icon is pushed off it.
     readonly property real along: DockService.offsetOf(DockService.shifted(root.index))
 
-    width: root.vertical ? Theme.dockDepth : Theme.dockIcon
-    height: root.vertical ? Theme.dockIcon : Theme.dockDepth
+    width: Theme.dockIcon
+    height: Theme.dockIcon
 
     z: root.held ? 2 : (root.hovered ? 1 : 0)
 
@@ -91,11 +90,6 @@ Item {
         width: Theme.dockIcon
         height: Theme.dockIcon
 
-        // Against the far side of the box; the dot takes the side nearest the
-        // screen edge.
-        x: root.edge === "right" ? 0 : root.width - Theme.dockIcon
-        y: root.edge === "bottom" ? 0 : (root.height - Theme.dockIcon) / 2
-
         scale: root.hovered || root.held ? Theme.dockLift : 1
 
         Behavior on scale {
@@ -107,7 +101,7 @@ Item {
             anchors.fill: parent
             anchors.margins: -3
             radius: Theme.radiusMedium
-            color: Theme.islandSurfaceHover
+            color: Theme.veilHoverOf(Theme.dockStyle)
             opacity: root.hovered || root.held ? 1 : 0
             visible: opacity > 0
 
@@ -125,6 +119,7 @@ Item {
             id: picture
 
             anchors.fill: parent
+            anchors.margins: Theme.dockInset
             source: slot.iconSource
             sourceSize: Qt.size(Theme.dockIcon * 2, Theme.dockIcon * 2)
             fillMode: Image.PreserveAspectFit
@@ -138,7 +133,7 @@ Item {
             visible: !picture.visible
             text: "󰀻"
             font.family: Theme.fontMono
-            font.pixelSize: Math.round(Theme.dockIcon * 0.6)
+            font.pixelSize: Math.round((Theme.dockIcon - 2 * Theme.dockInset) * 0.6)
             color: Theme.textMuted
         }
     }
@@ -155,11 +150,16 @@ Item {
         radius: Theme.radiusPill
         color: root.active ? Theme.accent : Theme.textMuted
 
+        // Centred between the drawn icon and the rim on the screen-edge side.
+        readonly property real room: Theme.dockPadding + Theme.dockInset
+
         x: root.edge === "right"
-            ? root.width - Theme.dockDot
-            : (root.edge === "left" ? 0 : (root.width - width) / 2)
+            ? root.width - Theme.dockInset + (room - width) / 2
+            : (root.edge === "left"
+                ? Theme.dockInset - (room + width) / 2
+                : (root.width - width) / 2)
         y: root.edge === "bottom"
-            ? root.height - Theme.dockDot
+            ? root.height - Theme.dockInset + (room - height) / 2
             : (root.height - height) / 2
 
         opacity: root.running ? 1 : 0

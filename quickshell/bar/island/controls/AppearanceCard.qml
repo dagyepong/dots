@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import Quickshell.Widgets
 
@@ -25,8 +26,8 @@ ClippingRectangle {
 
     contentUnderBorder: true
     radius: Theme.radiusMedium
-    color: Theme.islandSurface
-    border.color: mouse.containsMouse ? Theme.accent : Theme.islandBorder
+    color: Theme.surfaceIn(QsWindow.window)
+    border.color: mouse.containsMouse ? Theme.accent : Theme.borderIn(QsWindow.window)
     border.width: 1
 
     Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }

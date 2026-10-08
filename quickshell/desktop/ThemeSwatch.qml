@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 import "../services"
 
@@ -37,7 +38,7 @@ Item {
             anchors.fill: parent
             radius: Theme.desktopRadius
             color: Theme.island
-            border.color: Theme.islandBorder
+            border.color: Theme.borderIn(QsWindow.window)
             border.width: 2
         }
 

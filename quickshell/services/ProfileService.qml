@@ -63,7 +63,7 @@ Singleton {
 
     function wallpaperOf(id: string): string {
         if (id === root.active)
-            return WallpaperService.currentWallpaper
+            return WallpaperService.chosen
         const found = root.entry(id)
         return found ? found.wallpaper : ""
     }
@@ -108,7 +108,7 @@ Singleton {
         const made = {
             id: root.newId(),
             name: root.uniqueName(Tr.t("New profile"), ""),
-            wallpaper: WallpaperService.currentWallpaper,
+            wallpaper: WallpaperService.chosen,
             palette: ThemeService.activeId,
             settings: SettingsService.complete({})
         }
@@ -161,7 +161,7 @@ Singleton {
         root.profiles = root.profiles.map(item => item.id === root.active
             ? Object.assign({}, item, {
                 settings: SettingsService.snapshot(),
-                wallpaper: WallpaperService.currentWallpaper,
+                wallpaper: WallpaperService.chosen,
                 palette: ThemeService.activeId })
             : item)
     }
@@ -193,7 +193,7 @@ Singleton {
     // and WallpaperService would record it as current before
     // `theme_manager.py` refuses it.
     function showWallpaper(path: string): void {
-        if (!path || path === WallpaperService.currentWallpaper)
+        if (!path || path === WallpaperService.chosen)
             return
         root.wallpaperCheck.wanted = path
         root.wallpaperCheck.command = ["test", "-f", path]
@@ -204,7 +204,7 @@ Singleton {
         property string wanted: ""
 
         onExited: code => {
-            if (code === 0 && wanted !== WallpaperService.currentWallpaper)
+            if (code === 0 && wanted !== WallpaperService.chosen)
                 WallpaperService.apply(wanted)
         }
     }

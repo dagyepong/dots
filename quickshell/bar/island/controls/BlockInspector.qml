@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../../theme"
 import "../../../services"
 import "../../../components"
@@ -32,6 +33,9 @@ Item {
         ? ControlsService.geometry(root.block) : ({ x: 0, y: 0, width: 0, height: 0 })
 
     readonly property bool onToggles: root.blockId === "toggles"
+    readonly property bool onShortcuts: root.blockId === "shortcuts"
+    // The two blocks that carry a list chosen here.
+    readonly property bool listed: root.onToggles || root.onShortcuts
 
     readonly property int cardWidth: 268
     readonly property int pad: 14
@@ -56,7 +60,7 @@ Item {
         height: column.implicitHeight + 2 * root.pad
         radius: Theme.radiusLarge
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Behavior on x { NumberAnimation { duration: Theme.durationMedium; easing.type: Theme.easing } }
@@ -137,7 +141,7 @@ Item {
                         width: Math.max(48, sizeTile.shape.cols * 11 + 16)
                         height: 58
                         radius: Theme.radiusSmall
-                        color: sizeTile.current ? Theme.islandSurfaceHover : "transparent"
+                        color: sizeTile.current ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
                         border.color: sizeTile.current ? Theme.accent : Theme.hairline
                         border.width: 1
 
@@ -175,13 +179,13 @@ Item {
 
             // ── TILES ───────────────────────────────────────────────────────
             //
-            // Toggles block only: every switch in the catalogue, ticked when it
-            // is on this block. A newly ticked tile goes to the end; the arrows
-            // reorder.
+            // The toggles block's switches, or the shortcuts block's buttons:
+            // every one there is, ticked when it is on this block. A newly
+            // ticked one goes to the end; the arrows reorder.
 
             Text {
-                visible: root.onToggles
-                text: Tr.t("Toggles")
+                visible: root.listed
+                text: root.onShortcuts ? Tr.t("Shortcuts") : Tr.t("Toggles")
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeLabel
                 font.weight: Font.DemiBold
@@ -189,27 +193,26 @@ Item {
             }
 
             Column {
-                visible: root.onToggles
+                visible: root.listed
                 width: parent.width
                 spacing: 2
 
                 Repeater {
-                    model: root.onToggles ? ControlsService.tileRowsOf(root.key) : []
+                    model: root.listed ? ControlsService.listRowsOf(root.key) : []
 
                     Rectangle {
                         id: tickRow
 
                         required property var modelData
 
-                        readonly property bool on:
-                            ControlsService.showsTileIn(root.key, tickRow.modelData.key)
-                        readonly property var order: ControlsService.toggleKeysOf(root.key)
+                        readonly property var order: ControlsService.listKeysOf(root.key)
+                        readonly property bool on: tickRow.order.indexOf(tickRow.modelData.key) >= 0
                         readonly property int at: tickRow.order.indexOf(tickRow.modelData.key)
 
                         width: parent.width
                         height: 24
                         radius: Theme.radiusSmall
-                        color: tickHover.hovered ? Theme.islandSurfaceHover : "transparent"
+                        color: tickHover.hovered ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
                         Row {
                             anchors.left: parent.left
@@ -263,7 +266,7 @@ Item {
 
                         TapHandler {
                             gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: ControlsService.toggleTileIn(root.key, tickRow.modelData.key)
+                            onTapped: ControlsService.toggleIn(root.key, tickRow.modelData.key)
                         }
 
                         // Declared after the row's tap so a press on an arrow
@@ -290,7 +293,7 @@ Item {
                                     height: 20
                                     radius: Theme.radiusSmall
                                     color: arrowHover.hovered && arrow.usable
-                                        ? Theme.islandSurface : "transparent"
+                                        ? Theme.surfaceIn(QsWindow.window) : "transparent"
                                     opacity: arrow.usable ? 1 : 0.3
 
                                     Text {
@@ -310,7 +313,7 @@ Item {
                                         gesturePolicy: TapHandler.ReleaseWithinBounds
                                         onTapped: {
                                             if (arrow.usable)
-                                                ControlsService.moveTileIn(root.key,
+                                                ControlsService.moveIn(root.key,
                                                     tickRow.modelData.key, arrow.modelData.delta)
                                         }
                                     }

@@ -9,22 +9,22 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
 import "../../components"
 import "./controls"
 
-// The control centre: a row of buttons over a grid of blocks
-// (`ControlsService.blocks`) that the user arranges like desktop widgets.
+// The control centre: a row of small buttons, when any are chosen, over a
+// grid of blocks (`ControlsService.blocks`) that the user arranges like
+// desktop widgets.
 //
 // Right-click the background to arrange: drag blocks from the tray
 // (`ControlsTray`, hung under the island by the bar) onto a cell, pull a
 // corner or scroll to resize, and drop one back on the tray to remove it.
 // Tiles that lead to a list (Wi-Fi, Bluetooth) open it as an island panel of
 // its own, sized as a list rather than a block.
-//
-// Session actions sit at the left of the row and panel buttons at the right.
 ColumnLayout {
     id: root
 
@@ -57,39 +57,74 @@ ColumnLayout {
     }
 
     // ── TOP ROW ─────────────────────────────────────────────────────────────
+    //
+    // Two sides (`ControlsService.topSides`), arranged in the settings, or
+    // while arranging by choosing the row as a block is chosen. With both
+    // sides empty it is laid out only while arranging.
 
-    RowLayout {
+    Item {
+        visible: ControlsService.topShown
         Layout.fillWidth: true
         // A Layout nested in a Layout fills by default; without this it takes
         // the grid's height.
         Layout.fillHeight: false
         Layout.preferredHeight: ControlsService.rowHeight
-        spacing: 12
 
-        PowerRow { onRan: root.closed() }
+        readonly property bool chosen: ControlsService.selected === "top"
 
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        RowLayout {
+            anchors.fill: parent
+            spacing: 12
+            // Disabled while arranging, as a block's face is, so a click
+            // chooses the row instead of pressing a button.
+            enabled: !root.editing
+
+            TopButtons {
+                entries: ControlsService.topLeft
+                onRan: root.closed()
+                onPanelRequested: panel => root.panelRequested(panel)
+                onSettingsRequested: root.settingsRequested()
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+            }
+
+            TopButtons {
+                entries: ControlsService.topRight
+                onRan: root.closed()
+                onPanelRequested: panel => root.panelRequested(panel)
+                onSettingsRequested: root.settingsRequested()
+            }
         }
 
-        // Panel buttons, in the order settings keeps them. Settings sends its
-        // own request; the rest are panel names.
-        Repeater {
-            model: ControlsService.shownDoors
+        // Empty, it is there only while arranging: a place to click and fill.
+        Text {
+            anchors.centerIn: parent
+            visible: root.editing && !ControlsService.hasTop
+            text: Tr.t("The top row: click to choose its buttons")
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            color: Theme.textMuted
+        }
 
-            IconButton {
-                required property var modelData
+        // Outlined and chosen like a block while arranging.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -3
+            visible: root.editing
+            radius: Theme.radiusMedium + 3
+            color: "transparent"
+            border.color: parent.chosen ? Theme.accent : Theme.hairline
+            border.width: parent.chosen ? 2 : 1
+        }
 
-                icon: modelData.icon
-                iconSize: 14
-                onClicked: {
-                    if (modelData.panel === "")
-                        root.settingsRequested()
-                    else
-                        root.panelRequested(modelData.panel)
-                }
-            }
+        TapHandler {
+            enabled: root.editing
+            acceptedButtons: Qt.LeftButton
+            gesturePolicy: TapHandler.ReleaseWithinBounds
+            onTapped: ControlsService.selected = parent.chosen ? "" : "top"
         }
     }
 
@@ -113,9 +148,11 @@ ColumnLayout {
 
         // Right-click on the background toggles arranging. Declared first,
         // beneath everything: blocks take the left button and the right one
-        // falls through.
+        // falls through. Exclusive from the press, or the island's catch-all
+        // under the panel takes it; that one answers the panel's margin.
         TapHandler {
             acceptedButtons: Qt.RightButton
+            gesturePolicy: TapHandler.ReleaseWithinBounds
             onTapped: ControlsService.edit(!ControlsService.editing)
         }
 
@@ -176,11 +213,14 @@ ColumnLayout {
         // drop. Ids change only when a block is added or removed, so the snap
         // animates and a playing track or a scrolled list survives a drag.
         Repeater {
-            model: ControlsService.keys
+            model: ScriptModel {
+                values: ControlsService.keys
+            }
 
             Block {
                 board: surface
                 onPanelRequested: panel => root.panelRequested(panel)
+                onSettingsRequested: root.settingsRequested()
                 onDismissed: root.closed()
             }
         }
@@ -190,7 +230,17 @@ ColumnLayout {
             anchors.fill: parent
             z: 5
             active: root.editing && ControlsService.selected !== ""
+                && ControlsService.selected !== "top"
             sourceComponent: BlockInspector { board: surface }
+        }
+
+        // The top row's, under it at the right.
+        Loader {
+            anchors.right: parent.right
+            y: 0
+            z: 5
+            active: root.editing && ControlsService.selected === "top"
+            sourceComponent: TopRowInspector { limit: surface.height }
         }
     }
 

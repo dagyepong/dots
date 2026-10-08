@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // A thumbnail of a screen with the bar on it, showing only what the bar
@@ -38,7 +39,7 @@ Item {
         height: root.height - 14
         radius: 5
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
         clip: true
 
@@ -60,7 +61,7 @@ Item {
             radius: height / 2
             topLeftRadius: root.attached ? 0 : radius
             topRightRadius: root.attached ? 0 : radius
-            color: Theme.islandSurface
+            color: Theme.surfaceIn(QsWindow.window)
         }
 
         // The two sides: against the island when grouped, at the edges when
@@ -74,7 +75,7 @@ Item {
             width: 12
             height: screen.band
             radius: height / 2
-            color: Theme.islandSurface
+            color: Theme.surfaceIn(QsWindow.window)
         }
 
         Rectangle {
@@ -86,7 +87,7 @@ Item {
             width: 18
             height: screen.band
             radius: height / 2
-            color: Theme.islandSurface
+            color: Theme.surfaceIn(QsWindow.window)
         }
 
         // The island.

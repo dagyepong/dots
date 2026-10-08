@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../../theme"
@@ -97,12 +98,12 @@ FocusScope {
                     color: {
                         if (tile.isArmed)
                             return Theme.red
-                        return tile.isSelected ? Theme.islandSurfaceHover : Theme.islandSurface
+                        return tile.isSelected ? Theme.surfaceHoverIn(QsWindow.window) : Theme.surfaceIn(QsWindow.window)
                     }
                     border.color: {
                         if (tile.isArmed)
                             return Theme.red
-                        return tile.isSelected ? Theme.accent : Theme.islandBorder
+                        return tile.isSelected ? Theme.accent : Theme.borderIn(QsWindow.window)
                     }
                     border.width: tile.isSelected || tile.isArmed ? 2 : 1
 

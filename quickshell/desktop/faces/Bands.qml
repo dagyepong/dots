@@ -32,7 +32,8 @@ Item {
         weather: weatherBand,
         github: githubBand,
         notes: notesBand,
-        photo: photoBand
+        photo: photoBand,
+        spectrum: spectrumBand
     })
 
     Loader {
@@ -110,7 +111,9 @@ Item {
                     anchors.fill: parent
 
                     Repeater {
-                        model: band.hoursAhead
+                        model: ScriptModel {
+                            values: band.hoursAhead
+                        }
 
                         Item {
                             id: block
@@ -178,5 +181,12 @@ Item {
         id: githubBand
 
         GithubFace { ink: root.ink; family: "8x2" }
+    }
+
+    // The bars in a capsule; see `SpectrumFace`.
+    Component {
+        id: spectrumBand
+
+        SpectrumFace { ink: root.ink; row: root.row; family: "8x2" }
     }
 }

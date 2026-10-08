@@ -1,7 +1,7 @@
 // ╭──────────────────────────────────────────────────────────────────────────╮
 // │                                                                          │
 // │   L A U N C H E R   P A N E L                                            │
-// │   launcher · apps, calculator, windows, timer, clipboard                 │
+// │   launcher · apps, calculator, windows, timer, clipboard, emoji          │
 // │                                                                          │
 // │   github.com/andreumassanet/impasto                                      │
 // │                                                                          │
@@ -17,7 +17,8 @@ import "../../services"
 import "../../components"
 
 // Application launcher. The first character picks the mode: arithmetic, open
-// windows, a countdown, the clipboard history, or the shell's own actions.
+// windows, a countdown, the clipboard history, emoji, or the shell's own
+// actions.
 ColumnLayout {
     id: root
 
@@ -25,6 +26,16 @@ ColumnLayout {
     // height depends on it, and the island needs that before the panel exists.
     readonly property var results: LauncherService.results
     readonly property var mode: LauncherService.modeFor(LauncherService.query)
+
+    // Emoji are a grid of glyphs; every other mode is a list of rows.
+    readonly property bool grid: root.mode.id === "emoji"
+    readonly property var view: root.grid ? emojiGrid : resultList
+
+    // Loaded here rather than from the search, which runs inside a binding.
+    onModeChanged: {
+        if (root.mode.id === "emoji")
+            EmojiService.load()
+    }
 
     signal closed()
     // `>` lists panels as rows; picking one hands the island over.
@@ -44,24 +55,33 @@ ColumnLayout {
         searchField.forceActiveFocus()
         HyprlandService.loadClients()
         LauncherService.refresh()
+        EmojiService.fresh = false
+        if (root.mode.id === "emoji")
+            EmojiService.load()
     }
 
     // Cleared on the way out, not on the way in: the island is sized from the
     // query a frame before this panel is built, so clearing it on open would
     // size the island for the last search and then resize it.
-    Component.onDestruction: LauncherService.query = ""
-
-    // Something is always selected, so Enter always runs a result.
-    onResultsChanged: {
-        resultList.currentIndex = 0
-        resultList.positionViewAtBeginning()
+    Component.onDestruction: {
+        LauncherService.query = ""
+        EmojiService.group = ""
     }
 
-    // Wraps around at both ends.
+    // The list wraps around at both ends. The grid stops at its edges, since
+    // a line wrapped to the other end would land in a different column.
     function move(delta: int): void {
         const count = root.results.length
         if (count === 0)
             return
+        if (root.grid) {
+            const next = emojiGrid.currentIndex + delta
+            if (next < 0 || next >= count)
+                return
+            emojiGrid.currentIndex = next
+            emojiGrid.positionViewAtIndex(next, GridView.Contain)
+            return
+        }
         resultList.currentIndex = (resultList.currentIndex + delta + count) % count
         resultList.positionViewAtIndex(resultList.currentIndex, ListView.Contain)
     }
@@ -98,8 +118,16 @@ ColumnLayout {
         root.closed()
     }
 
-    function activateSelected(): void {
-        root.run(root.results[resultList.currentIndex])
+    // Shift or Ctrl with Enter opens a copied image in imv instead of copying
+    // it; on any other row it is a plain Enter.
+    function confirm(entry: var, modifiers: int): void {
+        if (entry && entry.kind === "clip" && entry.file
+                && (modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) {
+            Quickshell.execDetached(["imv", entry.file])
+            root.closed()
+            return
+        }
+        root.run(entry)
     }
 
     // Only clipboard entries can be forgotten: they are recorded without being
@@ -108,7 +136,7 @@ ColumnLayout {
     function forgetSelected(): void {
         if (root.mode.id !== "clipboard")
             return
-        const entry = root.results[resultList.currentIndex]
+        const entry = root.results[root.view.currentIndex]
         if (entry)
             ClipboardService.forget(entry.id)
     }
@@ -146,10 +174,31 @@ ColumnLayout {
             selectedTextColor: Theme.accentText
 
             onTextEdited: LauncherService.query = text
-            Keys.onReturnPressed: root.activateSelected()
-            Keys.onEnterPressed: root.activateSelected()
-            Keys.onUpPressed: root.move(-1)
-            Keys.onDownPressed: root.move(1)
+            Keys.onReturnPressed: event => root.confirm(root.results[root.view.currentIndex], event.modifiers)
+            Keys.onEnterPressed: event => root.confirm(root.results[root.view.currentIndex], event.modifiers)
+            Keys.onUpPressed: root.move(root.grid ? -LauncherService.emojiColumns : -1)
+            Keys.onDownPressed: root.move(root.grid ? LauncherService.emojiColumns : 1)
+            // In the grid the arrows move along a line; the field is a search
+            // term, rarely edited in the middle.
+            Keys.onLeftPressed: event => {
+                event.accepted = root.grid
+                if (root.grid)
+                    root.move(-1)
+            }
+            Keys.onRightPressed: event => {
+                event.accepted = root.grid
+                if (root.grid)
+                    root.move(1)
+            }
+            // Tab steps through the emoji groups; elsewhere it does nothing.
+            Keys.onTabPressed: {
+                if (root.mode.id === "emoji")
+                    EmojiService.stepGroup(1)
+            }
+            Keys.onBacktabPressed: {
+                if (root.mode.id === "emoji")
+                    EmojiService.stepGroup(-1)
+            }
             // Shift+Delete: plain Delete edits the text, and this cannot be
             // undone.
             Keys.onDeletePressed: event => {
@@ -183,12 +232,79 @@ ColumnLayout {
                 font: searchField.font
             }
         }
+
+        // The skin tone every emoji that takes one is shown and copied in.
+        // Its mark is the tone itself, on a raised hand; a click steps it.
+        Text {
+            visible: root.mode.id === "emoji"
+            text: EmojiService.toneMarks[EmojiService.tone]
+            font.family: Theme.fontFamily
+            font.pixelSize: 18
+
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -6
+                cursorShape: Qt.PointingHandCursor
+                onClicked: EmojiService.stepTone()
+            }
+        }
+    }
+
+    // ── GROUPS ──────────────────────────────────────────────────────────────
+    //
+    // The emoji mode's nine groups and the recent picks, each marked by an
+    // emoji and nothing else. Tab steps through them.
+    RowLayout {
+        Layout.fillWidth: true
+        Layout.preferredHeight: LauncherService.stripHeight
+        visible: LauncherService.showsStrip
+        spacing: 2
+
+        Repeater {
+            model: EmojiService.groups
+
+            delegate: Rectangle {
+                id: chip
+
+                required property var modelData
+                readonly property bool chosen: EmojiService.group === chip.modelData.id
+
+                Layout.preferredWidth: LauncherService.stripHeight + 2
+                Layout.preferredHeight: LauncherService.stripHeight
+                radius: Theme.radiusSmall
+                color: chip.chosen || chipMouse.containsMouse
+                    ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
+
+                Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: chip.modelData.mark
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 16
+                    opacity: chip.chosen ? 1 : 0.6
+                }
+
+                MouseArea {
+                    id: chipMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        EmojiService.group = chip.modelData.id
+                        searchField.forceActiveFocus()
+                    }
+                }
+            }
+        }
+
+        Item { Layout.fillWidth: true }
     }
 
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 1
-        color: Theme.islandBorder
+        color: Theme.borderIn(QsWindow.window)
     }
 
     // Explicit empty state. In a sigil mode, usually only the sigil has been
@@ -202,14 +318,80 @@ ColumnLayout {
         color: Theme.textMuted
     }
 
+    // ── EMOJI ───────────────────────────────────────────────────────────────
+    //
+    // The glyphs alone, as many to a line as fit; the name is only searched.
+    GridView {
+        id: emojiGrid
+
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        visible: root.grid
+        clip: true
+        cellWidth: LauncherService.emojiCell
+        cellHeight: LauncherService.emojiCell
+        model: ScriptModel {
+            values: root.grid ? root.results : []
+
+            onValuesChanged: {
+                emojiGrid.currentIndex = 0
+                emojiGrid.positionViewAtBeginning()
+            }
+        }
+        boundsBehavior: Flickable.StopAtBounds
+        currentIndex: 0
+
+        delegate: Rectangle {
+            id: cell
+
+            required property var modelData
+            required property int index
+
+            readonly property bool selected: GridView.view.currentIndex === cell.index
+
+            width: LauncherService.emojiCell
+            height: LauncherService.emojiCell
+            radius: Theme.radiusSmall
+            color: cell.selected ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
+
+            Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+            Text {
+                anchors.centerIn: parent
+                text: cell.modelData.glyph ?? ""
+                font.family: Theme.fontFamily
+                font.pixelSize: 28
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onPositionChanged: cell.GridView.view.currentIndex = cell.index
+                onClicked: root.run(cell.modelData)
+            }
+        }
+    }
+
     ListView {
         id: resultList
 
         Layout.fillWidth: true
         Layout.fillHeight: true
+        visible: !root.grid
         clip: true
         spacing: LauncherService.rowSpacing
-        model: root.results
+        model: ScriptModel {
+            values: root.grid ? [] : root.results
+
+            // Back to the top once the rows have landed, not when the list
+            // changes: a row inserted above the selection would shift it.
+            // Something is always selected, so Enter always runs a result.
+            onValuesChanged: {
+                resultList.currentIndex = 0
+                resultList.positionViewAtBeginning()
+            }
+        }
         boundsBehavior: Flickable.StopAtBounds
         // The delegate paints the selection itself; no separate highlight.
         currentIndex: 0
@@ -227,7 +409,7 @@ ColumnLayout {
             width: ListView.view.width
             height: LauncherService.rowHeight
             radius: Theme.radiusSmall
-            color: row.selected ? Theme.islandSurfaceHover : "transparent"
+            color: row.selected ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
             Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
@@ -252,6 +434,9 @@ ColumnLayout {
                     // share a name and a size.
                     readonly property string picture: row.modelData.picture ?? ""
 
+                    // An emoji is its own mark, drawn in colour.
+                    readonly property string glyph: row.modelData.glyph ?? ""
+
                     Layout.preferredWidth: 26
                     Layout.preferredHeight: 26
                     Layout.alignment: Qt.AlignVCenter
@@ -272,7 +457,7 @@ ColumnLayout {
                         anchors.fill: parent
                         visible: badge.picture !== "" && thumbnail.status === Image.Ready
                         radius: width * Theme.pictureCorner
-                        color: Theme.islandSurfaceHover
+                        color: Theme.surfaceHoverIn(QsWindow.window)
 
                         Image {
                             id: thumbnail
@@ -286,11 +471,19 @@ ColumnLayout {
                         }
                     }
 
+                    Text {
+                        anchors.centerIn: parent
+                        visible: badge.glyph !== ""
+                        text: badge.glyph
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 22
+                    }
+
                     Rectangle {
                         anchors.fill: parent
-                        visible: !appIcon.visible && badge.picture === ""
+                        visible: !appIcon.visible && badge.picture === "" && badge.glyph === ""
                         radius: width / 2
-                        color: Theme.islandSurfaceHover
+                        color: Theme.surfaceHoverIn(QsWindow.window)
 
                         Text {
                             anchors.centerIn: parent
@@ -352,7 +545,7 @@ ColumnLayout {
                     visible: (row.modelData.sigil ?? "") !== ""
                     radius: Theme.radiusSmall - 2
                     color: Theme.island
-                    border.color: Theme.islandBorder
+                    border.color: Theme.borderIn(QsWindow.window)
                     border.width: 1
 
                     Text {
@@ -374,7 +567,7 @@ ColumnLayout {
                 // On movement, not hover: a row appearing under a resting
                 // pointer would otherwise steal the selection on open.
                 onPositionChanged: row.ListView.view.currentIndex = row.index
-                onClicked: root.run(row.modelData)
+                onClicked: mouse => root.confirm(row.modelData, mouse.modifiers)
             }
         }
     }

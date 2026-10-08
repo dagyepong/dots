@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../../theme"
 
 // Flood-It. The top-left region takes each chosen colour and absorbs the
@@ -138,8 +139,8 @@ FocusScope {
         width: root.cell * root.columns + 2 * root.pad
         height: root.cell * (root.rows + 1) + 3 * root.pad
         radius: Theme.radiusMedium
-        color: Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Item {
@@ -155,15 +156,41 @@ FocusScope {
 
                 // One pixel of background between cells.
                 Rectangle {
+                    id: square
+
                     required property int index
 
-                    x: (index % root.columns) * root.cell
-                    y: Math.floor(index / root.columns) * root.cell
+                    // Distance from the corner the flood starts at, in cells:
+                    // every square waits that long before it turns, so a move
+                    // spreads out of the corner instead of landing at once.
+                    readonly property int reach:
+                        (square.index % root.columns) + Math.floor(square.index / root.columns)
+
+                    x: (square.index % root.columns) * root.cell
+                    y: Math.floor(square.index / root.columns) * root.cell
                     width: root.cell - 1
                     height: root.cell - 1
-                    color: root.colours[root.grid[index] ?? 0]
+                    radius: Math.max(1, root.cell * 0.18)
+                    color: root.colours[root.grid[square.index] ?? 0]
 
-                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+                    Behavior on color {
+                        SequentialAnimation {
+                            PauseAnimation { duration: square.reach * 16 }
+                            ColorAnimation { duration: 110 }
+                        }
+                    }
+
+                    // The light on the cell, so the board reads as tiles.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.13) }
+                            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.02) }
+                            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.13) }
+                        }
+                    }
                 }
             }
         }
@@ -193,6 +220,17 @@ FocusScope {
                     border.color: Theme.text
                     border.width: index === root.current ? 2 : 0
                     scale: press.containsMouse ? 1.12 : 1
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.18) }
+                            GradientStop { position: 0.6; color: Qt.rgba(1, 1, 1, 0.0) }
+                            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.16) }
+                        }
+                    }
 
                     Behavior on scale { NumberAnimation { duration: Theme.durationFast } }
 

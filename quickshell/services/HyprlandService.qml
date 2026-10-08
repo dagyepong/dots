@@ -31,6 +31,31 @@ QtObject {
     property int activeId: 1
     property var occupiedIds: []
 
+    // Every workspace as hyprctl lists it, for the name an event carries.
+    property var named: []
+
+    // The screen with the keyboard, by connector name. Quickshell's own
+    // `Hyprland.focusedMonitor` is empty here for the reason its monitor list
+    // is, so it comes from the active workspace and from `focusedmon`.
+    property string focusedMonitor: ""
+
+    // The workspace each screen is showing, by connector name, so the bar on a
+    // screen is about that screen. Seeded from hyprctl and kept up by the
+    // events that move a workspace or the keyboard.
+    property var activeByMonitor: ({})
+
+    function activeOn(monitor: string): int {
+        return root.activeByMonitor[monitor] ?? 0
+    }
+
+    function noteActive(monitor: string, workspaceId: int): void {
+        if (monitor === "" || workspaceId <= 0 || root.activeByMonitor[monitor] === workspaceId)
+            return
+        const next = Object.assign({}, root.activeByMonitor)
+        next[monitor] = workspaceId
+        root.activeByMonitor = next
+    }
+
     function isOccupied(workspaceId: int): bool {
         return root.occupiedIds.indexOf(workspaceId) >= 0
     }
@@ -52,8 +77,19 @@ QtObject {
         return root.visibleIds.indexOf(workspaceId) >= 0
     }
 
+    // Brings the workspace to the screen being worked on rather than taking
+    // the keyboard to the screen it is on, which is what the number keys do
+    // (`keybinds.lua`). A dot on a bar and a cell in the overview are both
+    // drawn on one screen and mean it.
     function focus(workspaceId: int): void {
-        Hyprland.dispatch(`hl.dsp.focus({ workspace = ${workspaceId} })`)
+        Hyprland.dispatch(
+            `hl.dsp.focus({ workspace = ${workspaceId}, on_current_monitor = true })`)
+    }
+
+    // The screen a workspace is on, or "" for one nobody has made yet.
+    function monitorOf(workspaceId: int): string {
+        const found = root.named.find(workspace => workspace.id === workspaceId)
+        return (found && typeof found.monitor === "string") ? found.monitor : ""
     }
 
     function refresh(): void {
@@ -63,8 +99,9 @@ QtObject {
 
     // ── ON DEMAND ───────────────────────────────────────────────────────────
     //
-    // Monitors and keybindings only matter while the settings window is open,
-    // so they are queried when asked for rather than kept in step with events.
+    // Keybindings only matter while the settings window is open, so they are
+    // queried when asked for. Monitors are read at start, whenever a workspace
+    // moves or a screen arrives, and when the settings window asks.
 
     property var monitors: []
     property var binds: []
@@ -74,8 +111,11 @@ QtObject {
         stdout: StdioCollector {
             onStreamFinished: {
                 const list = root.parseJson(text)
-                if (Array.isArray(list))
-                    root.monitors = list
+                if (!Array.isArray(list))
+                    return
+                root.monitors = list
+                for (const monitor of list)
+                    root.noteActive(monitor.name ?? "", monitor.activeWorkspace?.id ?? 0)
             }
         }
     }
@@ -136,6 +176,34 @@ QtObject {
     }
 
     function loadClients(): void { root.clientsProcess.running = true }
+
+    readonly property Timer refreshSoon: Timer {
+        interval: 30
+        onTriggered: {
+            root.refresh()
+            if (root.watchClients || root.clients.length > 0)
+                root.loadClients()
+        }
+    }
+
+    readonly property Timer clientsSoon: Timer {
+        interval: 30
+        onTriggered: root.loadClients()
+    }
+
+    function retitle(data: string): void {
+        const comma = data.indexOf(",")
+        if (comma < 0)
+            return
+        const address = `0x${data.slice(0, comma)}`
+        const title = data.slice(comma + 1)
+        const index = root.clients.findIndex(client => client.address === address)
+        if (index < 0 || root.clients[index].title === title)
+            return
+        const next = root.clients.slice()
+        next[index] = Object.assign({}, next[index], { title: title })
+        root.clients = next
+    }
 
     function clientsOn(workspaceId: int): var {
         return root.clients.filter(client => client.workspace.id === workspaceId)
@@ -210,7 +278,22 @@ QtObject {
     }
 
     function loadMonitors(): void { root.monitorsProcess.running = true }
+
+    // The id of a workspace an event names. Hyprland sends the name, which is
+    // the number for every workspace nobody has renamed.
+    function idNamed(name: string): int {
+        const found = root.named.find(workspace => workspace.name === name)
+        if (found)
+            return found.id
+        const number = parseInt(name, 10)
+        return isNaN(number) ? 0 : number
+    }
     function loadBinds(): void { root.bindsProcess.running = true }
+
+    // One read at start, for the workspace every screen is showing. After it
+    // the events keep the map, and the settings window asks again when it
+    // wants the full list.
+    Component.onCompleted: root.loadMonitors()
 
     readonly property Process workspacesProcess: Process {
         command: ["hyprctl", "workspaces", "-j"]
@@ -223,6 +306,7 @@ QtObject {
                 root.occupiedIds = workspaces
                     .filter(workspace => workspace.windows > 0)
                     .map(workspace => workspace.id)
+                root.named = workspaces
             }
         }
     }
@@ -235,6 +319,10 @@ QtObject {
                 const workspace = root.parseJson(text)
                 if (workspace && typeof workspace.id === "number")
                     root.activeId = workspace.id
+                if (typeof workspace?.monitor === "string" && workspace.monitor !== "") {
+                    root.focusedMonitor = workspace.monitor
+                    root.noteActive(workspace.monitor, workspace.id ?? 0)
+                }
             }
         }
     }
@@ -243,31 +331,46 @@ QtObject {
         target: Hyprland
 
         function onRawEvent(event): void {
+            // Hyprland sends most events twice, plain and v2; only one of
+            // each pair is handled, and a burst becomes one query.
             switch (event.name) {
-            case "workspace":
             case "workspacev2":
-            case "createworkspace":
             case "createworkspacev2":
-            case "destroyworkspace":
             case "destroyworkspacev2":
             case "openwindow":
             case "closewindow":
-            case "movewindow":
             case "movewindowv2":
-            case "windowtitle":
+                root.refreshSoon.restart()
+                break
+            // `ADDRESS,TITLE`. A spinner in a terminal's title sends one a
+            // second, so the title is written into the list already held
+            // rather than asked for again.
             case "windowtitlev2":
+                root.retitle(String(event.data))
+                break
+            // `MONITOR,WORKSPACE`, sent whenever the keyboard changes screen.
+            case "focusedmon":
+            case "focusedmonv2":
+                const moved = String(event.data).split(",")
+                root.focusedMonitor = moved[0]
+                root.noteActive(moved[0], root.idNamed(moved[1] ?? ""))
+                break
+            // `WORKSPACEID,WORKSPACENAME,MONITORNAME`: a whole workspace has
+            // gone to another screen, so both screens are showing something
+            // else now. A screen plugged in is showing one from the start.
+            case "moveworkspace":
+            case "moveworkspacev2":
+            case "monitoradded":
+            case "monitoraddedv2":
+                root.loadMonitors()
                 root.refresh()
-                if (root.watchClients || root.clients.length > 0)
-                    root.loadClients()
                 break
             // Focus changes only affect the client list, and only watchers
             // need it; skipping it otherwise saves a process per alt-tab.
-            case "activewindow":
             case "activewindowv2":
-                if (event.name === "activewindowv2")
-                    root.focusedAddress = event.data === "" ? "" : `0x${event.data}`
+                root.focusedAddress = event.data === "" ? "" : `0x${event.data}`
                 if (root.watchClients)
-                    root.loadClients()
+                    root.clientsSoon.restart()
                 break
             }
         }

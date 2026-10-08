@@ -117,7 +117,7 @@ Item {
             root.board.height - Theme.desktopGutter - card.height, root.box.y))
         radius: Theme.radiusLarge
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         // Exclusive from the press; otherwise the background's tap handler also
@@ -224,7 +224,7 @@ Item {
                     height: 32
                     radius: Theme.radiusSmall
                     color: placeRow.current || placeHover.hovered
-                        ? Theme.islandSurfaceHover : "transparent"
+                        ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
                     Row {
                         anchors.left: parent.left
@@ -327,7 +327,7 @@ Item {
                     width: root.thumb
                     height: root.thumb
                     radius: width * Theme.pictureCorner
-                    color: Theme.islandSurface
+                    color: Theme.surfaceIn(QsWindow.window)
                     border.color: tile.lit ? Theme.accent : "transparent"
                     border.width: 2
                     contentUnderBorder: true

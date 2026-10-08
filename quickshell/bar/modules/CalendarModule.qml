@@ -234,7 +234,10 @@ Item {
                     }
 
                     Repeater {
-                        model: page.due.slice(0, 2)
+                        model: ScriptModel {
+                            values: page.due.slice(0, 2)
+                            objectProp: "key"
+                        }
 
                         Rectangle {
                             id: row
@@ -246,7 +249,7 @@ Item {
                             width: parent.width
                             height: 18
                             radius: Theme.radiusSmall - 2
-                            color: rowMouse.containsMouse ? Theme.islandSurfaceHover : "transparent"
+                            color: rowMouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
                             Row {
                                 anchors.left: parent.left

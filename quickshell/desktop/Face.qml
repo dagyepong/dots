@@ -12,12 +12,14 @@ import QtQuick
 import "../services"
 import "./faces"
 import "./faces/analogue"
+import "./faces/sticker"
 
 // Picks the face for a module, a family (size) and a theme. Modern has one
 // registry per family, falling back within that registry for modules without a
-// row; Analogue has a single registry whose faces lay themselves out at any
-// size. Notes always use NoteFace. Faces read their colours from the widget's
-// resolved `ink`.
+// row; Analogue and Sticker each have a single registry whose faces lay
+// themselves out at any size. Notes always use NoteFace, the spectrum is its
+// bars and the lyrics are LyricsFace in every theme. Faces read their colours
+// from the widget's resolved `ink`.
 Item {
     id: root
 
@@ -31,13 +33,19 @@ Item {
     // an empty frame.
     property var row: null
 
-    readonly property bool analogue: root.theme === "analogue" && root.moduleId !== "notes"
+    readonly property bool shared: root.moduleId === "notes" || root.moduleId === "spectrum"
+    readonly property bool analogue: root.theme === "analogue" && !root.shared
+    readonly property bool sticker: root.theme === "sticker" && !root.shared
 
     Loader {
         anchors.fill: parent
         sourceComponent: {
+            if (root.moduleId === "lyrics")
+                return lyrics
             if (root.analogue)
                 return analogue
+            if (root.sticker)
+                return sticker
             if (root.family === "2x2")
                 return squares
             if (root.family === "4x4")
@@ -49,8 +57,18 @@ Item {
     }
 
     Component {
+        id: lyrics
+        LyricsFace { family: root.family; ink: root.ink }
+    }
+
+    Component {
         id: analogue
         Analogue { moduleId: root.moduleId; family: root.family; ink: root.ink; row: root.row }
+    }
+
+    Component {
+        id: sticker
+        Sticker { moduleId: root.moduleId; family: root.family; ink: root.ink; row: root.row }
     }
 
     Component {

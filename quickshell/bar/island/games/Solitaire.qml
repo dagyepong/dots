@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../../theme"
 
 // Klondike: seven columns, one card more in each, top cards face up, the rest
@@ -320,8 +321,8 @@ FocusScope {
         width: root.width
         height: root.height
         radius: Theme.radiusMedium
-        color: Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Repeater {
@@ -392,6 +393,17 @@ FocusScope {
                 width: root.cardWidth
                 height: root.cardHeight
 
+                // What the card casts on the one under it: overlapping cards
+                // are a stack rather than a printed column.
+                Rectangle {
+                    x: 1
+                    y: 3
+                    width: parent.width
+                    height: parent.height
+                    radius: Theme.radiusSmall
+                    color: Qt.rgba(0, 0, 0, 0.45)
+                }
+
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.radiusSmall
@@ -403,15 +415,48 @@ FocusScope {
                     border.color: card.selected ? Theme.accent
                         : card.face.faceUp
                             ? Qt.rgba(Theme.island.r, Theme.island.g, Theme.island.b, 0.35)
-                            : Theme.islandBorder
+                            : Theme.borderIn(QsWindow.window)
 
-                    // Card back: the tint with a faint inner frame.
+                    // Card back: the tint with a faint inner frame and a
+                    // lattice of diamonds in it.
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: root.cardInset
                         visible: !card.face.faceUp
                         radius: Math.max(2, Theme.radiusSmall - root.cardInset / 2)
                         color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.14)
+                        clip: true
+
+                        Grid {
+                            anchors.centerIn: parent
+                            columns: 3
+                            spacing: Math.round(root.cardWidth * 0.14)
+
+                            Repeater {
+                                model: 12
+
+                                Rectangle {
+                                    width: Math.round(root.cardWidth * 0.12)
+                                    height: width
+                                    rotation: 45
+                                    opacity: 0.35
+                                    color: Qt.rgba(Theme.text.r, Theme.text.g,
+                                                   Theme.text.b, 0.3)
+                                }
+                            }
+                        }
+                    }
+
+                    // The light across the face.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.14) }
+                            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.0) }
+                            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.1) }
+                        }
                     }
 
                     // Rank and suit in the corner, visible under the overlap.
@@ -433,6 +478,22 @@ FocusScope {
                         color: card.ink
                         font.family: Theme.fontFamily
                         font.pixelSize: Math.round(root.cardHeight / 3)
+                        opacity: 0.9
+                    }
+
+                    // The same corner upside down in the other one, the way a
+                    // card is printed. Only the bottom of a card shows when
+                    // nothing is on it.
+                    Text {
+                        x: parent.width - width - root.cardInset
+                        y: parent.height - height - Math.round(root.cardInset / 2)
+                        visible: card.face.faceUp
+                        rotation: 180
+                        text: root.rankLabels[card.face.rank - 1] + root.suitGlyphs[card.face.suit]
+                        color: card.ink
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.bold: true
                     }
                 }
 

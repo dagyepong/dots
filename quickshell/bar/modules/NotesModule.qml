@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
@@ -38,84 +39,59 @@ Item {
     Component {
         id: detail
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            anchors.topMargin: 12
-            anchors.bottomMargin: 12
-            spacing: 8
+        ModuleCard {
+            title: "Notes"
+            subtitle: root.count === 0
+                ? "Nothing written down yet"
+                : `${root.count} ${root.count === 1 ? "note" : "notes"}`
+                    + (NotesService.archived.length > 0
+                        ? ` · ${NotesService.archived.length} archived` : "")
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: 0
+                trackColor: Theme.indicatorDim
 
                 Text {
+                    anchors.centerIn: parent
                     text: "󰎞"
                     font.family: Theme.fontMono
                     font.pixelSize: 20
-                    color: Theme.accent
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "Notes"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        text: root.count === 0
-                            ? "Nothing written down yet"
-                            : `${root.count} ${root.count === 1 ? "note" : "notes"}`
-                                + (NotesService.archived.length > 0
-                                    ? ` · ${NotesService.archived.length} archived` : "")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.textMuted
-                    }
-                }
-
-                PillButton {
-                    text: "New"
-                    icon: "󰐕"
-                    onClicked: {
-                        NotesService.create()
-                        ModuleService.requestPanel("notes")
-                    }
-                }
-
-                PillButton {
-                    text: "Open"
-                    icon: "󰏫"
-                    onClicked: root.openOn("")
+                    color: Theme.indicator
                 }
             }
 
             // The last three, most recently edited first.
             Repeater {
-                model: NotesService.live.slice(0, 3)
+                model: ScriptModel {
+                    values: NotesService.live.slice(0, 3)
+                    objectProp: "key"
+                }
 
-                Rectangle {
+                Item {
                     id: row
 
                     required property var modelData
 
                     Layout.fillWidth: true
-                    implicitHeight: 24
-                    radius: Theme.radiusSmall
-                    color: rowMouse.containsMouse ? Theme.islandSurfaceHover : "transparent"
+                    Layout.preferredHeight: Theme.cardRow
 
-                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+                    // The hover reaches past the row, so its text lines up
+                    // with the card's other rows.
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: -8
+                        anchors.rightMargin: -8
+                        radius: Theme.radiusSmall
+                        color: Theme.surfaceHoverIn(QsWindow.window)
+                        opacity: rowMouse.containsMouse ? 1 : 0
+
+                        Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
+                    }
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 6
-                        anchors.rightMargin: 8
                         spacing: 10
 
                         Rectangle {
@@ -137,7 +113,7 @@ Item {
                         Text {
                             text: NotesService.ageOf(row.modelData.edited)
                             font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeLabel
+                            font.pixelSize: Theme.fontSizeSmall
                             color: Theme.textMuted
                         }
                     }
@@ -152,7 +128,30 @@ Item {
                 }
             }
 
-            Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.cardRow
+                spacing: 8
+
+                Item { Layout.fillWidth: true }
+
+                PillButton {
+                    implicitHeight: Theme.cardRow
+                    text: "New"
+                    icon: "󰐕"
+                    onClicked: {
+                        NotesService.create()
+                        ModuleService.requestPanel("notes")
+                    }
+                }
+
+                PillButton {
+                    implicitHeight: Theme.cardRow
+                    text: "Open"
+                    icon: "󰏫"
+                    onClicked: root.openOn("")
+                }
+            }
         }
     }
 }

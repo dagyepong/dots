@@ -74,39 +74,76 @@ Item {
         }
     }
 
+    // The CPU ring is the mark and its load the figure; then processor and
+    // memory as shares, and both histories side by side.
     Component {
         id: detail
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
+        ModuleCard {
+            title: "System"
+            subtitle: StatsService.cpuModel !== "" ? StatsService.cpuModel : StatsService.window
+            figure: `${StatsService.cpu.toFixed(0)}%`
+            figureColor: root.loadTint
 
-            StatCard {
-                Layout.fillWidth: true
-                // No card: both readings sit on the island.
-                bare: true
-                Layout.preferredWidth: 1
-                Layout.fillHeight: true
-                icon: "󰻠"
-                title: "Processor"
-                reading: `${StatsService.cpu.toFixed(0)}%`
-                detail: `load ${StatsService.load[0].toFixed(2)}`
-                series: StatsService.cpuHistory
-                accent: Theme.accent
+            mark: RingIndicator {
+                anchors.fill: parent
+                thickness: 3
+                progress: StatsService.cpu / 100
+                trackColor: Theme.indicatorDim
+                fillColor: root.loadTint
+
+                Behavior on fillColor {
+                    ColorAnimation { duration: Theme.durationMedium }
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰻠"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 18
+                    color: Theme.indicator
+                }
             }
 
-            StatCard {
+            CardLimit {
+                name: "Processor"
+                fraction: StatsService.cpu / 100
+                known: StatsService.ready
+                tint: Theme.accent
+                note: `load ${StatsService.load[0].toFixed(2)}`
+            }
+
+            CardLimit {
+                name: "Memory"
+                fraction: StatsService.memoryFraction
+                known: StatsService.memoryTotal > 0
+                tint: Theme.blue
+                note: StatsService.bytes(StatsService.memoryUsed)
+            }
+
+            // Each series under its own share, in its colour.
+            RowLayout {
                 Layout.fillWidth: true
-                bare: true
-                Layout.preferredWidth: 1
-                Layout.fillHeight: true
-                icon: "󰍛"
-                title: "Memory"
-                reading: `${(StatsService.memoryFraction * 100).toFixed(0)}%`
-                detail: `${StatsService.bytes(StatsService.memoryUsed)} of ${StatsService.bytes(StatsService.memoryTotal)}`
-                series: StatsService.memoryHistory
-                accent: Theme.blue
+                Layout.preferredHeight: 36
+                spacing: 16
+
+                Sparkline {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    values: StatsService.cpuHistory
+                    maximum: 1
+                    stroke: Theme.accent
+                }
+
+                Sparkline {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    values: StatsService.memoryHistory
+                    maximum: 1
+                    stroke: Theme.blue
+                }
             }
         }
     }

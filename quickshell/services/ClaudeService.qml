@@ -18,9 +18,9 @@ import "../theme"
 // Claude Code usage for the current five-hour block and the last seven days.
 //
 // Token and message counts come from the transcripts on disk, where every
-// assistant turn records its usage. Percentages come from the API's
-// `anthropic-ratelimit-unified-*-utilization` response headers, the same
-// figures `/usage` shows.
+// assistant turn records its usage. Percentages are the account's own, the
+// figures `/usage` shows: the session, the week, and a week per model where
+// the plan has one (`claude_usage.py limits`).
 //
 // Runs only while subscribed; the first transcript pass is a full scan.
 Singleton {
@@ -110,7 +110,8 @@ Singleton {
             return Theme.indicatorBad
         if (!root.measured)
             return Theme.indicator
-        const worst = Math.max(root.sessionFraction, root.weeklyFraction)
+        const worst = Math.max(root.sessionFraction, root.weeklyFraction,
+            ...root.models.map(model => model.used))
         if (worst >= 0.85)
             return Theme.indicatorBad
         if (worst >= 0.6)
@@ -123,6 +124,10 @@ Singleton {
     readonly property real gauge: root.measured
         ? Math.max(root.sessionFraction, root.weeklyFraction)
         : root.elapsed
+
+    // The rows of its card: each limit and the session's count, or the
+    // session's and the week's counts when the limits are unknown.
+    readonly property int rows: root.limitsKnown ? 3 + root.models.length : 2
 
     // "84 messages", "1.2k messages".
     function messages(count: int): string {
@@ -169,9 +174,8 @@ Singleton {
 
     // ── ACCOUNT LIMITS ──────────────────────────────────────────────────────
     //
-    // Read from the headers of an API response, so each check costs a small
-    // request (`claude_usage.py limits`). Polled every ten minutes, and only
-    // while subscribed.
+    // One request to the account's usage endpoint (`claude_usage.py
+    // limits`). Polled every ten minutes, and only while subscribed.
     readonly property int limitsInterval: 600000
 
     property bool limitsKnown: false
@@ -180,6 +184,9 @@ Singleton {
     property real sessionResets: 0
     property real weekResets: 0
     property string claim: ""
+    property string plan: ""
+    // A week per model, where the plan has one: `{ name, used, resets }`.
+    property var models: []
 
     // The headers report a rate limit before requests start failing.
     property bool limited: false
@@ -217,7 +224,11 @@ Singleton {
                     root.weekResets = report.week.resets
                 }
                 root.claim = report.claim ?? ""
+                root.plan = report.plan ?? ""
+                root.models = report.models ?? []
                 root.limited = report.status === "rate_limited"
+                    || [report.session, report.week].concat(root.models)
+                        .some(window => window && window.used >= 1)
                 root.limitsKnown = true
             }
         }

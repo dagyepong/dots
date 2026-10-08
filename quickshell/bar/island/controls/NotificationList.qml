@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Widgets
 
 import Quickshell.Services.Notifications
@@ -42,7 +43,7 @@ Card {
                 implicitWidth: Math.max(18, count.implicitWidth + 10)
                 implicitHeight: 17
                 radius: height / 2
-                color: Theme.islandSurfaceHover
+                color: Theme.surfaceHoverIn(QsWindow.window)
 
                 Text {
                     id: count
@@ -95,7 +96,9 @@ Card {
             visible: NotificationService.history.length > 0
             clip: true
             spacing: 6
-            model: NotificationService.history
+            model: ScriptModel {
+                values: NotificationService.history
+            }
 
             delegate: Rectangle {
                 id: entry
@@ -104,11 +107,13 @@ Card {
 
                 readonly property bool critical:
                     entry.modelData.urgency === NotificationUrgency.Critical
+                readonly property bool opens: NotificationService.defaultAction(
+                    NotificationService.openOf(entry.modelData)) !== null
 
                 width: ListView.view.width
                 height: 54
                 radius: Theme.radiusSmall
-                color: entryMouse.containsMouse ? Theme.islandSurfaceHover : "transparent"
+                color: entryMouse.containsMouse ? Theme.surfaceHoverIn(QsWindow.window) : "transparent"
 
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
@@ -123,7 +128,7 @@ Card {
                         Layout.preferredHeight: 30
                         Layout.alignment: Qt.AlignVCenter
                         radius: width * Theme.pictureCorner
-                        color: entry.critical ? Theme.red : Theme.islandSurfaceHover
+                        color: entry.critical ? Theme.red : Theme.surfaceHoverIn(QsWindow.window)
 
                         Image {
                             id: image
@@ -197,9 +202,21 @@ Card {
                     id: entryMouse
                     anchors.fill: parent
                     hoverEnabled: true
-                    // No click action: the server doesn't advertise actions, so
-                    // there is nothing to invoke.
                     acceptedButtons: Qt.NoButton
+                    cursorShape: entry.opens ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
+
+                // While its notification is still open, a click is its default
+                // action, and the island gets out of the way of the window it
+                // brings up. One from an earlier session only has its text. A
+                // handler, so the close button above keeps its own clicks.
+                TapHandler {
+                    enabled: entry.opens
+                    onTapped: {
+                        if (NotificationService.open(entry.modelData)
+                                && ModuleService.shownPanel !== "")
+                            ModuleService.togglePanel(ModuleService.shownPanel)
+                    }
                 }
             }
         }

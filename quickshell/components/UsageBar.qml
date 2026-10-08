@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // A thin horizontal gauge: a fraction and a colour. The fill keeps rounded
@@ -18,7 +19,7 @@ Rectangle {
 
     property real progress: 0
     property color fillColor: Theme.accent
-    property color trackColor: Theme.islandSurfaceHover
+    property color trackColor: Theme.surfaceHoverIn(QsWindow.window)
 
     readonly property real clamped: Math.max(0, Math.min(1, root.progress))
 

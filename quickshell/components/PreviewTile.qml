@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -37,10 +38,10 @@ Rectangle {
     Layout.fillWidth: true
     Layout.preferredWidth: 1
     radius: Theme.radiusMedium
-    color: root.selected ? Theme.islandSurfaceHover
-        : (mouse.containsMouse ? Theme.islandSurface : "transparent")
+    color: root.selected ? Theme.surfaceHoverIn(QsWindow.window)
+        : (mouse.containsMouse ? Theme.surfaceIn(QsWindow.window) : "transparent")
     border.color: root.selected ? Theme.accent
-        : (mouse.containsMouse ? Theme.islandBorder : Theme.islandSurfaceHover)
+        : (mouse.containsMouse ? Theme.borderIn(QsWindow.window) : Theme.surfaceHoverIn(QsWindow.window))
     border.width: 1
 
     Behavior on color { ColorAnimation { duration: Theme.durationFast } }

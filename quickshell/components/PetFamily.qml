@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 import "../theme"
 import "../services"
@@ -22,7 +23,9 @@ ColumnLayout {
     spacing: 10
 
     Repeater {
-        model: PetService.family
+        model: ScriptModel {
+            values: PetService.family
+        }
 
         Rectangle {
             id: member
@@ -36,8 +39,8 @@ ColumnLayout {
             Layout.fillWidth: true
             implicitHeight: 52
             radius: Theme.radiusMedium
-            color: Theme.islandSurface
-            border.color: member.out ? Theme.accent : Theme.islandBorder
+            color: Theme.surfaceIn(QsWindow.window)
+            border.color: member.out ? Theme.accent : Theme.borderIn(QsWindow.window)
             border.width: 1
 
             Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
@@ -74,7 +77,7 @@ ColumnLayout {
                     implicitHeight: 28
                     radius: Theme.radiusSmall
                     color: Theme.island
-                    border.color: named.activeFocus ? Theme.accent : Theme.islandBorder
+                    border.color: named.activeFocus ? Theme.accent : Theme.borderIn(QsWindow.window)
                     border.width: 1
 
                     Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }

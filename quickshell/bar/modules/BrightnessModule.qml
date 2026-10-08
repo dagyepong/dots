@@ -1,20 +1,20 @@
 // ╭──────────────────────────────────────────────────────────────────────────╮
 // │                                                                          │
 // │   B R I G H T N E S S   M O D U L E                                      │
-// │   brightness · backlight ring, slider when open                          │
+// │   brightness · the focused screen's ring, a slider per screen when open  │
 // │                                                                          │
 // │   github.com/andreumassanet/impasto                                      │
 // │                                                                          │
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
-import QtQuick.Layouts
+import Quickshell
 
 import "../../theme"
 import "../../services"
 import "../../components"
 
-// Hidden when there is no backlight. The ring is white: brightness is a
+// Hidden when no screen can be dimmed. The ring is white: brightness is a
 // choice, not a warning.
 Item {
     id: root
@@ -61,19 +61,22 @@ Item {
         }
     }
 
+    // A level per screen that can be dimmed, named by the screen.
     Component {
         id: detail
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 14
+        ModuleCard {
+            title: "Brightness"
+            subtitle: BrightnessService.several
+                ? `${BrightnessService.dimmable.length} screens`
+                : "One screen"
+            figure: `${BrightnessService.percent}%`
 
-            // Same white ring as the chip; only the slider follows the palette.
-            RingIndicator {
-                Layout.preferredWidth: 48
-                Layout.preferredHeight: 48
-                Layout.alignment: Qt.AlignVCenter
+            Component.onCompleted: BrightnessService.refresh()
+
+            // Same white ring as the chip; only the levels follow the palette.
+            mark: RingIndicator {
+                anchors.fill: parent
                 thickness: 3
                 progress: BrightnessService.percent / 100
                 trackColor: Theme.indicatorDim
@@ -83,74 +86,25 @@ Item {
                     anchors.centerIn: parent
                     text: BrightnessService.icon
                     font.family: Theme.fontMono
-                    font.pixelSize: 17
+                    font.pixelSize: 18
                     color: Theme.indicator
                 }
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "Brightness"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.DemiBold
-                        color: Theme.text
-                    }
-
-                    Text {
-                        text: `${BrightnessService.percent}%`
-                        font.family: Theme.fontMono
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.text
-                    }
+            Repeater {
+                model: ScriptModel {
+                    values: BrightnessService.dimmable
                 }
 
-                // The whole strip is the hit area.
-                Item {
-                    id: slider
+                CardLevel {
+                    id: screen
 
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 16
+                    required property var modelData
 
-                    UsageBar {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitHeight: sliderMouse.containsMouse ? 6 : 4
-                        progress: BrightnessService.percent / 100
-                        fillColor: Theme.accent
-
-                        Behavior on implicitHeight {
-                            NumberAnimation {
-                                duration: Theme.durationFast
-                                easing.type: Theme.easing
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: sliderMouse
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onPressed: event => BrightnessService.setPercent(
-                            Math.round(event.x / slider.width * 100))
-                        onPositionChanged: event => {
-                            if (pressed)
-                                BrightnessService.setPercent(Math.max(0,
-                                    Math.min(100,
-                                        Math.round(event.x / slider.width * 100))))
-                        }
-                    }
+                    glyph: screen.modelData.icon
+                    name: screen.modelData.title
+                    value: screen.modelData.percent
+                    onMoved: value => screen.modelData.setPercent(value)
                 }
             }
         }

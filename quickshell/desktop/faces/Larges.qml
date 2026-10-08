@@ -37,9 +37,11 @@ Item {
         stats: statsLarge,
         media: mediaLarge,
         claude: claudeLarge,
+        codex: codexLarge,
         notes: notesLarge,
         tasks: tasksLarge,
-        photo: photoLarge
+        photo: photoLarge,
+        spectrum: spectrumLarge
     })
 
     Loader {
@@ -90,7 +92,9 @@ Item {
                         anchors.fill: parent
 
                         Repeater {
-                            model: weather.hoursAhead
+                            model: ScriptModel {
+                                values: weather.hoursAhead
+                            }
 
                             Item {
                                 id: block
@@ -309,6 +313,71 @@ Item {
         }
     }
 
+    // Every window the plan has, each with its bar; one past its reset shows
+    // an empty bar until Codex runs again.
+    Component {
+        id: codexLarge
+
+        WidgetFace {
+
+            ink: root.ink
+            label: "Codex"
+            reading: CodexService.figure
+            note: !CodexService.available ? "no usage found"
+                : [CodexService.plan, CodexService.age].filter(part => part !== "").join(" · ")
+
+            CodexMark {
+                anchors.centerIn: parent
+                width: 34
+                height: 34
+                color: CodexService.tint
+            }
+
+            body: [
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    spacing: 16
+                    visible: CodexService.available
+
+                    Repeater {
+                        model: CodexService.limits
+
+                        Column {
+                            id: window
+
+                            required property var modelData
+                            readonly property bool running: CodexService.current(window.modelData)
+
+                            width: parent.width
+                            spacing: 7
+
+                            Text {
+                                width: parent.width
+                                text: window.running
+                                    ? `${CodexService.windowLine(window.modelData)} · ${Math.round(window.modelData.used * 100)}%`
+                                    : `${window.modelData.name.toLowerCase()} · renewed`
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: root.ink.muted
+                            }
+
+                            UsageBar {
+
+                                trackColor: root.ink.raised
+                                width: parent.width
+                                progress: window.running ? window.modelData.used : 0
+                                fillColor: window.modelData.used >= 0.85 ? Theme.indicatorBad
+                                    : window.modelData.used >= 0.6 ? Theme.indicatorWarn : root.ink.accent
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+
     // ── CUSTOM FACES ────────────────────────────────────────────────────────
 
     Component {
@@ -515,7 +584,10 @@ Item {
                     }
 
                     Repeater {
-                        model: agenda.due.slice(0, 2)
+                        model: ScriptModel {
+                            values: agenda.due.slice(0, 2)
+                            objectProp: "key"
+                        }
 
                         TaskRow {
                             required property var modelData
@@ -573,9 +645,12 @@ Item {
                                 parent.height - 22 - 14 - 18 - info.implicitHeight)
                 height: width
                 radius: width * Theme.pictureCorner
-                color: root.ink.raised
+                // None behind a picture: a player may send its logo on transparency.
+                color: largeArt.visible ? "transparent" : root.ink.raised
 
                 Image {
+                    id: largeArt
+
                     anchors.fill: parent
                     source: MediaService.artUrl
                     visible: source != "" && status === Image.Ready
@@ -709,7 +784,10 @@ Item {
                     spacing: 2
 
                     Repeater {
-                        model: TasksService.queue.slice(0, 6)
+                        model: ScriptModel {
+                            values: TasksService.queue.slice(0, 6)
+                            objectProp: "key"
+                        }
 
                         TaskRow {
                             required property var modelData
@@ -729,5 +807,12 @@ Item {
                 }
             ]
         }
+    }
+
+    // The bars in a capsule; see `SpectrumFace`.
+    Component {
+        id: spectrumLarge
+
+        SpectrumFace { ink: root.ink; row: root.row; family: "4x4" }
     }
 }

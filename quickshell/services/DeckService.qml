@@ -25,27 +25,39 @@ Singleton {
     id: root
 
     // The decks with their notes resolved, for the surface to repeat over.
+    // `screen` is the connector each one is on, since a surface only draws
+    // its own (`decksOn`).
     readonly property var decks: DesktopService.shownDecks.map(deck => ({
         key: deck.key,
         edge: deck.edge,
+        screen: DesktopService.nameOf(deck),
         along: DesktopService.alongOf(deck),
         notes: DesktopService.deckNotes(deck)
             .map(key => NotesService.entry(key))
             .filter(note => note !== null)
     }))
 
+    function decksOn(name: string): var {
+        return root.decks.filter(deck => deck.screen === name)
+    }
+
     readonly property int count: root.decks.reduce((sum, deck) => sum + deck.notes.length, 0)
 
-    // Hidden under a fullscreen window, as the dock is.
-    readonly property bool covered: HyprlandService.clients.some(
-        client => (client.fullscreen ?? 0) >= 2
-            && client.workspace && client.workspace.id === HyprlandService.activeId)
-
-    // With `deckOnEmpty`, also hidden on any workspace that has windows.
+    // Hidden under a fullscreen window, as the dock is, and with
+    // `deckOnEmpty` also on any workspace that has windows. Both are asked of
+    // the workspace the screen is showing, not of the focused one: the edges
+    // on one screen have no opinion about what is open on the other.
     readonly property bool onEmptyOnly: SettingsService.deckOnEmpty
-    readonly property bool workspaceEmpty:
-        HyprlandService.occupiedIds.indexOf(HyprlandService.activeId) < 0
-    readonly property bool away: root.covered || (root.onEmptyOnly && !root.workspaceEmpty)
+
+    function awayOn(name: string): bool {
+        const workspace = HyprlandService.activeOn(name)
+        if (workspace <= 0)
+            return false
+        if (HyprlandService.clients.some(client => (client.fullscreen ?? 0) >= 2
+                && client.workspace && client.workspace.id === workspace))
+            return true
+        return root.onEmptyOnly && HyprlandService.occupiedIds.indexOf(workspace) >= 0
+    }
 
     // ── GEOMETRY ────────────────────────────────────────────────────────────
     //
@@ -74,22 +86,31 @@ Singleton {
         return Math.max(0, count * (root.tabLength + root.tabGap) - root.tabGap)
     }
 
+    // A side runs the screen's whole height, past the bar's band above the
+    // board, as the spectrum on a side does; the bottom stays the board's.
+    function leadOf(edge: string): real {
+        return edge === "bottom" ? 0 : Theme.barReserve
+    }
+
     // Free travel along the edge: its length minus the strip and both margins.
     function runOf(edge: string, count: int, width: real, height: real): real {
-        const length = edge === "bottom" ? width : height
+        const length = edge === "bottom" ? width : height + root.leadOf(edge)
         return Math.max(0, length - root.stripLength(count) - 2 * root.margin)
     }
 
     // `along` is a 0–1 fraction of the run, so a deck keeps its relative
-    // position across screen sizes.
+    // position across screen sizes. In the board's coordinates, so a side's
+    // start can be above it.
     function startOf(edge: string, count: int, along: real, width: real, height: real): real {
-        return root.margin + Math.max(0, Math.min(1, along)) * root.runOf(edge, count, width, height)
+        return root.margin - root.leadOf(edge)
+            + Math.max(0, Math.min(1, along)) * root.runOf(edge, count, width, height)
     }
 
     // Inverse of `startOf`.
     function alongAt(edge: string, count: int, start: real, width: real, height: real): real {
         const run = root.runOf(edge, count, width, height)
-        return run <= 0 ? 0 : Math.max(0, Math.min(1, (start - root.margin) / run))
+        return run <= 0 ? 0
+            : Math.max(0, Math.min(1, (start + root.leadOf(edge) - root.margin) / run))
     }
 
     function tabAt(start: real, index: int): real {
@@ -184,9 +205,28 @@ Singleton {
     property string held: ""
 
     // Edge that would receive the widget or tray tile currently being dragged
-    // from the desktop, or "". Set by the desktop, drawn by the deck.
+    // from the desktop, or "", and the screen that edge is on. Set by the
+    // desktop, drawn by the deck.
     property string receiving: ""
+    property string receivingScreen: ""
 
-    // The edges' window, published by `Deck` for the desktop's focus grab.
-    property var surface: null
+    // The edges' windows, one per screen, published by `Deck` for the
+    // desktop's focus grab. Keyed by connector.
+    property var surfaces: ({})
+
+    function publish(name: string, window: var): void {
+        const next = Object.assign({}, root.surfaces)
+        if (window === null)
+            delete next[name]
+        else
+            next[name] = window
+        root.surfaces = next
+    }
+
+    readonly property var windows: {
+        const out = []
+        for (const name in root.surfaces)
+            out.push(root.surfaces[name])
+        return out
+    }
 }

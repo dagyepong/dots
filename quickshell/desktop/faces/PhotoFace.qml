@@ -14,7 +14,7 @@ import "../../theme"
 import "../../services"
 
 // A picture of your own, edge to edge, in any of the four families. The widget
-// draws no capsule for it (`DesktopService.styleOf`), so the picture is the
+// draws no capsule for it (`DesktopService.bare`), so the picture is the
 // widget and takes the widget's corner rather than `Theme.pictureCorner`.
 //
 // Empty, it is the capsule the other widgets are drawn on, saying so. The

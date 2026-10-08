@@ -15,13 +15,15 @@ import Quickshell
 
 import "../theme"
 
-// Control centre layout: the row of buttons along the top and the grid of
-// blocks under it. Nothing here draws; the panel and the settings page read it.
+// Control centre layout: a grid of blocks. Nothing here draws; the panel and
+// the settings page read it.
 //
-// The row has the session actions on the left (fixed) and user-chosen buttons
-// ("doors") on the right, each opening another island panel or the settings.
+// The session's actions and the shortcuts ("doors", each opening another
+// island panel or the settings) are small buttons in a top row chosen in the
+// settings, and blocks on the grid as well.
 //
-// The grid is `Theme.centreColumns` × `Theme.centreRows` cells. Blocks span
+// The grid is `columns` × `rows` cells, chosen in the settings up to
+// `Theme.centreColumns` × `Theme.centreRows`. Blocks span
 // whole cells, only offer sizes they have a face for, and never overlap: a
 // drop on an occupied cell moves to the nearest free fit, or is cancelled.
 // Toggles are a single block holding its own paged list of tiles.
@@ -55,7 +57,7 @@ Singleton {
           detail: "Every workspace side by side",          panel: "overview" },
         { id: "launcher",   icon: "󰍉", label: "Launcher",
           detail: "Where you already are",                 panel: "launcher" },
-        { id: "appearance", icon: "󰔏", label: "Appearance",
+        { id: "appearance", icon: "󰏘", label: "Appearance",
           detail: "The wallpaper and the palette",         panel: "appearance" },
         { id: "session",    icon: "󰐥", label: "Session menu",
           detail: "Lock, log out, suspend, restart, off",  panel: "session" },
@@ -67,13 +69,18 @@ Singleton {
 
     readonly property var defaultButtons: ["stats", "settings", "pet", "games", "notes", "board"]
 
+    // The grid when nothing is chosen, which the default layout fills.
+    readonly property int defaultColumns: 6
+    readonly property int defaultRows: 8
+
     // Not `Array.isArray`: lists read back from the settings file are wrapped
     // sequences that behave like arrays but fail that check.
     function stored(value: var): bool {
         return value !== null && value !== undefined && typeof value.length === "number"
     }
 
-    // Door ids on the row, left to right. Unknown ids are skipped.
+    // The doors the top row had before it was chosen whole (`centreTop`).
+    // Unknown ids are skipped.
     readonly property var buttons: {
         const kept = SettingsService.centreButtons
         const list = root.stored(kept) ? kept : root.defaultButtons
@@ -84,25 +91,101 @@ Singleton {
         return root.doors.find(entry => entry.id === id) ?? null
     }
 
-    readonly property var shownDoors: root.buttons.map(id => root.door(id))
+    // ── TOP ROW ─────────────────────────────────────────────────────────────
+    //
+    // Small buttons over the grid, on a left and a right side, each arranged
+    // by dragging (`TopRowEditor`, in the settings and while arranging):
+    // `centreTop` is `{ left, right }`, lists of session action and door ids.
+    // Null is the session's actions on the left and the doors the row had
+    // (`buttons`) on the right; both empty takes the row away, space and all.
+    readonly property var topCatalogue: SessionService.actions
+        .map(action => Object.assign({ session: true }, action))
+        .concat(root.doors.map(door => Object.assign({ session: false }, door)))
 
-    // Settings page model: shown doors in row order, then the rest.
-    readonly property var doorRows: root.shownDoors.concat(
-        root.doors.filter(entry => root.buttons.indexOf(entry.id) < 0))
-
-    function showsDoor(id: string): bool {
-        return root.buttons.indexOf(id) >= 0
+    function topEntry(id: string): var {
+        return root.topCatalogue.find(entry => entry.id === id) ?? null
     }
 
-    function setDoor(id: string, on: bool): void {
-        const list = root.buttons.filter(entry => entry !== id)
-        if (on)
-            list.push(id)
-        SettingsService.set("centreButtons", list)
+    readonly property var topSides: {
+        const kept = SettingsService.centreTop
+        const clean = list => (root.stored(list) ? Array.from(list) : [])
+            .filter(id => root.topEntry(id) !== null)
+        if (kept && root.stored(kept.left) && root.stored(kept.right))
+            return { left: clean(kept.left), right: clean(kept.right) }
+        return {
+            left: SessionService.actions.map(action => action.id),
+            right: clean(root.buttons)
+        }
     }
 
-    function moveDoor(id: string, delta: int): void {
-        SettingsService.set("centreButtons", root.moved(root.buttons, id, delta))
+    readonly property var topLeft: root.topSides.left.map(id => root.topEntry(id))
+    readonly property var topRight: root.topSides.right.map(id => root.topEntry(id))
+    readonly property bool hasTop: root.topLeft.length + root.topRight.length > 0
+    // While arranging the row is there even empty, as something to click and
+    // fill (`TopRowInspector`); `selected` is "top" while it is chosen.
+    readonly property bool topShown: root.hasTop || root.editing
+
+    // Those on neither side, for the editor's tray.
+    readonly property var topSpare: root.topCatalogue.filter(entry =>
+        root.topSides.left.indexOf(entry.id) < 0 && root.topSides.right.indexOf(entry.id) < 0)
+
+    function sideOf(id: string): string {
+        return root.topSides.left.indexOf(id) >= 0 ? "left"
+            : root.topSides.right.indexOf(id) >= 0 ? "right" : ""
+    }
+
+    // On or off the row: a session action lands at the left's end, a door at
+    // the right's, as the row has always had them.
+    function toggleTop(id: string): void {
+        if (root.sideOf(id) !== "") {
+            root.placeTop(id, "", -1)
+            return
+        }
+        const entry = root.topEntry(id)
+        const side = entry && entry.session ? "left" : "right"
+        root.placeTop(id, side, (side === "left" ? root.topSides.left : root.topSides.right).length)
+    }
+
+    // Along its own side.
+    function nudgeTop(id: string, delta: int): void {
+        const side = root.sideOf(id)
+        if (side === "")
+            return
+        const list = side === "left" ? root.topSides.left : root.topSides.right
+        root.placeTop(id, side, list.indexOf(id) + delta)
+    }
+
+    // To the other side, at its end.
+    function flipTop(id: string): void {
+        const side = root.sideOf(id)
+        if (side === "")
+            return
+        const other = side === "left" ? "right" : "left"
+        root.placeTop(id, other, (other === "left" ? root.topSides.left : root.topSides.right).length)
+    }
+
+    // Takes `id` off wherever it is and puts it on `side` ("left", "right",
+    // or "" for off the row) at `index`.
+    function placeTop(id: string, side: string, index: int): void {
+        const left = root.topSides.left.filter(other => other !== id)
+        const right = root.topSides.right.filter(other => other !== id)
+        const target = side === "left" ? left : side === "right" ? right : null
+        if (target)
+            target.splice(Math.max(0, Math.min(index, target.length)), 0, id)
+        SettingsService.set("centreTop", { left: left, right: right })
+    }
+
+    // Doors for one shortcuts block, from its own `doors` field (set in the
+    // inspector), else the defaults.
+    function doorKeysOf(key: string): var {
+        const block = root.entryOf(key)
+        const own = block ? block.doors : undefined
+        const list = root.stored(own) ? Array.from(own) : root.defaultButtons
+        return list.filter(id => root.door(id) !== null)
+    }
+
+    function doorsOf(key: string): var {
+        return root.doorKeysOf(key).map(id => root.door(id))
     }
 
     // Returns a copy of `list` with `id` moved by `delta` places.
@@ -182,6 +265,7 @@ Singleton {
             detail: AudioService.sourceMuted ? "Muted" : "Live"
             active: !AudioService.sourceMuted
             available: AudioService.sourceReady
+            expandable: AudioService.sourceReady; panel: "microphone"
             action: () => AudioService.toggleSourceMute()
         },
         Toggle {
@@ -201,6 +285,7 @@ Singleton {
             detail: SunsetService.detail
             active: SunsetService.on
             available: SunsetService.available
+            expandable: SunsetService.available; panel: "nightlight"
             action: () => SunsetService.toggle()
         },
         Toggle {
@@ -223,10 +308,24 @@ Singleton {
             action: () => SettingsService.set("islandAttached", !SettingsService.islandAttached)
         },
         Toggle {
+            // All three at once; the settings set them one by one.
+            readonly property int count: [SettingsService.windowShadow,
+                SettingsService.barShadow, SettingsService.widgetShadow].filter(on => on).length
+
             key: "shadow"; icon: "󰘷"; label: "Shadows"
-            detail: SettingsService.windowShadow ? "On the windows" : "Off"
-            active: SettingsService.windowShadow
-            action: () => SettingsService.set("windowShadow", !SettingsService.windowShadow)
+            detail: count === 3 ? "On" : count === 0 ? "Off" : `${count} of 3`
+            active: count > 0
+            action: () => {
+                const on = count === 0
+                for (const key of ["windowShadow", "barShadow", "widgetShadow"])
+                    SettingsService.set(key, on)
+            }
+        },
+        Toggle {
+            key: "game"; icon: "󰺵"; label: "Game mode"
+            detail: SettingsService.gameMode ? "No effects" : "Off"
+            active: SettingsService.gameMode
+            action: () => SettingsService.set("gameMode", !SettingsService.gameMode)
         },
         Toggle {
             key: "screenshot"; icon: "󰹑"; label: "Capture"
@@ -272,7 +371,7 @@ Singleton {
             active: RecorderService.recording
             available: RecorderService.available
             closes: true
-            action: () => RecorderService.toggle(CaptureService.settle)
+            action: () => RecorderService.toggle()
         },
         Toggle {
             key: "clearClipboard"; icon: "󰅍"; label: "Clear clipboard"
@@ -326,21 +425,41 @@ Singleton {
             root.toggleCatalogue.filter(tile => keys.indexOf(tile.key) < 0))
     }
 
-    function showsTileIn(key: string, tile: string): bool {
-        return root.toggleKeysOf(key).indexOf(tile) >= 0
+    // ── A BLOCK'S LIST ──────────────────────────────────────────────────────
+    //
+    // The inspector's one list, for the toggles block's switches and the
+    // shortcuts block's doors: `{ key, icon, label }` rows, carried ones in
+    // order first.
+    function listRowsOf(key: string): var {
+        const block = root.entryOf(key)
+        if (block && block.id === "shortcuts") {
+            const keys = root.doorKeysOf(key)
+            return keys.map(id => root.door(id)).concat(
+                root.doors.filter(door => keys.indexOf(door.id) < 0))
+                .map(door => ({ key: door.id, icon: door.icon, label: door.label }))
+        }
+        return root.tileRowsOf(key)
     }
 
-    // Adds the tile at the end, or removes it.
-    function toggleTileIn(key: string, tile: string): void {
-        const list = root.toggleKeysOf(key)
-        const next = list.filter(entry => entry !== tile)
+    function listKeysOf(key: string): var {
+        const block = root.entryOf(key)
+        return block && block.id === "shortcuts" ? root.doorKeysOf(key) : root.toggleKeysOf(key)
+    }
+
+    // Adds the entry at the end, or removes it.
+    function toggleIn(key: string, entry: string): void {
+        const block = root.entryOf(key)
+        const list = root.listKeysOf(key)
+        const next = list.filter(other => other !== entry)
         if (next.length === list.length)
-            next.push(tile)
-        root.update(key, { toggles: next })
+            next.push(entry)
+        root.update(key, block && block.id === "shortcuts" ? { doors: next } : { toggles: next })
     }
 
-    function moveTileIn(key: string, tile: string, delta: int): void {
-        root.update(key, { toggles: root.moved(root.toggleKeysOf(key), tile, delta) })
+    function moveIn(key: string, entry: string, delta: int): void {
+        const block = root.entryOf(key)
+        const next = root.moved(root.listKeysOf(key), entry, delta)
+        root.update(key, block && block.id === "shortcuts" ? { doors: next } : { toggles: next })
     }
 
     // ── BLOCKS ──────────────────────────────────────────────────────────────
@@ -355,29 +474,34 @@ Singleton {
         { id: "toggles",       name: "Toggles",       icon: "󰨚", sizes: ["2x2", "2x3", "2x4", "3x2", "3x3", "4x2", "4x3"] },
         { id: "volume",        name: "Volume",        icon: "󰕾", sizes: ["2x1", "3x1", "4x1"] },
         { id: "brightness",    name: "Brightness",    icon: "󰃠", sizes: ["2x1", "3x1", "4x1"] },
-        { id: "appearance",    name: "Appearance",    icon: "󰔏", sizes: ["2x2", "2x3", "2x4", "3x3", "4x2"] },
+        { id: "appearance",    name: "Appearance",    icon: "󰏘", sizes: ["2x2", "2x3", "2x4", "3x3", "4x2"] },
         { id: "media",         name: "Media",         icon: "󰝚", sizes: ["2x2", "2x3", "3x2", "4x2"] },
         { id: "weather",       name: "Weather",       icon: "󰖐", sizes: ["2x1", "2x2", "2x3", "4x2"] },
         { id: "calendar",      name: "Calendar",      icon: "󰃭", sizes: ["2x3", "2x4", "3x4"] },
-        { id: "notifications", name: "Notifications", icon: "󰂚", sizes: ["2x4", "2x6", "2x8", "3x8"] },
+        { id: "notifications", name: "Notifications", icon: "󰂚", sizes: ["3x2", "3x3", "2x4", "3x4", "2x6", "2x8", "3x8"] },
         { id: "impasto",       name: "impasto",       icon: "󰏘", sizes: ["1x2", "2x2", "2x4"] },
         { id: "pet",           name: "Pet",           icon: "󰏩", sizes: ["2x2", "2x3"] },
         { id: "clock",         name: "Clock",         icon: "󰥔", sizes: ["1x2", "2x2", "2x4"] },
         { id: "games",         name: "Games",         icon: "󰊗", sizes: ["2x1", "2x2"] },
         { id: "notes",         name: "Notes",         icon: "󰎞", sizes: ["1x2", "2x2", "2x4"] },
-        { id: "tasks",         name: "Tasks",         icon: "󰄲", sizes: ["1x2", "2x2", "2x3", "2x4"] }
+        { id: "tasks",         name: "Tasks",         icon: "󰄲", sizes: ["1x2", "2x2", "2x3", "2x4"] },
+        { id: "session",       name: "Session",       icon: "󰐥", sizes: ["1x1", "2x1", "3x1", "1x2", "2x2", "4x1"] },
+        { id: "shortcuts",     name: "Shortcuts",     icon: "󰕰", sizes: ["1x1", "2x1", "3x1", "1x2", "2x2", "4x1", "6x1"] }
     ]
 
-    // Toggles, sliders and appearance on the left; media, weather and
-    // calendar in the middle; notifications on the right.
+    // Toggles, sliders, appearance and the session on the left; media,
+    // weather, calendar and the shortcuts in the middle; notifications on the
+    // right.
     readonly property var defaultBlocks: [
         { id: "toggles",       col: 0, row: 0, size: "2x3" },
         { id: "volume",        col: 0, row: 3, size: "2x1" },
         { id: "brightness",    col: 0, row: 4, size: "2x1" },
-        { id: "appearance",    col: 0, row: 5, size: "2x3" },
+        { id: "appearance",    col: 0, row: 5, size: "2x2" },
+        { id: "session",       col: 0, row: 7, size: "2x1" },
         { id: "media",         col: 2, row: 0, size: "2x2" },
-        { id: "weather",       col: 2, row: 2, size: "2x3" },
-        { id: "calendar",      col: 2, row: 5, size: "2x3" },
+        { id: "weather",       col: 2, row: 2, size: "2x2" },
+        { id: "calendar",      col: 2, row: 4, size: "2x3" },
+        { id: "shortcuts",     col: 2, row: 7, size: "2x1" },
         { id: "notifications", col: 4, row: 0, size: "2x8" }
     ]
 
@@ -418,21 +542,23 @@ Singleton {
     //
     // Computed from the grid rather than measured, so the island can size
     // itself before the panel exists.
-    readonly property int columns: Theme.centreColumns
-    readonly property int rows: Theme.centreRows
+    readonly property int columns: Math.max(2, Math.min(Theme.centreColumns,
+        SettingsService.centreColumns > 0 ? SettingsService.centreColumns : root.defaultColumns))
+    readonly property int rows: Math.max(2, Math.min(Theme.centreRows,
+        SettingsService.centreRows > 0 ? SettingsService.centreRows : root.defaultRows))
 
     readonly property int boardWidth:
         root.columns * Theme.centreCellWidth + (root.columns - 1) * Theme.centreGutter
     readonly property int boardHeight:
         root.rows * Theme.centreCellHeight + (root.rows - 1) * Theme.centreGutter
 
-    // Button row along the top, and the gap below it.
+    // The top row and the gap under it, when it has anything.
     readonly property int rowHeight: 28
     readonly property int rowGap: 14
 
     readonly property int panelWidth: root.boardWidth + 2 * Theme.panelPadding
-    readonly property int panelHeight:
-        root.boardHeight + root.rowHeight + root.rowGap + 2 * Theme.panelPadding
+    readonly property int panelHeight: root.boardHeight + 2 * Theme.panelPadding
+        + (root.topShown ? root.rowHeight + root.rowGap : 0)
 
     function offsetX(col: int): real {
         return col * Theme.centreStrideX
@@ -724,9 +850,58 @@ Singleton {
         return best
     }
 
-    // Stored as null so the shipped default applies.
+    // Stored as null so the shipped default applies, on the grid it was made
+    // for.
     function restore(): void {
+        SettingsService.set("centreColumns", 0)
+        SettingsService.set("centreRows", 0)
         SettingsService.set("centreBlocks", null)
+    }
+
+    // A new grid. Columns come and go on both sides alike, so what is placed
+    // stays in the middle of the island, which is centred; rows at the
+    // bottom. A block the new grid cuts moves to the nearest free cell, and
+    // one with nowhere to go is taken off.
+    function resize(columns: int, rows: int): void {
+        columns = Math.max(2, Math.min(Theme.centreColumns, columns))
+        rows = Math.max(2, Math.min(Theme.centreRows, rows))
+        if (columns === root.columns && rows === root.rows)
+            return
+        const shift = Math.trunc((columns - root.columns) / 2)
+        const kept = []
+        const clash = (col, row, shape) => kept.some(other => {
+            const theirs = root.parse(root.sizeOf(other))
+            return col < other.col + theirs.cols && other.col < col + shape.cols
+                && row < other.row + theirs.rows && other.row < row + shape.rows
+        })
+        const fits = (col, row, shape) => col >= 0 && row >= 0
+            && col + shape.cols <= columns && row + shape.rows <= rows && !clash(col, row, shape)
+        for (const block of root.blocks) {
+            const shape = root.parse(root.sizeOf(block))
+            let col = (block.col ?? 0) + shift
+            let row = block.row ?? 0
+            if (!fits(col, row, shape)) {
+                let best = null
+                let bestDistance = Infinity
+                for (let c = 0; c < columns; c++) {
+                    for (let r = 0; r < rows; r++) {
+                        const distance = (c - col) * (c - col) + (r - row) * (r - row)
+                        if (distance < bestDistance && fits(c, r, shape)) {
+                            bestDistance = distance
+                            best = { col: c, row: r }
+                        }
+                    }
+                }
+                if (best === null)
+                    continue
+                col = best.col
+                row = best.row
+            }
+            kept.push(Object.assign({}, block, { col: col, row: row }))
+        }
+        SettingsService.set("centreColumns", columns)
+        SettingsService.set("centreRows", rows)
+        root.write(kept)
     }
 
     // ── ARRANGING ───────────────────────────────────────────────────────────

@@ -18,8 +18,8 @@ import "../theme"
 // Application index and launcher query logic.
 //
 // The first character selects the mode: plain text searches applications, and
-// a sigil switches to calculator, shell entries (`>`), windows, timer or
-// clipboard. Modes are explicit so `100` or `5:30` is never misread as a sum
+// a sigil switches to calculator, shell entries (`>`), windows, timer,
+// clipboard or emoji. Modes are explicit so `100` or `5:30` is never misread as a sum
 // or a duration.
 QtObject {
     id: root
@@ -47,6 +47,9 @@ QtObject {
           hint: "Copy something again",
           empty: ClipboardService.entries.length === 0
               ? "Nothing has been copied yet" : "Nothing copied says that" },
+        { id: "emoji",     prefix: SettingsService.launcherPrefix("emoji"),
+          label: "Emoji",     icon: "󰇲",
+          hint: "Copy an emoji",       empty: "No emoji by that name" },
         { id: "apps",      prefix: "",  label: "Apps",      icon: "󰀻",
           hint: "Search applications",
           empty: `No application matches. Type ${SettingsService.launcherPrefix("desk")} for what the shell itself can do.` }
@@ -80,16 +83,40 @@ QtObject {
     readonly property int rowSpacing: 2
     readonly property int gap: 12
 
-    // Field, divider, and the gap on either side of the divider.
+    // The emoji mode's row of groups, under the field.
+    readonly property int stripHeight: 30
+    readonly property bool showsStrip: root.modeFor(root.query).id === "emoji"
+
+    // The emoji mode is a grid of glyphs rather than rows: square cells, as
+    // many to a line as the panel holds.
+    readonly property int emojiCell: 52
+    readonly property int emojiColumns:
+        Math.floor((root.panelWidth - 2 * Theme.panelPadding) / root.emojiCell)
+
+    // Field, divider, and the gap on either side of the divider, plus the
+    // strip and its gap when it shows.
     readonly property int chromeHeight: root.fieldHeight + 2 * root.gap + 1
+        + (root.showsStrip ? root.stripHeight + root.gap : 0)
 
-    // At least one row, for the "no results" line.
-    readonly property int rows:
-        Math.max(1, Math.min(root.results.length, root.maxResults))
+    // At least one row, for the "no results" line. The grid counts lines of
+    // glyphs, capped at the same number as a list of rows.
+    readonly property int rows: root.showsStrip
+        ? Math.max(1, Math.min(Math.ceil(root.results.length / root.emojiColumns),
+                               root.maxResults))
+        : Math.max(1, Math.min(root.results.length, root.maxResults))
 
+    function listHeight(rows: int): int {
+        return rows * root.rowHeight + (rows - 1) * root.rowSpacing
+    }
+
+    // A full grid stops where a full list does, strip included, so the two
+    // modes open to one height; the grid scrolls under its last partial line.
     function heightFor(rows: int): int {
-        return root.chromeHeight + rows * root.rowHeight
-            + (rows - 1) * root.rowSpacing + 2 * Theme.panelPadding
+        const list = root.showsStrip
+            ? Math.min(rows * root.emojiCell,
+                       root.listHeight(root.maxResults) - root.stripHeight - root.gap)
+            : root.listHeight(rows)
+        return root.chromeHeight + list + 2 * Theme.panelPadding
     }
 
     readonly property int panelWidth: 560
@@ -203,6 +230,8 @@ QtObject {
             return root.timer(raw)
         case "clipboard":
             return root.clipboard(term)
+        case "emoji":
+            return root.emoji(term)
         }
 
         return root.rank(term).slice(0, root.maxResults)
@@ -340,11 +369,24 @@ QtObject {
                 kind: "clip", id: entry.key, icon: "󰅍",
                 name: ClipboardService.title(entry),
                 subtitle: ClipboardService.describe(entry),
-                // Images show a thumbnail instead of a glyph.
-                picture: entry.kind === "image" ? `file://${entry.file}` : ""
+                // Images show a thumbnail instead of a glyph, and can be
+                // opened in imv.
+                picture: entry.kind === "image" ? `file://${entry.file}` : "",
+                file: entry.kind === "image" ? entry.file : ""
             })
         }
         return found
+    }
+
+    // Recent picks first when the term is empty; the glyph, in the chosen
+    // skin tone, is the whole cell, and the name is only searched. Not cut to
+    // `maxResults`: a group is browsed as much as searched, and the list only
+    // builds the cells in view.
+    function emoji(term: string): var {
+        return EmojiService.search(term).map(item => ({
+            kind: "emoji", id: item.glyph, icon: "", item: item,
+            glyph: EmojiService.glyphOf(item), name: item.name, subtitle: ""
+        }))
     }
 
     // Open windows filtered by title or class. The client list is loaded when
@@ -410,6 +452,8 @@ QtObject {
             root.copy(entry.name)
         else if (entry.kind === "clip")
             ClipboardService.copy(entry.id)
+        else if (entry.kind === "emoji")
+            EmojiService.copy(entry.item)
         // `panel` and `mode` entries are handled by the launcher panel: the
         // service does not know about the island, and a mode row keeps the
         // launcher open.

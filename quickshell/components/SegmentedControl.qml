@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 
 import "../theme"
@@ -35,8 +36,8 @@ Rectangle {
     opacity: root.enabled ? 1 : 0.45
 
     Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
-    color: Theme.islandSurfaceHover
-    border.color: Theme.islandBorder
+    color: Theme.surfaceHoverIn(QsWindow.window)
+    border.color: Theme.borderIn(QsWindow.window)
     border.width: 1
 
     RowLayout {
@@ -60,7 +61,7 @@ Rectangle {
                     : Math.max(64, label.implicitWidth + 20)
                 radius: Theme.radiusSmall - 2
                 color: segment.active ? Theme.accent
-                    : (segmentMouse.containsMouse ? Theme.islandBorder : "transparent")
+                    : (segmentMouse.containsMouse ? Theme.borderIn(QsWindow.window) : "transparent")
 
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }
 
@@ -119,7 +120,7 @@ Rectangle {
         height: 26
         radius: height / 2
         color: Theme.island
-        border.color: Theme.islandBorder
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }

@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../theme"
 import "../../services"
 import "../modules"
@@ -28,10 +29,6 @@ Item {
 
     property string moduleId: ""
 
-    // Where a click comes from: "zone" on the island's own screen,
-    // "elsewhere" on the others, whose bar has no island to open it in.
-    property string origin: "zone"
-
     property bool alone: false
 
     // The piece's own look, "" for the bar's (`SettingsService.barItems`).
@@ -42,6 +39,9 @@ Item {
 
     readonly property bool button: ModuleService.isButton(root.moduleId)
     readonly property var door: ModuleService.buttons[root.moduleId] ?? null
+
+    Component.onCompleted: ModuleService.watch(root.moduleId, true)
+    Component.onDestruction: ModuleService.watch(root.moduleId, false)
 
     readonly property bool open: root.button
         ? ModuleService.shownPanel === root.door.panel
@@ -76,7 +76,7 @@ Item {
         width: parent.width - (root.alone ? 2 : 4)
         height: root.alone ? parent.height - 2 : Theme.capsuleHeight - 8
         radius: height / 2
-        color: Theme.islandSurfaceHover
+        color: Theme.surfaceHoverIn(QsWindow.window)
         opacity: mouse.containsMouse || root.open ? 1 : 0
 
         Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
@@ -108,11 +108,13 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            if (root.button)
+            if (root.button && root.door.panel)
                 ModuleService.togglePanel(root.door.panel)
+            else if (root.button)
+                root.door.action()
             // The player with no player open has nothing to open onto.
             else if (ModuleService.has(root.moduleId))
-                ModuleService.activate(root.moduleId, root.origin)
+                ModuleService.activate(root.moduleId)
         }
     }
 }

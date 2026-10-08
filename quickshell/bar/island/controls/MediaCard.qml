@@ -8,6 +8,7 @@
 // ╰──────────────────────────────────────────────────────────────────────────╯
 
 import QtQuick
+import Quickshell
 import QtQuick.Layouts
 import Quickshell.Widgets
 
@@ -43,7 +44,8 @@ Card {
                 Layout.preferredWidth: 58
                 Layout.preferredHeight: 58
                 radius: width * Theme.pictureCorner
-                color: Theme.islandSurfaceHover
+                // None behind a picture: a player may send its logo on transparency.
+                color: art.visible ? "transparent" : Theme.surfaceHoverIn(QsWindow.window)
 
                 Image {
                     id: art
@@ -102,7 +104,7 @@ Card {
             Layout.preferredHeight: 3
             visible: MediaService.seekable
             radius: 1.5
-            color: Theme.islandSurfaceHover
+            color: Theme.surfaceHoverIn(QsWindow.window)
 
             Rectangle {
                 width: parent.width * MediaService.progress

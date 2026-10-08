@@ -14,6 +14,7 @@ import Quickshell.Wayland
 
 import "../theme"
 import "../services"
+import "../components"
 
 // The dock: a capsule on a screen edge with the pinned and open applications.
 //
@@ -22,15 +23,26 @@ import "../services"
 // input mask is computed from the same geometry as the capsule, so clicks
 // beside it reach the window behind. Never on the top edge, which is the bar's.
 //
-// ── ONE SCREEN ──────────────────────────────────────────────────────────────
+// ── ONE PER SCREEN ──────────────────────────────────────────────────────────
 //
-// One instance, on whichever monitor the compositor assigns. A dock per monitor
-// would need a `Variants` over `Quickshell.screens` and per-screen state.
+// One on every screen, all showing the same shelf: the list is what you have
+// pinned and what is open anywhere, so every application is reachable from
+// wherever you are — the workspaces strip's rule, where the dots are every
+// workspace on the desk and only which one is lit is this screen's. What is
+// this screen's here is what the pointer and the windows are doing on it: the
+// hovered name, the menu, the autohide peek, and going away under a
+// fullscreen window (`DockService.coveredOn`).
 PanelWindow {
     id: root
 
     // The dock only requests the launcher; `shell.qml` wires it to the island.
     signal launcherRequested()
+
+    readonly property string screenName: root.screen?.name ?? ""
+
+    // Whether this is the screen being worked on — the same answer the island
+    // uses, so the two never disagree about where you are (`shell.qml`).
+    required property bool live
 
     readonly property bool vertical: DockService.vertical
     readonly property string edge: DockService.edge
@@ -85,17 +97,20 @@ PanelWindow {
     WlrLayershell.namespace: "impasto-dock"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    // Reserve space, or float over the windows. DockService resolves autohide
-    // against reserving.
-    exclusiveZone: DockService.reserves
-        ? Theme.dockMargin + Theme.dockThickness : 0
+    // It never reserves: windows pass under it, and the desktop keeps its
+    // grid clear of it on its own (`DockService.zone`). A reserved band would
+    // have to appear and go with the dock, re-tiling every window on both
+    // screens every time a hand crossed.
+    exclusiveZone: 0
 
     color: "transparent"
 
-    // Hidden when empty and under fullscreen windows. With the launcher button
-    // it is never empty.
-    visible: DockService.enabled && !DockService.covered
-        && (DockService.count > 0 || DockService.hasLauncher)
+    // Hidden when empty and under fullscreen windows on its own screen. With
+    // the launcher button it is never empty. Set to one dock, it is drawn only
+    // on the screen being worked on; it reserves nothing either way, so a
+    // crossing moves no window.
+    visible: DockService.shownOn(root.screenName)
+        && (DockService.everywhere || root.live)
 
     // ── CONTEXT MENU ────────────────────────────────────────────────────────
     //
@@ -204,20 +219,29 @@ PanelWindow {
         Loader {
             anchors.fill: parent
             anchors.margins: -Theme.shadowBarRange
-            active: SettingsService.windowShadow
+            active: SettingsService.barShadow
             sourceComponent: caster
         }
 
-        // The island's black; with lower opacity the compositor's blur shows
-        // through. The border keeps its own alpha, so a translucent capsule
-        // still has an edge.
+        // Classic is the island's black, at the Background setting's opacity
+        // over the compositor's blur; glass is the terminal's ground, with
+        // its lit edge. The border keeps its own alpha, so a translucent
+        // capsule still has an edge.
         Rectangle {
+            id: ground
+
             anchors.fill: parent
             radius: Theme.dockRadius
-            color: Qt.rgba(Theme.island.r, Theme.island.g, Theme.island.b,
-                           SettingsService.dockOpacity / 100)
-            border.color: Theme.islandBorder
+            color: Theme.dockGlass ? Theme.groundOf("glass")
+                : Qt.rgba(Theme.island.r, Theme.island.g, Theme.island.b,
+                          SettingsService.dockOpacity / 100)
+            border.color: Theme.rimOf(Theme.dockStyle)
             border.width: 1
+
+            GlassSheen {
+                shape: ground
+                visible: Theme.dockGlass
+            }
         }
 
         // ── LAUNCHER BUTTON ─────────────────────────────────────────────
@@ -246,7 +270,7 @@ PanelWindow {
                 anchors.fill: parent
                 anchors.margins: -3
                 radius: Theme.radiusMedium
-                color: Theme.islandSurfaceHover
+                color: Theme.veilHoverOf(Theme.dockStyle)
                 opacity: launcher.hovered ? 1 : 0
                 visible: opacity > 0
 
@@ -259,7 +283,7 @@ PanelWindow {
                 anchors.centerIn: parent
                 text: "󰀻"
                 font.family: Theme.fontMono
-                font.pixelSize: Math.round(Theme.dockIcon * 0.58)
+                font.pixelSize: Math.round((Theme.dockIcon - 2 * Theme.dockInset) * 0.58)
                 color: Theme.text
             }
 
@@ -284,7 +308,10 @@ PanelWindow {
         }
 
         Repeater {
-            model: DockService.items
+            model: ScriptModel {
+                values: DockService.items
+                objectProp: "key"
+            }
 
             DockItem {
                 capsule: shelf
@@ -424,9 +451,14 @@ PanelWindow {
             width: name.implicitWidth + 20
             height: name.implicitHeight + 12
             radius: Theme.radiusMedium
-            color: Theme.island
-            border.color: Theme.islandBorder
+            color: Theme.groundOf(Theme.dockStyle)
+            border.color: Theme.rimOf(Theme.dockStyle)
             border.width: 1
+
+            GlassSheen {
+                shape: plate
+                visible: Theme.dockGlass
+            }
 
             Text {
                 id: name

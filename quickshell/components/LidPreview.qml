@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../theme"
 
 // A laptop beside a monitor, showing which screen stays lit when the lid
@@ -40,7 +41,7 @@ Item {
                 height: 24
                 radius: Theme.radiusSmall - 4
                 color: root.lit ? Theme.accent : Theme.island
-                border.color: Theme.islandBorder
+                border.color: Theme.borderIn(QsWindow.window)
                 border.width: 1
                 opacity: root.lit ? 1 : 0.8
 
@@ -52,7 +53,7 @@ Item {
                     anchors.centerIn: parent
                     width: parent.width - 10
                     height: 1
-                    color: root.lit ? Theme.accentText : Theme.islandBorder
+                    color: root.lit ? Theme.accentText : Theme.borderIn(QsWindow.window)
                     opacity: 0.7
                 }
             }
@@ -62,7 +63,7 @@ Item {
                 height: 3
                 radius: 1.5
                 x: -3
-                color: Theme.islandBorder
+                color: Theme.borderIn(QsWindow.window)
             }
         }
 
@@ -77,7 +78,7 @@ Item {
                 height: 28
                 radius: Theme.radiusSmall - 4
                 color: Theme.accent
-                border.color: Theme.islandBorder
+                border.color: Theme.borderIn(QsWindow.window)
                 border.width: 1
             }
 
@@ -86,7 +87,7 @@ Item {
                 height: 3
                 radius: 1.5
                 x: 15
-                color: Theme.islandBorder
+                color: Theme.borderIn(QsWindow.window)
             }
         }
     }

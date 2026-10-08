@@ -9,6 +9,7 @@
 
 import QtQuick
 
+import Quickshell
 import "../../../theme"
 
 // 2048 on a 4×4 board. Tiles slide as far as they can; equal neighbours merge
@@ -160,7 +161,7 @@ FocusScope {
         const y = Theme.yellow
         const r = Theme.red
         switch (value) {
-        case 0:    return Theme.islandSurfaceHover
+        case 0:    return Theme.surfaceHoverIn(QsWindow.window)
         case 2:    return Qt.rgba(t.r, t.g, t.b, 0.25)
         case 4:    return Qt.rgba(t.r, t.g, t.b, 0.4)
         case 8:    return Qt.rgba(t.r, t.g, t.b, 0.6)
@@ -190,8 +191,8 @@ FocusScope {
         width: root.side * root.cell + (root.side + 1) * root.gap
         height: width
         radius: Theme.radiusMedium
-        color: Theme.islandSurface
-        border.color: Theme.islandBorder
+        color: Theme.surfaceIn(QsWindow.window)
+        border.color: Theme.borderIn(QsWindow.window)
         border.width: 1
 
         Repeater {
@@ -209,10 +210,47 @@ FocusScope {
                 height: root.cell
                 radius: Theme.radiusSmall
                 color: root.fill(tile.value)
+                border.color: tile.value === 0
+                    ? "transparent" : Qt.rgba(0, 0, 0, 0.25)
+                border.width: 1
 
                 // Animate the colour so a merge reads as the same tile
                 // changing.
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+
+                // A tile that has just taken a value swells and settles: the
+                // grid has no identity to slide, so the beat is what says
+                // something happened here.
+                onValueChanged: {
+                    if (tile.value !== 0)
+                        swell.restart()
+                }
+
+                NumberAnimation {
+                    id: swell
+
+                    target: tile
+                    property: "scale"
+                    from: 1.16
+                    to: 1
+                    duration: 170
+                    easing.type: Easing.OutBack
+                }
+
+                // The light on the face, so a tile is a tile and not a patch
+                // of colour. A gradient over the colour rather than in it,
+                // since the colour is animated on a merge.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    visible: tile.value !== 0
+
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.16) }
+                        GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.03) }
+                        GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.14) }
+                    }
+                }
 
                 Text {
                     anchors.centerIn: parent

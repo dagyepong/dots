@@ -73,7 +73,7 @@ SettingsSection {
 
                 PillButton {
                     text: Tr.t("Open")
-                    icon: "󰔏"
+                    icon: "󰏘"
                     active: true
                     implicitWidth: 92
                     implicitHeight: 30
@@ -156,7 +156,7 @@ SettingsSection {
         SettingGroup {
             title: Tr.t("Windows")
             note: Tr.t("How Hyprland draws every window, this one included.")
-            hint: Tr.t("The preview below is live and at full size. The border stays at zero because gaps and rounding already separate windows; the inner gap applies to each side of a window, so two windows sit twice that apart.")
+            hint: Tr.t("Dwindle splits the space each new window lands in, Master keeps one large window beside a stack, and Scrolling lays windows in a row wider than the screen. The preview below is live and at full size. The border stays at zero because gaps and rounding already separate windows; the inner gap applies to each side of a window, so two windows sit twice that apart.")
 
             SettingBlock {
                 WindowsPreview {
@@ -170,6 +170,17 @@ SettingsSection {
                     glassed: SettingsService.windowGlass && CompositorService.glassAvailable
                     lifted: SettingsService.windowShadow
                     wallpaper: WallpaperService.currentWallpaper
+                }
+            }
+
+            SettingRow {
+                label: Tr.t("Layout")
+
+                SegmentedControl {
+                    options: CompositorService.windowLayouts.map(
+                        entry => ({ id: entry.id, label: Tr.t(entry.label) }))
+                    current: CompositorService.windowLayout
+                    onSelected: id => CompositorService.remember("general:layout", id)
                 }
             }
 
@@ -222,9 +233,9 @@ SettingsSection {
         }
 
         SettingGroup {
-            title: Tr.t("Depth")
-            note: Tr.t("What shows through a window, and what it sits on.")
-            hint: Tr.t("Blur shows behind anything translucent, such as the terminal. Glass (a Hyprland plugin, tuned in look.lua) frosts and refracts what is behind a window, and the shadow lifts windows and bar capsules off the wallpaper.")
+            title: Tr.t("Blur and glass")
+            note: Tr.t("What shows through a window.")
+            hint: Tr.t("Blur shows behind anything translucent, such as the terminal. Glass (a Hyprland plugin, tuned in look.lua) frosts and refracts what is behind a window.")
 
             SettingSlider {
                 label: Tr.t("Blur")
@@ -257,16 +268,6 @@ SettingsSection {
                 }
             }
 
-            SettingRow {
-                label: Tr.t("Shadow")
-                reading: SettingsService.windowShadow
-                    ? Tr.t("Lifted off the wallpaper") : Tr.t("Flat")
-
-                ToggleSwitch {
-                    checked: SettingsService.windowShadow
-                    onToggled: checked => SettingsService.set("windowShadow", checked)
-                }
-            }
         }
 
         // ── WINDOW RULES ────────────────────────────────────────────────────
@@ -386,6 +387,46 @@ SettingsSection {
         }
     }
 
+    // ── DEPTH ───────────────────────────────────────────────────────────────
+    //
+    // How the shell sits on the wallpaper: a shadow under each layer.
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: root.spacing
+        visible: root.tab === "depth"
+
+        // One shadow per layer, side by side: the windows are Hyprland's, the
+        // bar, the dock and the widgets the shell's own.
+        SettingGroup {
+            title: Tr.t("Shadows")
+            note: Tr.t("What is lifted off the wallpaper.")
+
+            Repeater {
+                model: [
+                    { key: "windowShadow", label: "Windows" },
+                    { key: "barShadow", label: "Bar and dock" },
+                    { key: "widgetShadow", label: "Desktop widgets" }
+                ]
+
+                SettingRow {
+                    id: shadowRow
+
+                    required property var modelData
+
+                    label: Tr.t(shadowRow.modelData.label)
+                    reading: SettingsService[shadowRow.modelData.key]
+                        ? Tr.t("Lifted off the wallpaper") : Tr.t("Flat")
+
+                    ToggleSwitch {
+                        checked: SettingsService[shadowRow.modelData.key]
+                        onToggled: checked => SettingsService.set(shadowRow.modelData.key, checked)
+                    }
+                }
+            }
+        }
+    }
+
     // ── TYPE ────────────────────────────────────────────────────────────────
     //
     // Families come from fontconfig: Qt silently substitutes a family that is
@@ -444,6 +485,22 @@ SettingsSection {
         Layout.fillWidth: true
         spacing: root.spacing
         visible: root.tab === "motion"
+
+        SettingGroup {
+            title: Tr.t("Game mode")
+            note: Tr.t("Everything still, for a game or a slow machine.")
+            hint: Tr.t("Stops the shell's animations, the spectrum and the pet, and turns off Hyprland's animations, blur, shadow and glass. The settings below are kept and come back when it is turned off.")
+
+            SettingRow {
+                label: Tr.t("Game mode")
+                reading: ShortcutService.current("Shell · Turn game mode on or off")
+
+                ToggleSwitch {
+                    checked: SettingsService.gameMode
+                    onToggled: checked => SettingsService.set("gameMode", checked)
+                }
+            }
+        }
 
         SettingGroup {
             title: Tr.t("The shell")
