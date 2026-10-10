@@ -69,9 +69,9 @@ layout {
 
     border {
         width 2
-        active-color "#ff00ff"
-        inactive-color "#ff00ff"
-        urgent-color "#ff00ff"
+        active-color "#4a5353"
+        inactive-color "#4a5353"
+        urgent-color "#4a5353"
     }
 
     shadow {
@@ -90,7 +90,7 @@ layout {
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/zeipaper.jpg"
+spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/1920x1080_aesthetic_japan2.jpg"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-sh-at-startup "vicinae server"
 spawn-sh-at-startup "xwayland-satellite"
@@ -463,5 +463,6 @@ binds {
 
     Mod+Shift+P { power-off-monitors; }
 }
+
 
 
