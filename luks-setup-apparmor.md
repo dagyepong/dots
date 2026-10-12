@@ -196,8 +196,11 @@ nano /etc/dracut.conf
 
 
 
+# PUT YOUR CONFIG IN separate files
+# in /etc/dracut.conf.d named "<name>.conf"
+# SEE man dracut.conf(5) for options
 hostonly="no"
-add_dracutmodules+=" crypt btrfs dm apparmor "
+add_dracutmodules+=" crypt btrfs dm "
 add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
 force_drivers+=" dm_crypt btrfs "
 ```
@@ -222,7 +225,7 @@ nano /etc/default/uefi-mkconfig
 Map your structural storage device specifications explicitly (replace UUIDs with your actual device values):
 
 
-KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@ lsm=landlock,lockdown,yama,integrity,apparmor,bpf"
+KERNEL_CONFIG="%entry_id %linux_name Linux %kernel_version ; rd.luks.uuid=f0f2e57d-b3dd-44fb-bf19-5875a82287ee root=UUID=79a2d19f-d489-4517-b8fb-cf3eb55b345a rootfstype=btrfs rootflags=subvol=@ lsm=landlock,lockdown,yama,integrity,apparmor,bpf"
 ```
 Compile NVRAM motherboard execution items:
 ```bash
