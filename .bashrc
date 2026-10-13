@@ -109,10 +109,10 @@ config() {
     declare -g use_glyphs=true
     declare -g use_badges=true
 
-    # Define custom colors (Aura Dark Palette)
-    declare -g color_primary="#bd9dff"    # Aura Purple
-    declare -g color_secondary="#ff5c8f"  # Aura Pink
-    declare -g color_neutral="#68a8e4"    # Aura Soft Blue
+    # Define custom colors
+    declare -g color_primary="#e91e63"
+    declare -g color_secondary="#e91e63"
+    declare -g color_neutral="#e91e63"
     declare -g color_global
 
     declare -g glyph_badge_left=""
@@ -212,7 +212,6 @@ render_path() {
     local glyph=""
     local label="\w"
 
-    # Rendering logic
     if $use_glyphs; then
         printf "%s %s" "$(make_label "$glyph")" "$label"
     else
@@ -257,13 +256,13 @@ render_prompt() {
     local glyph
 
     # Define glyph
-    if $use_glyphs &&$use_badges; then glyph="󱞩"; else glyph="→"; fi
+    if $use_glyphs && $use_badges; then glyph="󱞩"; else glyph="→"; fi
 
     # Prepend space character to match badge
     if $use_badges; then glyph=" $glyph"; fi
 
     # Use bold glyph
-    if $use_glyphs &&$use_badges; then
+    if $use_glyphs && $use_badges; then
         glyph="\001\033[1m\002$glyph\001\033[0m\002"
     fi
 
@@ -357,7 +356,7 @@ is_git() { [[ -n $(get_git_project) ]]; }
 
 # Get top-level repository name
 get_git_project() {
-    # Skip execution if `git` is not available
+    # Skip if git is unavailable
     if ! command -v git > /dev/null 2>&1; then return 1; fi
 
     local git_root
@@ -395,3 +394,4 @@ greet() {
 
 # Run it automatically on login
 greet
+
