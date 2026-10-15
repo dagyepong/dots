@@ -381,8 +381,8 @@ config && init
 export PATH="/home/nana/.local/bin:$PATH"
 export GPG_TTY=$(tty)
 # Add to ~/.bashrc, ~/.zshrc, or ~/.bash_profile
-export DEEPSEEK_API_KEY="sk-9c94dbed897d40158f6cac3fa47a2645"
-export CLAUDE_API_KEY="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"
+export DEEPSEEK_API_KEY=""
+export CLAUDE_API_KEY=""
 
 # Custom greeting function
 greet() {
