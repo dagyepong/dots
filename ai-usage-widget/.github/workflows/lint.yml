@@ -1,0 +1,117 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      # The release commit only bumps the version. The v* tag it ships with runs
+      # release.yml, which builds and tests everything again.
+      - 'hosts/kde/metadata.json'
+      - 'ui/js/ProjectInfo.js'
+
+permissions:
+  contents: read
+
+jobs:
+  # Figures out which of the two jobs below actually need to run for this
+  # diff, so e.g. a docs-only PR doesn't pay for a backend
+  # test run, and a QML-only PR doesn't pay for ruff/pytest.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      qml: ${{ steps.filter.outputs.qml }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            qml:
+              # The one UI and every host's QML; their i18n(…) strings are
+              # extracted into translate/*.po.
+              - 'ui/**'
+              - 'hosts/**/*.qml'
+              - 'hosts/**/*.js'
+              - 'hosts/kde/**'
+              - 'scripts/build-kde-package.sh'
+              - 'Makefile'
+              - 'translate/**'
+              - 'backend/aiusage/**/*.py'
+              - 'flake.nix'
+              - 'flake.lock'
+              - '.github/workflows/lint.yml'
+            backend:
+              - 'backend/**'
+              - 'hosts/**'
+              - 'ui/**'
+              - 'scripts/**'
+              - 'tests/**'
+              - 'translate/**'
+              - 'pyproject.toml'
+              - '.github/workflows/lint.yml'
+
+  qml:
+    needs: changes
+    if: needs.changes.outputs.qml == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v27
+
+      - name: qmllint
+        run: nix develop --command bash -c 'find ui hosts -name "*.qml" -print0 | xargs -0 qmllint -E --unresolved-type info'
+
+      - name: qmlformat check
+        run: nix develop --command bash -c 'find ui hosts -name "*.qml" | xargs qmlformat --dry-run 2>&1 | grep -q "would reformat" && echo "Files need formatting, run qmlformat -i" && exit 1 || true'
+
+      - name: KDE package assembles
+        run: nix develop --command ./scripts/build-kde-package.sh
+
+      - name: i18n catalogs complete
+        run: nix develop --command ./translate/check.sh
+
+      - name: i18n catalogs in sync with sources
+        run: |
+          nix develop --command ./translate/Messages.sh
+          git diff --exit-code -- 'translate/*.po'
+
+      # The .mo files are not committed; this only proves every catalog compiles.
+      - name: i18n catalogs compile
+        run: nix develop --command ./translate/build.sh
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ruff check
+        uses: astral-sh/ruff-action@v4.1.0
+        with:
+          args: "check backend/aiusage hosts scripts tests/python"
+
+      - name: ruff format check
+        uses: astral-sh/ruff-action@v4.1.0
+        with:
+          args: "format --check backend/aiusage hosts scripts tests/python"
+
+      - name: portable backend tests
+        run: python3 -m unittest discover -s tests/python
+
+      - name: interpreter resolution tests
+        run: ./tests/python-interp.test.sh
+
+      - name: shared history file tests
+        run: ./tests/history-io.test.sh
+
+      - name: shared frontend code tests
+        run: node --test tests/*.test.js

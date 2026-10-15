@@ -1,0 +1,12 @@
+{
+  "name": "web-crawlers-extension-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "node e2e.mjs",
+    "pack": "python pack.py"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}

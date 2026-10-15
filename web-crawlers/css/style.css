@@ -1,0 +1,177 @@
+:root {
+  --bg: #000;
+  --fg: #e8e9eb;
+  --dim: #a2a9b1;
+  --rule: #54595d;
+  --link: #7f9dff;
+  --link-v: #a799cd;
+  --serif: "Linux Libertine", Georgia, "Times New Roman", serif;
+  --sans: -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "Courier New", Courier, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* the crawler's camera owns scrolling: no browser scroll anchoring nudging it
+   back whenever a mutated word above the view grows or shrinks */
+html { scroll-behavior: auto; overflow-anchor: none; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.6 var(--sans);
+  overflow-x: hidden;
+}
+
+/* ---------- encyclopedia page ---------- */
+
+#content {
+  position: relative;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 22px 120px;
+}
+
+.article { padding-bottom: 60px; }
+
+.article.cont { border-top: 3px double var(--rule); padding-top: 40px; }
+
+h1, h2, h3 { font-family: var(--serif); font-weight: normal; color: var(--fg); }
+h1 { font-size: 2.1em; margin: .2em 0 .1em; border-bottom: 1px solid var(--rule); }
+h2 { font-size: 1.55em; margin: 1.1em 0 .4em; border-bottom: 1px solid var(--rule); line-height: 1.35; }
+h3 { font-size: 1.15em; font-weight: bold; font-family: var(--sans); margin: 1em 0 .3em; }
+
+.tagline { color: var(--dim); font-size: .92em; margin-bottom: 1em; }
+
+p { margin: .5em 0 .8em; }
+
+#content a { color: var(--link); text-decoration: none; cursor: pointer; }
+#content a.v { color: var(--link-v); }
+#content a:hover .w { text-decoration: underline; }
+
+sup { font-size: .72em; line-height: 0; }
+
+a.ext::after {
+  content: "";
+  display: inline-block;
+  width: .78em; height: .78em;
+  margin-left: .18em;
+  vertical-align: -.02em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M5 1H1v10h10V7M7 1h4v4M11 1 5.5 6.5' fill='none' stroke='%237f9dff' stroke-width='1.3'/%3E%3C/svg%3E") no-repeat center/contain;
+}
+
+/* chunks far from the viewport skip layout/paint; the page grows forever.
+   (implies paint containment — the clip margin keeps enlarged / rotated
+   mutations near a chunk edge from being cut off) */
+.cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+  overflow-clip-margin: 80px;
+}
+
+ol.refs, ul.refs { font-size: .92em; padding-left: 2.4em; margin: .4em 0; }
+.cv > ol.refs { margin: 0; }
+ol.refs li, ul.refs li { margin: .12em 0; }
+.back { color: var(--link); margin-right: .2em; }
+.back b { font-weight: normal; font-style: italic; font-size: .85em; margin-right: .25em; }
+i { font-style: italic; }
+
+.lock { color: #6fbf73; font-size: .8em; margin-left: .15em; }
+.pdf  { color: #ff6060; font-size: .78em; margin-left: .15em; }
+
+/* navbox */
+table.navbox {
+  width: 100%;
+  border: 1px solid var(--dim);
+  border-collapse: collapse;
+  margin: 1.8em 0 .5em;
+  font-size: .88em;
+}
+.navbox th, .navbox td { border: 1px solid var(--rule); padding: .25em .6em; }
+.navbox .nb-title { text-align: center; font-weight: bold; background: #10141c; position: relative; }
+.navbox .nb-vte { position: absolute; left: .6em; font-weight: normal; font-size: .8em; color: var(--dim); }
+.navbox .nb-tax { text-align: center; }
+.navbox th.nb-group { background: #10141c; text-align: right; white-space: nowrap; width: 1%; }
+.navbox .nb-sub { text-align: center; font-weight: bold; background: #0b0e14; }
+.navbox td .dot { color: var(--dim); }
+
+/* ---------- mutations (applied by the crawler) ---------- */
+
+.mut { --mc: #3d6dff; --mt: #05051a; --ms: 1.8em; --mr: -90deg; }
+
+.m-box   { outline: 1px solid var(--mc); outline-offset: 1px; }
+.m-box2  { outline: 1.5px solid var(--mc); outline-offset: 3px; }
+.m-hl    { background: var(--mc); color: var(--mt) !important; }
+.m-hl .w { color: inherit; }
+.m-ink   { color: var(--mc) !important; }
+.m-mono  { font-family: var(--mono); letter-spacing: .04em; }
+.m-serif { font-family: var(--serif); letter-spacing: .06em; }
+.m-big   { font-size: var(--ms); line-height: 1.05; }
+.m-tiny  { font-size: .62em; opacity: .8; }
+.m-wide  { letter-spacing: .45em; }
+.m-upper { text-transform: uppercase; }
+.m-rot   { display: inline-block; transform: rotate(var(--mr)); transform-origin: 50% 50%; }
+.m-skew  { display: inline-block; transform: skewX(-20deg) scaleY(1.35); }
+.m-under { text-decoration: underline wavy var(--mc); text-underline-offset: 3px; }
+.m-strike{ text-decoration: line-through var(--mc) 2px; }
+.m-dash  { border-bottom: 1px dashed var(--mc); }
+.m-blink { animation: m-blink .14s steps(2, jump-none) infinite; }
+.m-pad   { padding: 0 .35em; }
+
+@keyframes m-blink { 0% { opacity: 1; } 100% { opacity: .15; } }
+
+/* ---------- fx layer ---------- */
+
+#fx {
+  position: absolute;
+  left: 0; top: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.ghost {
+  position: absolute;
+  white-space: nowrap;
+  font-family: var(--mono);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.bar {
+  position: absolute;
+  height: 16px;
+  transform-origin: 0 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  font: 11px/16px var(--mono);
+  padding-left: 4px;
+  pointer-events: none;
+}
+
+#legs {
+  position: fixed;
+  left: 0; top: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hint {
+  position: fixed;
+  right: 12px; bottom: 10px;
+  z-index: 20;
+  font: 11px var(--mono);
+  color: #6b7280;
+  background: rgba(0, 0, 0, .7);
+  padding: 4px 8px;
+  border: 1px solid #222;
+  transition: opacity 1.2s;
+  pointer-events: none;
+}
+#hint.off { opacity: 0; }
+
+@media (max-width: 600px) {
+  #content { padding: 16px 16px 100px; }
+  #hint { display: none; }
+}

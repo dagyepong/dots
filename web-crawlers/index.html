@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Crawlers</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- procedurally generated encyclopedia pages the spider walks on -->
+  <main id="content"></main>
+
+  <!-- DOM effects layer (ghost clones, stretched silk bars), page coordinates -->
+  <div id="fx"></div>
+
+  <!-- legs / body / threads, viewport coordinates -->
+  <canvas id="legs"></canvas>
+
+  <div id="hint">drag mouse — lure · click — target · space — pause · F — camera follow</div>
+
+  <script src="js/content.js"></script>
+  <script src="js/crawler.js"></script>
+</body>
+</html>

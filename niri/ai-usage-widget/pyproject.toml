@@ -1,0 +1,40 @@
+# Dev-only lint/format config for the provider backend
+# (backend/aiusage). Nothing here is a runtime dependency —
+# the backend itself stays standard-library-only; see plan.md.
+
+# The backend is imported as the top-level package `aiusage` with
+# backend on sys.path (the bash launcher exports PYTHONPATH;
+# scripts/check-pricing.py inserts it). Tell type checkers the same, so
+# `import aiusage.…` resolves outside of a running widget.
+[tool.pyrefly]
+search-path = ["backend", "."]
+
+[tool.ruff]
+line-length = 150
+target-version = "py39"
+include = ["backend/aiusage/**/*.py", "scripts/**/*.py", "hosts/**/*.py", "tests/python/**/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade — with target-version pinned to py39, this also flags
+           # any 3.10+-only syntax that would break the RHEL/openSUSE floor
+    "PLW1514",  # open() in text mode needs an encoding: Windows' default is
+                # cp1252, not UTF-8 (the Windows tray app runs this code)
+]
+ignore = ["B008"]
+# PLW1514 is still a preview rule; this turns on the preview rules named in
+# `select` and no others.
+preview = true
+explicit-preview-rules = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

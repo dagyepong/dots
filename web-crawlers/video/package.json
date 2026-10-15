@@ -1,0 +1,12 @@
+{
+  "name": "web-crawlers-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "music": "python music.py --out build/music.wav",
+    "render": "node render.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}

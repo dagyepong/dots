@@ -1,0 +1,47 @@
+{
+  "extName": {
+    "message": "Web Crawlers"
+  },
+  "extDesc": {
+    "message": "閲覧中のページにネオンの蜘蛛を放ちます。蜘蛛は本物の文字の上を歩き、触れた言葉は一瞬だけグリッチします。ページは変更せず、データも収集しません。"
+  },
+  "actionTitle": {
+    "message": "Web Crawlers — このページに蜘蛛を放つ"
+  },
+  "cmdToggle": {
+    "message": "このタブで蜘蛛を放つ / 呼び戻す"
+  },
+  "release": {
+    "message": "蜘蛛を放つ"
+  },
+  "recall": {
+    "message": "蜘蛛を呼び戻す"
+  },
+  "autoRead": {
+    "message": "自動読み進め（下へスクロール）"
+  },
+  "size": {
+    "message": "サイズ"
+  },
+  "density": {
+    "message": "エフェクトの量"
+  },
+  "calm": {
+    "message": "控えめ"
+  },
+  "normal": {
+    "message": "ふつう"
+  },
+  "wild": {
+    "message": "ワイルド"
+  },
+  "shortcut": {
+    "message": "ショートカット"
+  },
+  "notSet": {
+    "message": "未設定"
+  },
+  "cantRun": {
+    "message": "このページには蜘蛛が入れません。ブラウザは chrome:// ページとウェブストアへの拡張機能のアクセスを禁止しています。"
+  }
+}

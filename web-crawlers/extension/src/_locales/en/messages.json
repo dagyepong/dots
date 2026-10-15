@@ -1,0 +1,47 @@
+{
+  "extName": {
+    "message": "Web Crawlers"
+  },
+  "extDesc": {
+    "message": "Let a neon spider loose on the page you're reading: it walks on the real words, and each word it touches glitches for a moment."
+  },
+  "actionTitle": {
+    "message": "Web Crawlers — release a spider on this page"
+  },
+  "cmdToggle": {
+    "message": "Release / recall the spider on this tab"
+  },
+  "release": {
+    "message": "Release the spider"
+  },
+  "recall": {
+    "message": "Recall the spider"
+  },
+  "autoRead": {
+    "message": "Auto-read (scroll down)"
+  },
+  "size": {
+    "message": "Size"
+  },
+  "density": {
+    "message": "Effects"
+  },
+  "calm": {
+    "message": "calm"
+  },
+  "normal": {
+    "message": "normal"
+  },
+  "wild": {
+    "message": "wild"
+  },
+  "shortcut": {
+    "message": "Shortcut"
+  },
+  "notSet": {
+    "message": "not set"
+  },
+  "cantRun": {
+    "message": "Spiders can't enter this page — browsers keep all extensions out of chrome:// pages and the Web Store."
+  }
+}

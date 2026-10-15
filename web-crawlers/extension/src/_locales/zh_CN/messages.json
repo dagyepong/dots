@@ -1,0 +1,47 @@
+{
+  "extName": {
+    "message": "Web Crawlers"
+  },
+  "extDesc": {
+    "message": "在你正在浏览的网页上放出一只霓虹蜘蛛：它踩着页面上真实的文字爬行，被踩到的字会短暂“故障”变形。不改动页面，不收集任何数据。"
+  },
+  "actionTitle": {
+    "message": "Web Crawlers — 在此页面放出蜘蛛"
+  },
+  "cmdToggle": {
+    "message": "在当前标签页放出 / 收回蜘蛛"
+  },
+  "release": {
+    "message": "放出蜘蛛"
+  },
+  "recall": {
+    "message": "收回蜘蛛"
+  },
+  "autoRead": {
+    "message": "自动阅读（向下滚动）"
+  },
+  "size": {
+    "message": "大小"
+  },
+  "density": {
+    "message": "特效"
+  },
+  "calm": {
+    "message": "平静"
+  },
+  "normal": {
+    "message": "普通"
+  },
+  "wild": {
+    "message": "狂野"
+  },
+  "shortcut": {
+    "message": "快捷键"
+  },
+  "notSet": {
+    "message": "未设置"
+  },
+  "cantRun": {
+    "message": "蜘蛛进不了这个页面——浏览器禁止所有扩展进入 chrome:// 页面和应用商店。"
+  }
+}

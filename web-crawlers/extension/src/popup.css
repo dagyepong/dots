@@ -1,0 +1,67 @@
+:root {
+  --bg: #07080b;
+  --panel: #10131a;
+  --fg: #e8e9eb;
+  --dim: #8a93a6;
+  --rule: #232836;
+  --leg: #5cc8ff;
+  --joint: #ff4a6e;
+  --blue: #3d6dff;
+  --mono: "Courier New", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 280px;
+  padding: 14px 14px 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+}
+
+header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.glyph { font: 15px var(--mono); color: var(--leg); letter-spacing: .08em; }
+h1 { margin: 0; font: 700 17px var(--mono); letter-spacing: .02em; }
+
+.main {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--leg);
+  background: transparent;
+  color: var(--fg);
+  font: 600 14px var(--mono);
+  letter-spacing: .03em;
+  cursor: pointer;
+  outline: 1px solid transparent;
+  outline-offset: 3px;
+  transition: background .12s, outline-color .12s;
+}
+.main:hover:not(:disabled) { background: rgba(92, 200, 255, .1); outline-color: var(--blue); }
+.main.on { border-color: var(--joint); color: #fff; background: rgba(255, 74, 110, .14); }
+.main:disabled { opacity: .45; cursor: default; }
+
+.note { margin: 8px 0 0; color: var(--dim); font-size: 12px; }
+
+section { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 6px; }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; gap: 10px; }
+.row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--leg); margin: 0; cursor: pointer; }
+label.row { cursor: pointer; }
+
+.seg { display: flex; border: 1px solid var(--rule); }
+.seg button {
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--dim);
+  font: 12px var(--mono);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.seg button:first-child { border-left: 0; }
+.seg button.sel { background: var(--blue); color: #fff; }
+.seg button:hover:not(.sel) { color: var(--fg); }
+
+footer { margin-top: 8px; border-top: 1px solid var(--rule); padding-top: 8px; color: var(--dim); font-size: 11px; }
+kbd { font: 11px var(--mono); color: var(--fg); border: 1px solid var(--rule); padding: 1px 5px; }

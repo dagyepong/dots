@@ -92,6 +92,7 @@ layout {
 // ==============================================================================
 spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/SEELE-wall.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
+spawn-sh-at-startup "quickshell -p ~/.config/niri/ai-usage-widget/shell.qml"
 spawn-sh-at-startup "vicinae server"
 spawn-sh-at-startup "xwayland-satellite"
 spawn-sh-at-startup "/usr/local/bin/pia-start.sh"

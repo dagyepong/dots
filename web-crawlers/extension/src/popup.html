@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <span class="glyph">/[•]\</span>
+    <h1 data-i18n="extName"></h1>
+  </header>
+
+  <button id="toggle" class="main" disabled></button>
+  <p id="note" class="note" hidden></p>
+
+  <section>
+    <label class="row">
+      <span data-i18n="autoRead"></span>
+      <input type="checkbox" id="autoRead">
+    </label>
+    <div class="row">
+      <span data-i18n="size"></span>
+      <div class="seg" data-key="size">
+        <button data-v="S">S</button><button data-v="M">M</button><button data-v="L">L</button>
+      </div>
+    </div>
+    <div class="row">
+      <span data-i18n="density"></span>
+      <div class="seg" data-key="density">
+        <button data-v="calm" data-i18n="calm"></button><button data-v="normal" data-i18n="normal"></button><button data-v="wild" data-i18n="wild"></button>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span data-i18n="shortcut"></span> <kbd id="kbd"></kbd>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

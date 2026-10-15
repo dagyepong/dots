@@ -1,0 +1,94 @@
+# Local agent workspace: plans, notes and benchmark receipts are working
+# artifacts, never shipped. Keep them out of history.
+.omo/
+
+# Build artifacts
+*.plasmoid
+package
+# compiled catalogs — built from translate/*.po by translate/build.sh at pack/install time
+build/kde/contents/locale/
+notes.md
+plan.md
+docs/readme/opendesktop
+
+
+# Swift / the macOS app
+*.xcuserstate
+*.xcodeproj
+
+# Nix
+result
+.direnv/
+
+# Editor junk
+*~
+*.swp
+.idea/
+.vscode/
+
+# System junk
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller / Py2app
+*.manifest
+*.spec
+# …except the macOS backend's, which is source: it is what PyInstaller is told
+# to build, not something PyInstaller generated.
+# The hand-written build specs of the Windows and macOS apps.
+!hosts/macos/ai-usage.spec
+
+!hosts/windows/ai-usage.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-file.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+.pytest_cache/
+.ruff_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.pyo
+.hypothesis/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+tmp/
