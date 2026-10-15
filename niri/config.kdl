@@ -90,7 +90,7 @@ layout {
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/1920x1080_aesthetic_japan2.jpg"
+spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/SEELE-wall.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 spawn-sh-at-startup "vicinae server"
 spawn-sh-at-startup "xwayland-satellite"
