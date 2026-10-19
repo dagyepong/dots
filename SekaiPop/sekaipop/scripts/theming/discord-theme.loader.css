@@ -1,0 +1,20 @@
+/* ===== loading screen ===== */
+@keyframes pj-shine { to { background-position: 200% 50%; } }
+@container body style(--pj-loader: sekai) {
+    [class*="content_"]:has(> [class*="spinner_"]):has(> [class*="text_"]) {
+        display: flex; flex-direction: column; align-items: center; gap: 14px;
+    }
+    [class*="content_"]:has(> [class*="text_"]) > [class*="spinner_"] { display: none; }
+    [class*="content_"]:has(> [class*="spinner_"]):has(> [class*="text_"])::before {
+        content: '\266A  sekaipop  \266A'; display: block;
+        font-size: 44px; font-weight: 900; letter-spacing: 0.04em;
+        background: linear-gradient(90deg, var(--pj-a), var(--pj-b), var(--pj-a)) 0 50% / 200% auto;
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        animation: pj-shine 1.6s linear infinite;
+    }
+    [class*="content_"]:has(> [class*="spinner_"]) > [class*="text_"] { position: static; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [class*="content_"]::before { animation: none; }
+}

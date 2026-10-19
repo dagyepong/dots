@@ -1,0 +1,23 @@
+/* ===== Performance layer ===== */
+@property --pj-desk { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-s0 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-s1 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-s2 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-s3 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-s4 { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-text { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-text-strong { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-muted { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-line { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-ring { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-rule { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-line-soft { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-shadow { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-link { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-hover { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-active { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-selected { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-scroll { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --pj-edge { syntax: '<color>'; inherits: true; initial-value: transparent; }
+
+[class*="scroll"]:not(#_) { will-change: auto; }

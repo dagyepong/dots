@@ -1,0 +1,37 @@
+#version 440
+
+// Vertex stage for sekai_star_lock.frag. Does nothing special — the uniform
+// block below MUST stay identical (same members, same order) to the one
+// in sekai_star_lock.frag, even though only qt_Matrix is used here. See
+// shaders/README.md, "Uniform layout".
+
+layout(location = 0) in vec4 qt_Vertex;
+layout(location = 1) in vec2 qt_MultiTexCoord0;
+layout(location = 0) out vec2 qt_TexCoord0;
+
+layout(std140, binding = 0) uniform buf {
+    mat4 qt_Matrix;
+    float qt_Opacity;
+    float progress;
+    float aspect;
+    float thickness;
+    float pointLength;
+    float curvature;
+    float colorIntensity;
+    float elastic;
+    float spin;
+    vec2 center;
+    vec4 colorWhite;
+    vec4 colorCyan;
+    vec4 colorPink;
+    int unlocking;
+} ubuf;
+
+out gl_PerVertex {
+    vec4 gl_Position;
+};
+
+void main() {
+    qt_TexCoord0 = qt_MultiTexCoord0;
+    gl_Position = ubuf.qt_Matrix * qt_Vertex;
+}

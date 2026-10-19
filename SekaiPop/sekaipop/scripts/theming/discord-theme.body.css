@@ -1,0 +1,433 @@
+/* ===== sekaipop for Discord ===== */
+
+/* ===== 1 ===== */
+/*@mode light*/
+:is(.theme-light, .theme-dark, .theme-darker, .theme-midnight):not(#_) {
+    --pj-desk: color-mix(in srgb, var(--pj-a) 30%, var(--pj-board-bg));    /* app frame / title bar */
+    --pj-s0: var(--pj-desk);
+    --pj-s1: color-mix(in srgb, var(--pj-a) 14%, white);                    /* channel / DM list */
+    --pj-s2: #ffffff;                                                       /* main pane */
+    --pj-s3: color-mix(in srgb, var(--pj-border) 7%, white);                /* inputs, embeds (the "add a task" grey) */
+    --pj-s4: color-mix(in srgb, var(--pj-a) 24%, white);
+    --pj-text: color-mix(in srgb, var(--pj-border) 86%, black);             /* plum ink, not black */
+    --pj-text-strong: color-mix(in srgb, var(--pj-border) 60%, black);
+    --pj-muted: color-mix(in srgb, var(--pj-border) 62%, white);
+    --pj-line: var(--pj-border);                                           /* the thick outline */
+    --pj-ring: var(--pj-a);                                                /* pale ring just inside it */
+    --pj-rule: color-mix(in srgb, var(--pj-a) 34%, white);                  /* thin pink dividers */
+    --pj-line-soft: color-mix(in srgb, var(--pj-a) 34%, white);
+    --pj-shadow: var(--pj-border);                                         /* the hard shadow */
+    --pj-link: color-mix(in srgb, var(--pj-a) 30%, var(--pj-border));
+    --pj-hover: color-mix(in srgb, var(--pj-a) 20%, white);
+    --pj-active: color-mix(in srgb, var(--pj-a) 30%, white);
+    --pj-selected: color-mix(in srgb, var(--pj-a) 44%, white);
+    --pj-scroll: color-mix(in srgb, var(--pj-border) 40%, white);
+    color-scheme: light;
+}
+/*@end*/
+/*@mode dark*/
+:is(.theme-light, .theme-dark, .theme-darker, .theme-midnight):not(#_) {
+    --pj-desk: color-mix(in srgb, var(--pj-deep) 70%, black);
+    --pj-s0: var(--pj-desk);
+    --pj-s1: color-mix(in srgb, var(--pj-deep) 94%, white);
+    --pj-s2: color-mix(in srgb, var(--pj-deep) 94%, white);
+    --pj-s3: color-mix(in srgb, var(--pj-deep) 82%, white);
+    --pj-s4: color-mix(in srgb, var(--pj-deep) 72%, white);
+    --pj-text: color-mix(in srgb, var(--pj-hover-tint) 88%, white);
+    --pj-text-strong: #ffffff;
+    --pj-muted: color-mix(in srgb, var(--pj-rim-hi) 78%, white);
+    --pj-line: var(--pj-rim-hi);
+    --pj-ring: color-mix(in srgb, var(--pj-a) 42%, var(--pj-deep));
+    --pj-rule: color-mix(in srgb, var(--pj-rim-hi) 28%, var(--pj-deep));
+    --pj-line-soft: color-mix(in srgb, var(--pj-rim-hi) 28%, var(--pj-deep));
+    --pj-shadow: color-mix(in srgb, var(--pj-deep) 35%, black);
+    --pj-link: var(--pj-a);
+    --pj-hover: color-mix(in srgb, var(--pj-a) 13%, var(--pj-deep));
+    --pj-active: color-mix(in srgb, var(--pj-a) 20%, var(--pj-deep));
+    --pj-selected: color-mix(in srgb, var(--pj-a) 28%, var(--pj-deep));
+    --pj-scroll: color-mix(in srgb, var(--pj-rim-hi) 55%, var(--pj-deep));
+    color-scheme: dark;
+}
+/*@end*/
+/*@mode auto*/
+:is(.theme-light):not(#_) {
+    --pj-desk: color-mix(in srgb, var(--pj-a) 30%, var(--pj-board-bg));    /* app frame / title bar */
+    --pj-s0: var(--pj-desk);
+    --pj-s1: color-mix(in srgb, var(--pj-a) 14%, white);                    /* channel / DM list */
+    --pj-s2: #ffffff;                                                       /* main pane */
+    --pj-s3: color-mix(in srgb, var(--pj-border) 7%, white);                /* inputs, embeds (the "add a task" grey) */
+    --pj-s4: color-mix(in srgb, var(--pj-a) 24%, white);
+    --pj-text: color-mix(in srgb, var(--pj-border) 86%, black);             /* plum ink, not black */
+    --pj-text-strong: color-mix(in srgb, var(--pj-border) 60%, black);
+    --pj-muted: color-mix(in srgb, var(--pj-border) 62%, white);
+    --pj-line: var(--pj-border);                                           /* the thick outline */
+    --pj-ring: var(--pj-a);                                                /* pale ring just inside it */
+    --pj-rule: color-mix(in srgb, var(--pj-a) 34%, white);                  /* thin pink dividers */
+    --pj-line-soft: color-mix(in srgb, var(--pj-a) 34%, white);
+    --pj-shadow: var(--pj-border);                                         /* the hard shadow */
+    --pj-link: color-mix(in srgb, var(--pj-a) 30%, var(--pj-border));
+    --pj-hover: color-mix(in srgb, var(--pj-a) 20%, white);
+    --pj-active: color-mix(in srgb, var(--pj-a) 30%, white);
+    --pj-selected: color-mix(in srgb, var(--pj-a) 44%, white);
+    --pj-scroll: color-mix(in srgb, var(--pj-border) 40%, white);
+    color-scheme: light;
+}
+:is(.theme-dark, .theme-darker, .theme-midnight):not(#_) {
+    --pj-desk: color-mix(in srgb, var(--pj-deep) 70%, black);
+    --pj-s0: var(--pj-desk);
+    --pj-s1: color-mix(in srgb, var(--pj-deep) 94%, white);
+    --pj-s2: color-mix(in srgb, var(--pj-deep) 94%, white);
+    --pj-s3: color-mix(in srgb, var(--pj-deep) 82%, white);
+    --pj-s4: color-mix(in srgb, var(--pj-deep) 72%, white);
+    --pj-text: color-mix(in srgb, var(--pj-hover-tint) 88%, white);
+    --pj-text-strong: #ffffff;
+    --pj-muted: color-mix(in srgb, var(--pj-rim-hi) 78%, white);
+    --pj-line: var(--pj-rim-hi);
+    --pj-ring: color-mix(in srgb, var(--pj-a) 42%, var(--pj-deep));
+    --pj-rule: color-mix(in srgb, var(--pj-rim-hi) 28%, var(--pj-deep));
+    --pj-line-soft: color-mix(in srgb, var(--pj-rim-hi) 28%, var(--pj-deep));
+    --pj-shadow: color-mix(in srgb, var(--pj-deep) 35%, black);
+    --pj-link: var(--pj-a);
+    --pj-hover: color-mix(in srgb, var(--pj-a) 13%, var(--pj-deep));
+    --pj-active: color-mix(in srgb, var(--pj-a) 20%, var(--pj-deep));
+    --pj-selected: color-mix(in srgb, var(--pj-a) 28%, var(--pj-deep));
+    --pj-scroll: color-mix(in srgb, var(--pj-rim-hi) 55%, var(--pj-deep));
+    color-scheme: dark;
+}
+/*@end*/
+
+:root {
+    --pj-on-accent: var(--pj-border);   /* plum ink on the pastel accents, as in the shell */
+    --pj-grad: linear-gradient(to right, var(--pj-a), var(--pj-b));   /* pink -> peach, like the active workspace pill */
+    --pj-card-r: 14px;
+    /* the shell's Pill.qml, used for buttons only */
+    --pj-bw: 3px;        /* Theme.borderWidth */
+    --pj-sh: 4px;        /* Theme.shadowOffset: the shadow only ever drops straight down */
+    --pj-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* Easing.OutBack: the release bounce */
+    --pj-pill-ring: 3px;                               /* Pill.ringWidth is 8 in the bar; Discord's buttons are smaller */
+    --pj-online: #5be3a5;
+    --pj-idle: #ffd166;
+    --pj-dnd: #ff8fa3;
+}
+
+/* ===== 2 ===== */
+:is(.theme-light, .theme-dark, .theme-darker, .theme-midnight, body):not(#_) {
+    /* fonts (Google Sans Flex is the shell's font; falls back if not installed) */
+    --font-primary: "Google Sans Flex", "Google Sans", "gg sans", "Noto Sans", system-ui, sans-serif;
+    --font-display: "Google Sans Flex", "Google Sans", "gg sans", "Noto Sans", system-ui, sans-serif;
+    --font-headline: "Google Sans Flex", "Google Sans", "gg sans", "Noto Sans", system-ui, sans-serif;
+
+    /* the one outline colour every card / field / menu uses: the shell's outline, softened */
+    --pj-edge: color-mix(in srgb, var(--pj-line) 72%, var(--pj-s1));
+    --pj-sel-grad: linear-gradient(to right, color-mix(in srgb, var(--pj-a) 34%, transparent), color-mix(in srgb, var(--pj-b) 20%, transparent));
+
+    /* surfaces: classic names */
+    --background-primary: var(--pj-s2);
+    --background-secondary: var(--pj-s1);
+    --background-secondary-alt: var(--pj-s1);
+    --background-tertiary: var(--pj-s0);
+    --background-floating: var(--pj-s3);
+    --background-nested-floating: var(--pj-s3);
+    --background-accent: var(--pj-s4);
+    --background-mobile-primary: var(--pj-s2);
+    --background-mobile-secondary: var(--pj-s1);
+    --chat-background: var(--pj-s2);
+    --channeltextarea-background: var(--pj-s3);
+    --input-background: var(--pj-s3);
+    --deprecated-card-bg: var(--pj-s3);
+    --deprecated-store-bg: var(--pj-s2);
+    --deprecated-quickswitcher-input-background: var(--pj-s3);
+    --profile-body-background-color: var(--pj-s2);
+    --modal-background: var(--pj-s2);
+    --modal-footer-background: var(--pj-s1);
+    /* surfaces: new names */
+    --background-base-lowest: var(--pj-s0);
+    --background-base-lower: var(--pj-s1);
+    --background-base-low: var(--pj-s1);
+    --background-surface-high: var(--pj-s3);
+    --background-surface-higher: var(--pj-s3);
+    --background-surface-highest: var(--pj-s4);
+    --chat-background-default: var(--pj-s2);
+    --input-background-default: var(--pj-s3);
+    --card-background-default: var(--pj-s3);
+    --card-background-hover: var(--pj-s4);
+
+    /* hover / active / selected */
+    --background-modifier-hover: var(--pj-hover);
+    --background-modifier-active: var(--pj-active);
+    --background-modifier-selected: var(--pj-selected);
+    --background-modifier-accent: var(--pj-line-soft);
+    --background-mod-subtle: var(--pj-hover);
+    --background-mod-normal: var(--pj-active);
+    --background-mod-strong: var(--pj-selected);
+    --interactive-background-hover: var(--pj-hover);
+    --interactive-background-active: var(--pj-active);
+    --interactive-background-selected: var(--pj-selected);
+
+    /* text */
+    --text-normal: var(--pj-text);
+    --text-default: var(--pj-text);
+    --text-strong: var(--pj-text-strong);
+    --text-muted: var(--pj-muted);
+    --text-subtle: var(--pj-muted);
+    --text-secondary: var(--pj-muted);
+    --header-primary: var(--pj-text-strong);
+    --header-secondary: var(--pj-muted);
+    --text-link: var(--pj-link);
+    --text-brand: var(--pj-link);
+    --text-link-low-saturation: var(--pj-link);
+    --channels-default: var(--pj-muted);
+    --channel-icon: var(--pj-muted);
+    --input-placeholder-text: var(--pj-muted);
+    --interactive-normal: var(--pj-muted);
+    --interactive-hover: var(--pj-text);
+    --interactive-active: var(--pj-text-strong);
+    --interactive-muted: var(--pj-line-soft);
+    --interactive-text-default: var(--pj-muted);
+    --interactive-text-hover: var(--pj-text);
+    --interactive-text-active: var(--pj-text-strong);
+    --interactive-icon-default: var(--pj-muted);
+    --interactive-icon-hover: var(--pj-text);
+    --interactive-icon-active: var(--pj-text-strong);
+
+    /* borders */
+    --border-faint: var(--pj-line-soft);
+    --border-subtle: var(--pj-edge);          /* system24's cards draw their outline with this */
+    --border-hover: var(--pj-edge);           /* no colour flash when a card is hovered */
+    --border-light: var(--pj-line-soft);
+    --radius-lg: var(--pj-card-r);
+    --border-normal: var(--pj-line);
+    --border-strong: var(--pj-line);
+    --divider: var(--pj-line-soft);
+
+    /* accent (Discord "brand") */
+    --brand-experiment: var(--pj-a);
+    --brand-experiment-05a: color-mix(in srgb, var(--pj-a) 5%, transparent);
+    --brand-experiment-10a: color-mix(in srgb, var(--pj-a) 10%, transparent);
+    --brand-experiment-15a: color-mix(in srgb, var(--pj-a) 15%, transparent);
+    --brand-experiment-20a: color-mix(in srgb, var(--pj-a) 20%, transparent);
+    --brand-experiment-25a: color-mix(in srgb, var(--pj-a) 25%, transparent);
+    --brand-experiment-30a: color-mix(in srgb, var(--pj-a) 30%, transparent);
+    --brand-experiment-360: var(--pj-a);
+    --brand-experiment-500: var(--pj-a);
+    --brand-experiment-560: color-mix(in srgb, var(--pj-a) 82%, var(--pj-border));
+    --brand-experiment-600: color-mix(in srgb, var(--pj-a) 70%, var(--pj-border));
+    --brand-360: var(--pj-a);
+    --brand-400: var(--pj-a);
+    --brand-500: var(--pj-a);
+    --brand-560: color-mix(in srgb, var(--pj-a) 82%, var(--pj-border));
+    --brand-600: color-mix(in srgb, var(--pj-a) 70%, var(--pj-border));
+    --bg-brand: var(--pj-a);
+    --control-brand-foreground: var(--pj-a);
+    --control-brand-foreground-new: var(--pj-a);
+    --control-primary-background-default: var(--pj-a);
+    --control-primary-background-hover: color-mix(in srgb, var(--pj-a) 85%, var(--pj-b));
+    --control-primary-background-active: var(--pj-b);
+    --control-primary-text-default: var(--pj-on-accent);
+    --control-primary-text-hover: var(--pj-on-accent);
+    --control-primary-text-active: var(--pj-on-accent);
+    --focus-primary: var(--pj-a);
+    --mention-background: color-mix(in srgb, var(--pj-a) 32%, transparent);
+    --mention-foreground: var(--pj-text-strong);
+    --info-help-foreground: var(--pj-link);
+
+    /* system24 / midnight's own palette, remapped so whatever the imported layout colours lands on ours */
+    --bg-1: var(--pj-selected);
+    --bg-2: var(--pj-s4);
+    --bg-3: var(--pj-s3);
+    --bg-4: var(--pj-s1);
+    --hover: var(--pj-hover);
+    --active: var(--pj-active);
+    --active-2: var(--pj-selected);
+    --message-hover: var(--pj-hover);
+    --text-0: var(--pj-on-accent);
+    --text-1: var(--pj-text-strong);
+    --text-2: var(--pj-text-strong);
+    --text-3: var(--pj-text);
+    --text-4: var(--pj-muted);
+    --text-5: var(--pj-muted);
+    --accent-1: var(--pj-link);
+    --accent-2: var(--pj-a);
+    --accent-3: var(--pj-a);
+    --accent-4: color-mix(in srgb, var(--pj-a) 82%, var(--pj-border));
+    --accent-5: color-mix(in srgb, var(--pj-a) 70%, var(--pj-border));
+    --accent-new: var(--pj-dnd);
+    --online: var(--pj-online);
+    --idle: var(--pj-idle);
+    --dnd: var(--pj-dnd);
+    --offline: var(--pj-muted);
+
+    /* scrollbars */
+    --scrollbar-thin-thumb: var(--pj-scroll);
+    --scrollbar-thin-track: transparent;
+    --scrollbar-auto-thumb: var(--pj-scroll);
+    --scrollbar-auto-track: transparent;
+    --scrollbar-auto-scrollbar-color-thumb: var(--pj-scroll);
+    --scrollbar-auto-scrollbar-color-track: transparent;
+}
+
+/* ===== 3 ===== */
+::selection { background: var(--pj-a); color: var(--pj-on-accent); }
+h1, h2, h3 { font-weight: 800; }
+
+/* Buttons = the shell's pills. Plum outline -> white ring -> fill, sitting on a
+   hard plum shadow. OFF = white fill (like an OFF Quick Panel toggle); hover or
+   brand = the accent gradient (the lit look). */
+button[class*="lookFilled"], button[class*="lookOutlined"] {
+    border: var(--pj-bw) solid var(--pj-border);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--pj-border);
+    font-weight: 800;
+    box-shadow: inset 0 0 0 var(--pj-pill-ring) #ffffff, 0 var(--pj-sh) 0 var(--pj-border);
+    transform: translateY(0);
+    transition: transform 260ms var(--pj-spring), box-shadow 260ms var(--pj-spring), background 150ms, filter 150ms;
+}
+button[class*="lookFilled"][class*="colorBrand"], button[class*="lookFilled"]:hover, button[class*="lookOutlined"]:hover {
+    background: var(--pj-grad);
+    color: var(--pj-border);
+}
+button[class*="lookFilled"]:is([class*="colorRed"], [class*="colorDanger"]) { background: #ff8fa3; }
+/* pressed: the cap drops onto its shadow, then springs back on release */
+button[class*="lookFilled"]:active, button[class*="lookOutlined"]:active {
+    transform: translateY(var(--pj-sh));
+    box-shadow: inset 0 0 0 var(--pj-pill-ring) #ffffff, 0 0 0 var(--pj-border);
+    transition-duration: 80ms;
+    transition-timing-function: ease-out;
+}
+button[class*="lookFilled"][disabled], button[class*="lookOutlined"][disabled] {
+    filter: grayscale(0.6) opacity(0.6);
+    transform: none;
+}
+button[class*="lookFilled"] svg, button[class*="lookOutlined"] svg { color: var(--pj-border); }
+
+/* Discord's redesigned ("Mana") buttons: same pill shape, colours come from the --control-* vars above */
+[data-mana-component="button"] {
+    border: var(--pj-bw) solid var(--pj-border);
+    border-radius: 999px;
+    box-shadow: 0 var(--pj-sh) 0 var(--pj-border);
+    font-weight: 800;
+    transform: translateY(0);
+    transition: transform 260ms var(--pj-spring), box-shadow 260ms var(--pj-spring), filter 150ms;
+}
+[data-mana-component="button"]:active {
+    transform: translateY(var(--pj-sh));
+    box-shadow: 0 0 0 var(--pj-border);
+    transition-duration: 80ms;
+}
+[data-mana-component="button"][disabled], [data-mana-component="button"][aria-disabled="true"] { filter: grayscale(0.6) opacity(0.6); transform: none; }
+
+/* fields: the search pill in the header */
+[class*="searchBar_"] {
+    background: var(--pj-s3);
+    border: 2px solid var(--pj-edge);
+    border-radius: 999px;
+    box-shadow: none;
+}
+[class*="searchBar_"]:focus-within { border-color: var(--pj-a); }
+/* the message box, classic layout (the floating layout frames it as its own card, section 4) */
+:is([class^="channelTextArea_"], [class*=" channelTextArea_"]) [class*="scrollableContainer_"] {
+    background: var(--pj-s3);
+    border: 2px solid var(--pj-edge);
+    border-radius: var(--pj-card-r);
+    box-shadow: none;
+}
+:is([class^="channelTextArea_"], [class*=" channelTextArea_"]) [class*="scrollableContainer_"]:focus-within { border-color: var(--pj-a); }
+
+/* the selected channel / DM row: a soft accent wash, like the active workspace pill but calmer */
+[class*="interactiveSelected"]:not(#_) {
+    border-radius: 10px;
+    box-shadow: none;
+    background-image: var(--pj-sel-grad);
+}
+
+/* floating things: menus, popouts, modals. Outline + an ordinary soft elevation shadow. */
+[role="menu"], [class*="popout_"], [class*="root_"][role="dialog"] {
+    background: var(--pj-s2);
+    border: 2px solid var(--pj-edge);
+    border-radius: var(--pj-card-r);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+    outline: 0;
+}
+/* quick switcher (Ctrl+K): no frame behind the search pill, so the pill floats on the dimmed screen.
+   The results list below it still gets its own card so it stays readable. */
+:is([class*="quickswitcher"], [role="dialog"]:has([class*="quickswitcher"])):not(#_) {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+    backdrop-filter: none !important;
+}
+[class*="quickswitcher"] [class*="scroller"]:not(:empty):not(#_) {
+    background: var(--pj-s2);
+    border: 2px solid var(--pj-edge);
+    border-radius: var(--pj-card-r);
+    margin-top: 8px;
+}
+[class*="tooltip_"] {
+    background: var(--pj-s3);
+    color: var(--pj-text);
+    border: 1px solid var(--pj-edge);
+    border-radius: 10px;
+    box-shadow: none;
+}
+
+/* mentions, reactions, badges */
+.mention { border-radius: 8px; color: var(--pj-text-strong); font-weight: 700; }
+[class*="reaction_"] { border: 1px solid var(--pj-line-soft); border-radius: 999px; }
+[class*="reactionMe"] { border-color: var(--pj-edge); background: color-mix(in srgb, var(--pj-a) 22%, transparent); }
+[class*="numberBadge_"], [class*="textBadge_"] { color: var(--pj-on-accent); }
+
+/* code */
+:is(pre, code) { border: 1px solid var(--pj-line-soft); border-radius: 8px; background: var(--pj-s3); }
+pre code { border: 0; }
+
+/* ===== 4 ===== */
+:root { container-name: root; }
+body {
+    container-name: body;
+    font-weight: 400;        /* system24 sets 300 + tight letter-spacing for its mono font */
+    letter-spacing: normal;
+}
+@property --pj-layout  { syntax: 'floating | classic';  inherits: false; initial-value: floating; }
+@property --pj-chatbar { syntax: 'separated | joined';  inherits: false; initial-value: separated; }
+@property --pj-loader  { syntax: 'sekai | off';         inherits: false; initial-value: sekai; }
+@property --pj-spotify { syntax: 'on | off';            inherits: false; initial-value: on; }
+
+@container body style(--pj-layout: floating) {
+    /* the gaps between cards show the desk colour, not a card colour */
+    :is([class^="bg_"], [class*=" bg_"]) { background: var(--pj-desk); }
+    /* the channel header is a card of its own: keep its corners matching */
+    [class*="subtitleContainer_"] { border-radius: var(--pj-card-r); }
+}
+
+/* mention / reply edge: the workspace-pill gradient */
+:is([class*="message_"][class*="mentioned_"], [class*="message_"][class*="replying_"])::before {
+    background: var(--pj-grad) !important;
+}
+[class*="embedFull_"] {
+    border: 1px solid var(--pj-line-soft); border-left: 4px solid var(--pj-a);
+    border-radius: 12px; box-shadow: none;
+}
+
+/* Spotify progress bar (Vencord SpotifyControls): thin gradient pill */
+@container body style(--pj-spotify: on) {
+    #vc-spotify-progress-bar { margin: 8px 0 0 0; }
+    #vc-spotify-progress-bar [class*="slider_"] { --bar-size: 16px !important; }
+    #vc-spotify-progress-bar [class*="track_"] {
+        height: 16px; border: 1px solid var(--pj-edge); border-radius: 999px; overflow: hidden;
+        background: var(--pj-s3);
+    }
+    #vc-spotify-progress-bar [class*="bar_"] { height: 100% !important; top: 0 !important; background: var(--pj-grad) !important; }
+    #vc-spotify-progress-bar [class*="grabber_"] { visibility: hidden; }
+    #vc-spotify-progress-bar :is(.vc-spotify-time-left, .vc-spotify-time-right) {
+        z-index: 1; top: 0; margin-top: 0; font-size: 11px; font-weight: 800; line-height: 16px;
+        color: var(--pj-deep); pointer-events: none;
+    }
+    #vc-spotify-progress-bar .vc-spotify-time-left { left: 8px; }
+    #vc-spotify-progress-bar .vc-spotify-time-right { right: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button[class*="lookFilled"], button[class*="lookOutlined"], [data-mana-component="button"] { transition: none; }
+}
