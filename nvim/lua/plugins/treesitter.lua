@@ -1,43 +1,30 @@
+-- Additional configurations from nvim-treesitter
 return {
+  -- since `vim.tbl_deep_extend`, can only merge tables and not lists, the code above
+  -- would overwrite `ensure_installed` with the new value.
+  -- If you'd rather extend the default config, use the code below instead:
   {
     "nvim-treesitter/nvim-treesitter",
-    build = ":TSUpdate",
-    config = function()
-      local status, configs = pcall(require, "nvim-treesitter.configs")
-      if not status then
-        return
-      end
-      configs.setup({
-        ensure_installed = {
-          "lua",
-          "vim",
-          "vimdoc",
-          "javascript",
-          "typescript",
-          "tsx",
-          "html",
-          "python",
-          "markdown",
-          "markdown_inline",
-        },
-        highlight = { enable = true },
-        indent = { enable = true },
-        autotag = {
-          enable = true,
-          enable_close_on_slash = false,
-        },
-      })
-    end,
-  },
-  {
-    "windwp/nvim-ts-autotag",
-    config = function()
-      require("nvim-ts-autotag").setup({
-        opts = {
-          enable_close = true,
-          enable_rename = true,
-          enable_close_on_slash = false,
-        },
+    opts = function(_, opts)
+      -- add tsx and treesitter
+      vim.list_extend(opts.ensure_installed, {
+        "bash",
+        "go",
+        "html",
+        "java",
+        "javascript",
+        "json",
+        "lua",
+        "markdown",
+        "markdown_inline",
+        "python",
+        "query",
+        "regex",
+        "tsx",
+        "typescript",
+        "vim",
+        "vimdoc",
+        "yaml",
       })
     end,
   },
