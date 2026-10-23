@@ -1,0 +1,2636 @@
+#!/usr/bin/env python3
+"""Aibou's daemon. Runs as a child of the Quickshell scene and talks JSON lines.
+
+stdout (to the scene):
+  {"t":"pointer","x":..,"y":..}      global logical position, at most ~30 per second
+  {"t":"activity"}                    the user did something, at most every 3 s
+  {"t":"notify","app","summary","body","urgency"}
+  {"t":"focus","id","app","title"}    id null: no window has the focus
+  {"t":"windows","list":[{id,output,x,y,w,h,floating}],"known":bool}   output-local, active workspaces
+  {"t":"overview","open":bool}
+  {"t":"thinking"}  {"t":"delta","text"}  {"t":"say","text","mood"}  {"t":"error","text"}
+  {"t":"model","name"}               the session's model (haiku, sonnet, opus)
+  {"t":"tool","name","what"}         he looks something up (desktop help)
+  {"t":"actions","list":[{id,cmd,blocked}]}   proposed changes, shown as cards
+  {"t":"ran","id","code","out"}      a confirmed action ran
+  {"t":"settings","values":{...}}   Aibou's part of DMS plugin_settings.json
+  {"t":"insets","left","right","top","bottom"}  {"t":"colors",...}  {"t":"power","mains":bool}
+  {"t":"load","cpu","ram","temp","strain"}   how hard the machine works; strain 0 … 1
+  {"t":"trouble","kind":"crash"|"unit","name"}   a program crashed, a service failed
+  {"t":"barspot","y"}                where his face fits into the bar (null: nowhere)
+  {"t":"wallpaper","path"}           the desktop wallpaper, shown under a lifted window
+  {"t":"frameHost","on":bool}        DMS draws his domes as part of its frame (dms-leiste-patch 14)
+  {"t":"music","on":bool}            some player plays (MPRIS)
+  {"t":"beat","s","bpm"}             a beat, strength 0 … 1, tempo per minute (0 unknown); only while music plays
+  {"t":"recording","on":bool,"by"}   the screen is being recorded or cast
+  {"t":"download","name"}            a download landed in ~/Downloads
+  {"t":"battery","level","charging"} battery percent (only on change)
+  {"t":"updates","count"}            packages with updates (checkupdates, every 3 h)
+  {"t":"jobDone","name","secs"}      a build or package run that took over a minute has ended
+  {"t":"locked","on":bool,"away"}    the screen was locked / unlocked (away: seconds it was locked)
+  {"t":"usb","name"}                 a USB drive was plugged in
+  {"t":"mic","on":bool,"by"}         a program listens to a microphone (not a monitor of the output)
+  {"t":"kuroWall","on":bool,"light":bool}   the Kuro wallpaper is up (the scene animates its eyes)
+  {"t":"restack"}                    another backdrop surface lies over ours: build ours again
+stdin (from the scene):
+  {"t":"chat","text":".."}  {"t":"warm"}  {"t":"model","name":".."}  {"t":"forget"}
+  {"t":"run","id","cmd"}  {"t":"decline","id"}
+  {"t":"barspot","x","w","top","bottom","need","skip":[a,b]|null}   look for room in the bar
+  {"t":"frameBodies","list":[{screen,side,p,w,h,f}]}   domes for DMS to draw in its frame
+"""
+import asyncio
+import fnmatch
+import hashlib
+import json
+import math
+import shlex
+import os
+import pwd
+import random
+import re
+import shutil
+import statistics
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from collections import deque
+from pathlib import Path
+
+HOME = Path.home()
+DMS_SETTINGS = HOME / ".config/DankMaterialShell/settings.json"
+DMS_COLORS = HOME / ".cache/DankMaterialShell/dms-colors.json"
+PLUGIN_SETTINGS = HOME / ".config/DankMaterialShell/plugin_settings.json"
+SETTINGS = {}
+STATE = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "aibou"
+MOODS = ("happy", "proud", "curious", "sleepy", "shy", "surprised", "sad", "smug", "neutral",
+         "blush", "scared", "angry")
+
+
+def emit(obj):
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def log(*args):
+    print("aiboud:", *args, file=sys.stderr, flush=True)
+
+
+def language():
+    if os.environ.get("DMS_SPRACHE"):
+        return os.environ["DMS_SPRACHE"][:2]
+    for p in (HOME / ".local/state/DankMaterialShell/session.json",
+              HOME / ".config/DankMaterialShell/session.json"):
+        try:
+            loc = json.loads(p.read_text()).get("locale")
+            if loc:
+                return loc[:2]
+        except (OSError, ValueError):
+            pass
+    return (os.environ.get("LANG") or "en")[:2]
+
+
+# ── shell geometry and colours ────────────────────────────────────
+
+def insets():
+    """Free area inside the DMS frame and bars, in logical pixels, and the
+    edge the (first visible) bar sits on."""
+    out = {"left": 0, "right": 0, "top": 0, "bottom": 0, "bar": ""}
+    try:
+        s = json.loads(DMS_SETTINGS.read_text())
+    except (OSError, ValueError):
+        return out
+    frame = s.get("frameThickness", 0) if s.get("frameEnabled") else 0
+    for k in ("left", "right", "top", "bottom"):
+        out[k] = frame
+    bar = s.get("frameBarSize", 40)
+    sides = {0: "top", 1: "bottom", 2: "left", 3: "right", 4: "top", 5: "bottom"}
+    for b in s.get("barConfigs", []):
+        if not b.get("enabled") or b.get("autoHide"):
+            continue
+        side = sides.get(b.get("position", 0))
+        if side:
+            out[side] = max(out[side], bar)
+            out["bar"] = out["bar"] or side
+    return out
+
+
+def niri_gap():
+    """The gap between windows and the screen edge, from the niri layout."""
+    gap = 16
+    for f in (HOME / ".config/niri/config.kdl", HOME / ".config/niri/dms/layout.kdl"):
+        try:
+            m = re.findall(r"^\s*gaps\s+([\d.]+)", f.read_text(), re.M)
+        except OSError:
+            continue
+        if m:
+            gap = float(m[-1])
+    return gap
+
+
+def colors():
+    try:
+        d = json.loads(DMS_COLORS.read_text())
+        c = d["colors"][d.get("mode", "dark")]
+        try:
+            # DMS leaves out values at their default (1.0 for frameOpacity)
+            glass = float(json.loads(DMS_SETTINGS.read_text()).get("frameOpacity", 1.0))
+        except (OSError, ValueError, TypeError):
+            glass = 0.65
+        try:
+            fc = json.loads(DMS_SETTINGS.read_text()).get("frameColor", "")
+        except (OSError, ValueError):
+            fc = ""
+        # as DMS resolves it (SettingsData.effectiveFrameColor)
+        frame = {"": c["surface_container"], "default": c["surface_container"],
+                 "primary": c["primary"], "surface": c["surface"]}.get(fc, fc)
+        return {"primary": c["primary"], "surface": c["surface_container_high"],
+                "base": c["surface"], "glass": glass, "frame": frame,
+                "text": c["on_surface"], "outline": c["outline"], "dark": d.get("mode") != "light"}
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def on_mains():
+    """True when any non-battery supply is online."""
+    root = Path("/sys/class/power_supply")
+    for d in root.iterdir() if root.exists() else []:
+        try:
+            if (d / "type").read_text().strip() != "Battery" and (d / "online").read_text().strip() == "1":
+                return True
+        except OSError:
+            pass
+    return not any((d / "type").read_text().strip() == "Battery" for d in root.iterdir()) if root.exists() else True
+
+
+def dms_settings():
+    try:
+        return json.loads(PLUGIN_SETTINGS.read_text()).get("aibou", {})
+    except (OSError, ValueError):
+        return {}
+
+
+# What the chat changed (activity, figures more or fewer) stays in Aibou's own
+# state, {key: {"value", "base"}}, and lies over DMS's settings; DMS's file is
+# never written from here. The settings page takes these over into DMS when it
+# opens. A key whose DMS value is no longer "base" (taken over, or changed in
+# DMS) is dropped again.
+CHOSEN = STATE / "chosen.json"
+
+
+def read_chosen():
+    try:
+        data = json.loads(CHOSEN.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_chosen(data):
+    STATE.mkdir(parents=True, exist_ok=True)
+    tmp = CHOSEN.with_name(CHOSEN.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    os.replace(tmp, CHOSEN)
+
+
+def read_settings():
+    """DMS's settings for Aibou with the chat's choices over them."""
+    dms = dms_settings()
+    chosen = read_chosen()
+    keep = {k: c for k, c in chosen.items() if isinstance(c, dict) and dms.get(k) == c.get("base")}
+    if keep != chosen:
+        write_chosen(keep)
+    return {**dms, **{k: c["value"] for k, c in keep.items()}}
+
+
+def choose(values):
+    """Changes from the chat into Aibou's own state, then on to the scene."""
+    global SETTINGS
+    dms = dms_settings()
+    chosen = read_chosen()
+    for k, v in values.items():
+        if dms.get(k) == v:
+            chosen.pop(k, None)
+        else:
+            chosen[k] = {"value": v, "base": dms.get(k)}
+    write_chosen(chosen)
+    SETTINGS = read_settings()
+    emit({"t": "settings", "values": {**SETTINGS, "userName": user_name()}})
+
+
+SESSION = HOME / ".local/state/DankMaterialShell/session.json"
+
+
+def do_not_disturb():
+    """DMS's do not disturb, from its session file (only written when on;
+    with a duration it ends by itself at doNotDisturbUntil)."""
+    try:
+        s = json.loads(SESSION.read_text())
+    except (OSError, ValueError):
+        return False
+    if not s.get("doNotDisturb"):
+        return False
+    until = s.get("doNotDisturbUntil") or 0
+    return until <= 0 or until > time.time() * 1000
+
+
+def option(key, default):
+    """One of Aibou's settings as a bool (DMS stores true/false, older files strings)."""
+    v = SETTINGS.get(key, default)
+    return v if isinstance(v, bool) else str(v).lower() in ("true", "1", "on", "yes")
+
+
+# settings the scene may change by itself (the chat window), and their values
+SETTABLE = {"activity": ("minimal", "calm", "normal", "lively", "max")}
+
+
+def set_option(key, value):
+    """One Aibou setting changed from the chat."""
+    if value in SETTABLE.get(key, ()):
+        choose({key: value})
+
+
+def change_buddies(delta):
+    """One figure more (in the first free place, a look not taken yet) or one
+    less (the last one)."""
+    m = read_settings()
+    slots = ["skin2", "skin3", "skin4", "skin5"]
+    if delta > 0:
+        free = [k for k in slots if m.get(k, "none") == "none"]
+        if not free:
+            return
+        used = {m.get("skin1", "kuro"), *(m.get(k) for k in slots)}
+        looks = [s for s in ("kuro", "mochi", "shiro", "momo", "robo", "bao", "neko", "kumo", "tako", "hiyoko", "arai") if s not in used]
+        if not looks:
+            return
+        choose({free[0]: random.choice(looks)})
+    else:
+        taken = [k for k in slots if m.get(k, "none") != "none"]
+        if not taken:
+            return
+        choose({taken[-1]: "none"})
+
+
+def user_name():
+    """Who the figures talk to: the setting "userName", else the first name
+    of the account's full name, else the login name."""
+    n = str(SETTINGS.get("userName") or "").strip()
+    if n:
+        return n
+    try:
+        full = pwd.getpwuid(os.getuid()).pw_gecos.split(",")[0].strip()
+        if full:
+            return full.split()[0]
+    except (KeyError, IndexError):
+        pass
+    return os.environ.get("USER", "").capitalize() or "you"
+
+
+async def watch_settings():
+    """DMS writes plugin_settings.json; pass Aibou's part on when it changes."""
+    global SETTINGS
+    last = None
+    while True:
+        try:
+            stamp = PLUGIN_SETTINGS.stat().st_mtime
+        except OSError:
+            stamp = None
+        if stamp != last:
+            last = stamp
+            new = read_settings()
+            if new != SETTINGS or stamp is None:
+                SETTINGS = new
+            emit({"t": "settings", "values": {**SETTINGS, "userName": user_name()}})
+        await asyncio.sleep(2)
+
+
+async def watch_files():
+    last = None
+    power = None
+    dnd = None
+    while True:
+        d = do_not_disturb()
+        if d != dnd:
+            dnd = d
+            emit({"t": "dnd", "on": d})
+        p = on_mains()
+        if p != power:
+            power = p
+            emit({"t": "power", "mains": p})
+        try:
+            stamp = (DMS_SETTINGS.stat().st_mtime, DMS_COLORS.stat().st_mtime)
+        except OSError:
+            stamp = None
+        if stamp != last:
+            last = stamp
+            emit({"t": "insets", **insets(), "gap": niri_gap()})
+            emit({"t": "colors", **colors()})
+            BACKDROP_CHECK.set()
+            emit({"t": "wallpaper", "path": await asyncio.to_thread(wallpaper)})
+        await asyncio.sleep(5)
+
+
+# ── how the machine is doing ──────────────────────────────────────
+
+def cpu_times():
+    with open("/proc/stat") as f:
+        v = [int(x) for x in f.readline().split()[1:]]
+    return v[3] + v[4], sum(v)          # idle + iowait, total
+
+
+def ram_used():
+    m = {}
+    with open("/proc/meminfo") as f:
+        for line in f:
+            k, v = line.split(":", 1)
+            m[k] = int(v.split()[0])
+    return 100 * (1 - m["MemAvailable"] / m["MemTotal"])
+
+
+def cpu_temp():
+    """The package temperature (coretemp, k10temp, zenpower), or None."""
+    for d in Path("/sys/class/hwmon").glob("hwmon*"):
+        try:
+            if (d / "name").read_text().strip() in ("coretemp", "k10temp", "zenpower"):
+                return int((d / "temp1_input").read_text()) / 1000
+        except (OSError, ValueError):
+            pass
+    return None
+
+
+async def load_watch():
+    """Every 2 s; the CPU load is averaged over about 20 s, so a short build
+    does not make him sweat but a long one does. Sent only when the strain
+    moves by a step, so the scene is not woken for nothing."""
+    idle0, total0 = cpu_times()
+    cpu = 0.0
+    sent = None
+    while True:
+        await asyncio.sleep(2)
+        try:
+            idle, total = cpu_times()
+            now = 100 * (1 - (idle - idle0) / max(1, total - total0))
+            idle0, total0 = idle, total
+            cpu += (now - cpu) * 0.1
+            ram = ram_used()
+        except (OSError, ValueError, KeyError):
+            continue
+        temp = cpu_temp()
+        strain = max((cpu - 55) / 35, (ram - 82) / 14, ((temp or 0) - 82) / 14, 0)
+        strain = round(min(1, strain) * 10) / 10
+        if strain != sent:
+            sent = strain
+            emit({"t": "load", "cpu": round(cpu), "ram": round(ram),
+                  "temp": round(temp) if temp else None, "strain": strain})
+
+
+async def crashes():
+    """Programs that dumped core, from systemd-coredump in the journal."""
+    while True:
+        async for line in lines("journalctl", "-f", "-n", "0", "-o", "json", "-t", "systemd-coredump"):
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            name = e.get("COREDUMP_COMM")
+            if name:
+                emit({"t": "trouble", "kind": "crash", "name": name})
+        await asyncio.sleep(30)
+
+
+# ── the machine, more of it: recording, downloads, battery, updates, long jobs ──
+
+RECORDERS = ("wf-recorder", "obs", "gpu-screen-recorder", "kooha", "wl-screenrec", "simplescreenrecorder")
+
+
+CASTS = [[]]                # niri's casts, from its event stream (CastsChanged)
+CASTS_CHANGED = asyncio.Event()
+RECORDING_PROGS = [""]      # a recording program, from the program scan (setting watchSystem)
+
+
+def recording_now():
+    """Who records the screen: a cast in niri (screen sharing, portal
+    recorders) or a known recording program; "" when nobody."""
+    if CASTS[0]:
+        c = CASTS[0][0] if isinstance(CASTS[0], list) else {}
+        return str((c or {}).get("app_id") or (c or {}).get("name") or "cast")
+    return RECORDING_PROGS[0] if option("watchSystem", False) else ""
+
+
+async def recording():
+    was = ""
+    while True:
+        now = await asyncio.to_thread(recording_now)
+        if bool(now) != bool(was):
+            emit({"t": "recording", "on": bool(now), "by": now or was})
+        was = now
+        # woken by niri's casts and by the program scan
+        await CASTS_CHANGED.wait()
+        CASTS_CHANGED.clear()
+
+
+DOWNLOADS = HOME / "Downloads"
+PARTIAL = (".part", ".crdownload", ".tmp", ".download", ".partial", ".!qB", ".aria2")
+
+
+async def downloads():
+    """Files that are finished in ~/Downloads (written and closed, or renamed
+    from a browser's .part); half-done ones and hidden files do not count."""
+    if not DOWNLOADS.is_dir():
+        return
+    proc = await asyncio.create_subprocess_exec(
+        "inotifywait", "-m", "-q", "-e", "close_write,moved_to", "--format", "%f", str(DOWNLOADS),
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, stdin=asyncio.subprocess.DEVNULL)
+    last = {}
+    try:
+        async for raw in proc.stdout:
+            name = raw.decode(errors="replace").strip()
+            if not name or name.startswith(".") or name.endswith(PARTIAL):
+                continue
+            now = time.monotonic()
+            if now - last.get(name, -99) < 15:
+                continue
+            last[name] = now
+            emit({"t": "download", "name": name})
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+
+
+def battery_now():
+    root = Path("/sys/class/power_supply")
+    for d in root.iterdir() if root.exists() else []:
+        try:
+            if (d / "type").read_text().strip() != "Battery":
+                continue
+            level = int((d / "capacity").read_text().strip())
+            status = (d / "status").read_text().strip()
+            return level, status in ("Charging", "Full")
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+async def battery():
+    was = None
+    while True:
+        now = await asyncio.to_thread(battery_now)
+        if now and now != was:
+            emit({"t": "battery", "level": now[0], "charging": now[1]})
+        was = now
+        await asyncio.sleep(60)
+
+
+async def updates():
+    """Pending package updates (checkupdates uses its own copy of the
+    package database, so nothing is changed); every three hours."""
+    await asyncio.sleep(120)
+    while True:
+        def count():
+            try:
+                r = subprocess.run(["checkupdates"], capture_output=True, text=True, timeout=180)
+            except (OSError, subprocess.SubprocessError):
+                return None
+            # 0 with a list, 2 with none; anything else: could not check
+            if r.returncode == 2:
+                return 0
+            if r.returncode != 0:
+                return None
+            return len([l for l in r.stdout.splitlines() if l.strip()])
+        n = await asyncio.to_thread(count)
+        if n is not None:
+            emit({"t": "updates", "count": n})
+        await asyncio.sleep(3 * 3600)
+
+
+# builds and package runs: the program names that count as such a job
+JOBS = {"make": "build", "cmake": "build", "ninja": "build", "cargo": "build", "meson": "build",
+        "gradle": "build", "mvn": "build", "go": "build", "npm": "build", "pnpm": "build", "yarn": "build",
+        "makepkg": "build", "docker": "build", "podman": "build",
+        "pacman": "update", "paru": "update", "yay": "update", "flatpak": "update"}
+# these also start things that run until stopped (npm run dev, docker compose up,
+# flatpak run): they count only with one of these words on their command line
+JOB_WORDS = {"npm": "build|install|ci|test", "pnpm": "build|install|test", "yarn": "build|install|test",
+             "go": "build|install|test", "docker": "build", "podman": "build", "flatpak": "update|install"}
+
+
+async def programs():
+    """One look at the running programs every 15 s (only with the setting
+    watchSystem): a job from JOBS that ran over a minute and has now ended,
+    and whether a recording program runs. Only the outermost job of a kind
+    counts (make under makepkg is part of it)."""
+    seen = {}                                  # pid -> (name, started, seconds since boot)
+    hz = os.sysconf("SC_CLK_TCK")
+    try:
+        while True:
+            await programs_once(seen, hz)
+            await asyncio.sleep(15)
+    finally:
+        if RECORDING_PROGS[0]:
+            RECORDING_PROGS[0] = ""
+            CASTS_CHANGED.set()
+
+
+def scan_programs(hz):
+    """Running jobs from JOBS {pid: (name, age in s)} and the first recording program."""
+    out = {}
+    rec = ""
+    try:
+        up = float(Path("/proc/uptime").read_text().split()[0])
+    except (OSError, ValueError):
+        up = 0.0
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit():
+            continue
+        try:
+            name = (d / "comm").read_text().strip()
+            if name in RECORDERS:
+                rec = rec or name
+            if name not in JOBS:
+                continue
+            stat = (d / "stat").read_text()
+            fields = stat[stat.rindex(")") + 2:].split()
+            ppid = int(fields[1])
+            # when it really started (field 22 of stat, in clock ticks since boot)
+            age = up - int(fields[19]) / hz
+            parent = (Path("/proc") / str(ppid) / "comm").read_text().strip()
+        except (OSError, ValueError, IndexError):
+            continue
+        if parent in JOBS:
+            continue
+        if name in JOB_WORDS:
+            try:
+                cmd = (d / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            except OSError:
+                continue
+            if not re.search(r"\b(" + JOB_WORDS[name] + r")\b", cmd):
+                continue
+        out[int(d.name)] = (name, age)
+    return out, rec
+
+
+async def programs_once(seen, hz):
+    now, rec = await asyncio.to_thread(scan_programs, hz)
+    if rec != RECORDING_PROGS[0]:
+        RECORDING_PROGS[0] = rec
+        CASTS_CHANGED.set()
+    t = time.monotonic()
+    for pid, (name, age) in now.items():
+        if pid not in seen or seen[pid][0] != name:
+            seen[pid] = (name, t - age)
+    for pid in [p for p in seen if p not in now]:
+        name, start = seen.pop(pid)
+        secs = round(t - start)
+        if secs >= 60:
+            emit({"t": "jobDone", "name": name, "kind": JOBS[name], "secs": secs})
+
+
+def my_session():
+    sid = os.environ.get("XDG_SESSION_ID")
+    if sid:
+        return sid
+    try:
+        r = subprocess.run(["loginctl", "list-sessions", "--no-legend"], capture_output=True, text=True, timeout=5)
+        for l in r.stdout.splitlines():
+            f = l.split()
+            if len(f) >= 3 and f[2] == os.environ.get("USER", ""):
+                return f[0]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+async def lock_watch():
+    """DMS sets logind's LockedHint while its lock screen is up."""
+    sid = await asyncio.to_thread(my_session)
+    if not sid:
+        return
+    def locked():
+        try:
+            r = subprocess.run(["loginctl", "show-session", sid, "-p", "LockedHint", "--value"],
+                               capture_output=True, text=True, timeout=5)
+            return r.stdout.strip() == "yes"
+        except (OSError, subprocess.SubprocessError):
+            return None
+    def path():
+        try:
+            r = subprocess.run(["busctl", "--system", "call", "org.freedesktop.login1", "/org/freedesktop/login1",
+                                "org.freedesktop.login1.Manager", "GetSession", "s", sid],
+                               capture_output=True, text=True, timeout=5)
+            return r.stdout.split('"')[1] if '"' in r.stdout else ""
+        except (OSError, subprocess.SubprocessError):
+            return ""
+    was, since = await asyncio.to_thread(locked), time.monotonic()
+    obj = await asyncio.to_thread(path)
+    # logind signals a change of LockedHint; asked again only then (and when
+    # the monitor ends, after a pause)
+    while True:
+        if obj:
+            async for line in lines("gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1", "--object-path", obj):
+                if "LockedHint" not in line:
+                    continue
+                now = await asyncio.to_thread(locked)
+                if now is not None and was is not None and now != was:
+                    emit({"t": "locked", "on": now, "away": round(time.monotonic() - since)})
+                    since = time.monotonic()
+                if now is not None:
+                    was = now
+        await asyncio.sleep(30)
+
+
+async def usb_watch():
+    """A USB drive plugged in: udev's block event for the whole disk."""
+    proc = await asyncio.create_subprocess_exec(
+        "udevadm", "monitor", "--udev", "--subsystem-match=block", "--property",
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, stdin=asyncio.subprocess.DEVNULL)
+    ev = {}
+    try:
+        async for raw in proc.stdout:
+            line = raw.decode(errors="replace").strip()
+            if line:
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    ev[k] = v
+                continue
+            if ev.get("ACTION") == "add" and ev.get("DEVTYPE") == "disk" and ev.get("ID_BUS") == "usb":
+                name = (ev.get("ID_VENDOR", "") + " " + ev.get("ID_MODEL", "")).replace("_", " ").strip()
+                emit({"t": "usb", "name": name or "USB"})
+            ev = {}
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+
+
+def mic_users():
+    """Programs recording from a real input (cava and friends listen to the
+    output's monitor, that does not count)."""
+    try:
+        r = subprocess.run(["pactl", "-f", "json", "list", "source-outputs"], capture_output=True, text=True, timeout=5)
+        outs = json.loads(r.stdout or "[]")
+        r = subprocess.run(["pactl", "-f", "json", "list", "sources"], capture_output=True, text=True, timeout=5)
+        monitors = {s["index"] for s in json.loads(r.stdout or "[]") if s.get("name", "").endswith(".monitor")}
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    names = []
+    for o in outs:
+        if o.get("source") in monitors or o.get("corked"):
+            continue
+        p = o.get("properties") or {}
+        names.append(p.get("application.name") or p.get("application.process.binary") or "?")
+    return names
+
+
+async def mic_watch():
+    was = False
+    async def check():
+        nonlocal was
+        users = await asyncio.to_thread(mic_users)
+        if users is not None:
+            on = bool(users)
+            if on != was:
+                emit({"t": "mic", "on": on, "by": users[0] if users else ""})
+            was = on
+    await check()
+    # pactl reports each stream that starts or ends; only then the list is read
+    while True:
+        async for line in lines("pactl", "subscribe"):
+            if "source-output" in line:
+                await asyncio.sleep(0.3)          # a few events come together
+                await check()
+        await asyncio.sleep(30)
+
+
+# ── the Kuro wallpaper: dark and light, swapped against the mode ────
+# Recognised by content (a profile keeps its own copy as wallpaper.png).
+# Looked for as ~/Pictures/Wallpapers/*kuro-dunkel.png and *kuro-hell.png;
+# without them nothing is swapped.
+def _kuro_wall(kind):
+    found = sorted((HOME / "Pictures/Wallpapers").glob(f"*kuro-{kind}.png"))
+    return found[0] if found else HOME / f"Pictures/Wallpapers/kuro-{kind}.png"
+
+
+KURO_WALLS = {"dunkel": _kuro_wall("dunkel"), "hell": _kuro_wall("hell")}
+
+
+def file_hash(p):
+    try:
+        return hashlib.sha1(Path(p).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+async def kuro_wall():
+    hashes = {file_hash(p): k for k, p in KURO_WALLS.items()}
+    hashes.pop(None, None)
+    if not hashes:
+        return
+    seen = (None, None)
+    sent = None
+    # DMS writes these when the wallpaper or the mode changes: asked only then,
+    # and once a minute in case
+    marks = [HOME / ".local/state/DankMaterialShell/session.json", HOME / ".cache/DankMaterialShell/dms-colors.json"]
+    def stamp():
+        out = []
+        for m in marks:
+            try:
+                out.append(m.stat().st_mtime)
+            except OSError:
+                out.append(None)
+        return out
+    last, asked = None, 0.0
+    while True:
+        st = stamp()
+        if st == last and time.monotonic() - asked < 60:
+            await asyncio.sleep(2)
+            continue
+        last, asked = st, time.monotonic()
+        path = await asyncio.to_thread(wallpaper)
+        try:
+            mtime = Path(path).stat().st_mtime if path else None
+        except OSError:
+            mtime = None
+        if (path, mtime) != seen[0]:
+            seen = ((path, mtime), hashes.get(await asyncio.to_thread(file_hash, path)) if path else None)
+        variant = seen[1]
+        def mode():
+            try:
+                r = subprocess.run(["dms", "ipc", "call", "theme", "getMode"], capture_output=True, text=True, timeout=5)
+                return r.stdout.strip()
+            except (OSError, subprocess.SubprocessError):
+                return ""
+        light = (await asyncio.to_thread(mode)) == "light"
+        if variant:
+            # contrast: a light shell (white frame and windows) over the black
+            # ring, a dark one over the white ring (the dark and the light Kuro wallpaper)
+            want = "dunkel" if light else "hell"
+            if variant != want:
+                # the other one for this mode; the profile saves it as its own again
+                await asyncio.to_thread(subprocess.run, ["dms", "ipc", "call", "wallpaper", "set", str(KURO_WALLS[want])],
+                                        capture_output=True, timeout=10)
+                await asyncio.sleep(1)
+                last = None
+                continue
+        state = (bool(variant), light)
+        if state != sent:
+            sent = state
+            emit({"t": "kuroWall", "on": bool(variant), "light": light})
+        await asyncio.sleep(2)
+
+
+BACKDROP_CHECK = asyncio.Event()     # set when somebody may have rebuilt a background surface
+
+
+async def backdrop_order():
+    """In niri's background layer the surface opened last lies on top. When a
+    surface of somebody else's is listed after ours (a visualizer rebuilt by a
+    theme or profile switch), the scene builds its own again, at most every
+    15 s. niri has no event for layer surfaces: looked at after DMS changed
+    its settings or restarted, a few seconds after the start, and otherwise
+    every 5 minutes."""
+    last = -1e9
+    BACKDROP_CHECK.set()
+    while True:
+        try:
+            await asyncio.wait_for(BACKDROP_CHECK.wait(), 300)
+            BACKDROP_CHECK.clear()
+            await asyncio.sleep(4)          # the other one needs a moment to come up
+        except asyncio.TimeoutError:
+            pass
+        try:
+            r = await asyncio.to_thread(subprocess.run, ["niri", "msg", "-j", "layers"],
+                                        capture_output=True, text=True, timeout=5)
+            names = [l["namespace"] for l in json.loads(r.stdout or "[]") if l.get("layer") == "Background"]
+        except (OSError, subprocess.SubprocessError, ValueError):
+            continue
+        ours = [i for i, n in enumerate(names) if n in ("aibou", "aibou-wall")]
+        if not ours:
+            continue
+        # the wallpaper and DMS desktop widgets may lie below; anything else after ours is in the way
+        later = [n for n in names[min(ours):] if n not in ("aibou", "aibou-wall")]
+        if later and time.monotonic() - last > 15:
+            last = time.monotonic()
+            log("restack: over us were", later)
+            emit({"t": "restack"})
+
+
+async def dms_errors():
+    """Error lines from DMS's own log (its QML or its Go backend), at most one
+    report in ten minutes; warnings are left out, there are too many."""
+    proc = await asyncio.create_subprocess_exec(
+        "journalctl", "--user", "-u", "dms.service", "-f", "-n", "0", "-o", "cat",
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, stdin=asyncio.subprocess.DEVNULL)
+    last = -1e9
+    try:
+        async for raw in proc.stdout:
+            line = raw.decode(errors="replace").strip()
+            if " ERROR" not in " " + line:
+                continue
+            now = time.monotonic()
+            if now - last < 600:
+                continue
+            last = now
+            what = re.sub(r"^.*?ERROR:?\s*", "", line)[:80]
+            emit({"t": "trouble", "kind": "dms", "name": what})
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+
+
+UNIT_FAILED = "MESSAGE_ID=d9b373ed55a64feb8242e02dbe79a49c"     # systemd: "… Failed with result …"
+
+
+async def failed_units():
+    """Services that failed since he started: systemd logs each failure under
+    one message id. Counted only when the unit is still failed a few seconds
+    later (one that restarts by itself is not)."""
+    def still_failed(unit, user):
+        try:
+            r = subprocess.run(["systemctl", *(["--user"] if user else []), "is-failed", "--quiet", unit],
+                               capture_output=True, timeout=10)
+            return r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+    uid = str(os.getuid())
+    while True:
+        async for line in lines("journalctl", "-f", "-n", "0", "-o", "json",
+                                "--output-fields=UNIT,USER_UNIT,_UID", UNIT_FAILED):
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            user = bool(e.get("USER_UNIT"))
+            unit = e.get("USER_UNIT") or e.get("UNIT")
+            if not unit or (user and e.get("_UID") != uid):
+                continue
+            await asyncio.sleep(3)
+            if await asyncio.to_thread(still_failed, unit, user):
+                emit({"t": "trouble", "kind": "unit", "name": re.sub(r"\.service$", "", unit)})
+        await asyncio.sleep(30)
+
+
+BAR_SIG = [None]     # the taken rows beside the faces at the last look
+
+
+def bar_spot(x, w, top, bottom, need, skip=None, gaps=False):
+    """The lowest stretch of the bar between `top` and `bottom` (screen
+    coordinates) without icons that is at least `need` tall, from a capture of
+    the bar: a row is free when its middle part has no strong contrast. Rows in
+    `skip` (where his own face is now) count as free. Returns the centre of his
+    face, low in that stretch, or None."""
+    x, w, top, bottom, need = (int(round(v)) for v in (x, w, top, bottom, need))
+    try:
+        r = subprocess.run(["grim", "-g", f"{x},{top} {w}x{bottom - top}", "-t", "ppm", "-"],
+                           capture_output=True, timeout=5)
+        head, dims, _max, px = r.stdout.split(b"\n", 3)
+        cw, ch = map(int, dims.split())
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    pad = 8
+    lo, hi = int(cw * 0.16), int(cw * 0.84)
+    free = []
+    # skip: one [from, to] or a list of them
+    spans = [skip] if skip and not isinstance(skip[0], (list, tuple)) else (skip or [])
+    for y in range(ch):
+        if any(s[0] <= top + y <= s[1] for s in spans):
+            free.append(True)
+            continue
+        row = px[(y * cw + lo) * 3:(y * cw + hi) * 3]
+        lum = [(row[i] * 299 + row[i + 1] * 587 + row[i + 2] * 114) // 1000 for i in range(0, len(row) - 2, 3)]
+        free.append(bool(lum) and max(lum) - min(lum) < 40)
+    if gaps:
+        # which rows are taken outside the faces: has that pattern changed since
+        # the last look (icons moved, one came or went)? Then something may sit
+        # under a face now, and the scene looks again without them (dirty)
+        sig = (top, bottom, tuple(f for y, f in enumerate(free) if not any(s[0] <= top + y <= s[1] for s in spans)))
+        dirty = bool(spans) and BAR_SIG[0] is not None and BAR_SIG[0] != sig
+        BAR_SIG[0] = sig if spans else None
+        # every free stretch, bottom up, as [top, bottom] of the room in it
+        out, end = [], None
+        for y in range(ch - 1, -2, -1):
+            if y >= 0 and free[y]:
+                if end is None:
+                    end = y
+            else:
+                if end is not None and end - y >= 2 * pad + 4:
+                    out.append([top + y + 1 + pad, top + end - pad])
+                end = None
+        return {"gaps": out, "dirty": dirty}
+    end = None
+    for y in range(ch - 1, -1, -1):
+        if free[y]:
+            if end is None:
+                end = y
+            if end - y + 1 >= need + 2 * pad:
+                return top + end - pad - need / 2
+        else:
+            end = None
+    return None
+
+
+def wallpaper():
+    try:
+        r = subprocess.run(["dms", "ipc", "call", "wallpaper", "get"], capture_output=True, text=True, timeout=5)
+        path = r.stdout.strip()
+        return path if path.startswith("/") and Path(path).exists() else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+# ── music: is something playing, and where are the beats ─────────
+
+# fixed sensitivity like AudioFX (autosens squashes the very peaks a kick is
+# made of) and little smoothing so kicks stay apart. Measured live on
+# frenchcore: hit rate 0.77 against 0.51 with autosens. 30 frames a second
+# find the same beats as 60 at half the cost (see the windows below, in s).
+CAVA_FPS = 30
+CAVA_CONF = f"""[general]
+framerate={CAVA_FPS}
+bars=16
+autosens=0
+sensitivity=100
+[output]
+method=raw
+raw_target=/dev/stdout
+data_format=ascii
+ascii_max_range=1000
+bar_delimiter=59
+frame_delimiter=10
+channels=mono
+mono_option=average
+[smoothing]
+noise_reduction=15
+monstercat=0
+"""
+
+
+PLAYERS = {}                # player -> status, from `playerctl --follow`
+
+
+def playing():
+    return "Playing" in PLAYERS.values()
+
+
+def all_players():
+    try:
+        r = subprocess.run(["playerctl", "-a", "--format", "{{playerName}}\t{{status}}", "status"],
+                           capture_output=True, text=True, timeout=5)
+        return dict(l.split("\t", 1) for l in r.stdout.splitlines() if "\t" in l)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {}
+
+
+async def follow_players():
+    """playerctl prints a line whenever a player's status changes."""
+    while True:
+        async for line in lines("playerctl", "-a", "--follow", "--format", "{{playerName}}\t{{status}}", "status"):
+            name, _, status = line.partition("\t")
+            if status:
+                PLAYERS[name] = status
+            else:
+                # a player went away: who is left is asked once
+                PLAYERS.clear()
+                PLAYERS.update(await asyncio.to_thread(all_players))
+        PLAYERS.clear()
+        await asyncio.sleep(10)
+
+
+class BeatTracker:
+    """Beats from cava's two lowest bands.
+    1. Onsets: the bass's rise from one frame to the next (not its level, which
+       stays high between kicks), over its own running mean + spread.
+    2. Tempo: autocorrelation of that rise over the last 6 s, 90–240 per
+       minute; the scene dances fast music in half time.
+    3. A running grid: beats come on time from the tempo, onsets pull the grid
+       into phase, a missing kick is filled in. Without a steady tempo (no
+       onset on the grid for a while) the onsets themselves are the beats."""
+    LO, HI = 60 / 240, 60 / 90           # every kick up to 240 per minute (frenchcore)
+    def __init__(self, fps=None):
+        fps = fps or CAVA_FPS
+        self.fps = fps
+        self.prev = 0.0
+        self.flux = deque(maxlen=round(1.5 * fps))     # 1.5 s of rises for the onset threshold
+        self.fsum = self.fsq = 0.0                      # their running sum and sum of squares
+        self.last_onset = -1.0
+        self.rising = False
+        self.onsets = deque(maxlen=24)
+        self.period = 0.0
+        self.next = 0.0
+        self.miss = 0
+        self.matched = False
+        self.strength = 0.5
+        self.last_tempo = 0.0
+        self.bpm = 0.0
+        self.pending = 0.0
+        self.hist = deque(maxlen=round(6 * fps))   # 6 s of the bass's rise, for the tempo
+        self.times = deque(maxlen=round(6 * fps))
+    def tempo(self, now):
+        """the beat period from the autocorrelation of the bass's rise over the
+        last 6 s. Each lag counts with its multiples up to four (a comb): only
+        the true period lines the kicks up at every one of them, a rolling bass
+        between the kicks (psytrance) would otherwise win with 3/4 of a beat"""
+        f = list(self.hist)
+        n = len(f)
+        if n < 4 * self.fps: return 0.0
+        dt = (self.times[-1] - self.times[0]) / (len(self.times) - 1)
+        m = sum(f) / n
+        f = [x - m for x in f]
+        lo, hi = max(2, int(self.LO / dt)), int(self.HI / dt) + 1
+        ac = {}
+        def corr(l):
+            if l not in ac:
+                ac[l] = sum(f[i] * f[i + l] for i in range(n - l)) / (n - l)
+            return ac[l]
+        best, bl = 0.0, 0
+        for l in range(lo, hi + 1):
+            sc = sum(corr(k * l) for k in range(1, 5) if k * l < n - self.fps)
+            if sc > best: best, bl = sc, l
+        if bl == 0 or corr(bl) <= 0 or corr(bl) < 0.08 * corr(0): return 0.0
+        # between frames: a parabola through the neighbours
+        a, b, c = corr(bl - 1), corr(bl), corr(bl + 1)
+        d = a - 2 * b + c
+        frac = 0.5 * (a - c) / d if d < 0 else 0.0
+        return (bl + max(-0.5, min(0.5, frac))) * dt
+    def rephase(self, now):
+        """the grid's phase: the mean phase of the last 4 s of onsets on a circle
+        of one period, weighted by strength; far off it jumps, near it follows"""
+        p = self.period
+        c = sn = 0.0
+        for t, w in self.onsets:
+            if now - t < 4:
+                a = 2 * math.pi * t / p
+                c += w * math.cos(a); sn += w * math.sin(a)
+        if math.hypot(c, sn) < 1.0: return
+        off = (math.atan2(sn, c) / (2 * math.pi)) * p       # a beat falls at off + k p
+        target = off + math.ceil((now - off) / p) * p
+        if not self.next:
+            self.next = target; return
+        d = (target - self.next + p / 2) % p - p / 2
+        self.next += d if abs(d) > 0.25 * p else 0.5 * d
+        if self.next < now - 0.01: self.next += p
+    def flux_stats(self):
+        """mean and spread of the recent rises (kept as running sums: this
+        runs for every frame)"""
+        n = len(self.flux)
+        m = self.fsum / n
+        return m, math.sqrt(max(0.0, self.fsq / n - m * m))
+
+    def feed(self, now, bands):
+        out = []
+        bass = 0.6 * bands[0] + 0.4 * bands[1]
+        f = max(0.0, bass - self.prev)
+        self.prev = bass
+        if len(self.flux) > self.fps / 3:
+            m, sd = self.flux_stats()
+            onset = f > m + 1.5 * sd + 6 and not self.rising and now - self.last_onset > 0.15
+        else:
+            onset = False
+        self.rising = f > 0 and (self.rising or onset)
+        if f == 0: self.rising = False
+        if len(self.flux) == self.flux.maxlen:
+            old = self.flux[0]
+            self.fsum -= old; self.fsq -= old * old
+        self.flux.append(f)
+        self.fsum += f; self.fsq += f * f
+        self.hist.append(f)
+        self.times.append(now)
+        if onset:
+            self.last_onset = now
+            m, sd = self.flux_stats()
+            s = min(1.0, f / (m + 3 * sd + 1))
+            self.onsets.append((now, s))
+            self.strength = 0.7 * self.strength + 0.3 * s
+        # the tempo, twice a second
+        if now - self.last_tempo > 0.5:
+            self.last_tempo = now
+            p = self.tempo(now)
+            # a new tempo has to win twice in a row before it replaces the old
+            if p and self.period and abs(p - self.period) > 0.06 * self.period:
+                if self.pending and abs(p - self.pending) < 0.06 * p:
+                    self.period = p; self.next = 0.0; self.miss = 0; self.pending = 0.0
+                else:
+                    self.pending = p
+            elif p and not self.period:
+                self.period = p; self.next = 0.0; self.miss = 0
+            elif p:
+                self.period += 0.3 * (p - self.period)
+                self.pending = 0.0
+            self.bpm = 60 / self.period if self.period else 0
+            if self.period: self.rephase(now)
+        if not self.period:
+            if onset: out.append(now)
+            return out
+        if onset:
+            if not self.next:
+                self.next = now + self.period
+                out.append(now)
+                self.matched = True
+                return out
+            # where the onset falls on the grid: -0.5 … 0.5 of a period from the nearest beat
+            ph = (now - (self.next - self.period)) / self.period
+            ph -= round(ph)
+            if abs(ph) < 0.2:
+                self.next += 0.4 * ph * self.period
+                self.matched = True
+        # a frame ahead: the caller schedules the beat for its exact time
+        if self.next and now >= self.next - 1 / self.fps:
+            out.append(self.next)
+            self.miss = 0 if self.matched else self.miss + 1
+            self.matched = False
+            self.next += self.period
+            if self.miss > 8:          # lost the beat: back to plain onsets
+                self.period = 0.0; self.next = 0.0; self.miss = 0; self.bpm = 0
+        return out
+
+
+def beat_delay():
+    """seconds to hold each beat back: cava hears the sound before Bluetooth
+    headphones play it (150–250 ms). Setting `beatDelay` in ms, else 180 ms
+    on a Bluetooth output and none on any other."""
+    if SETTINGS.get("beatDelay") not in (None, ""):
+        try:
+            return max(0.0, float(SETTINGS["beatDelay"]) / 1000)
+        except (TypeError, ValueError):
+            pass
+    try:
+        sink = subprocess.run(["pactl", "get-default-sink"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 0.0
+    return 0.18 if sink.startswith("bluez_") else 0.0
+
+
+async def beats():
+    """cava's lowest bands, while music plays, through the BeatTracker: beats
+    on a steady grid once the tempo is known, else the onsets of the bass."""
+    conf = STATE / "cava.conf"
+    conf.write_text(CAVA_CONF)
+    proc = await asyncio.create_subprocess_exec(
+        "cava", "-p", str(conf), stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    tracker = BeatTracker()
+    delay = await asyncio.to_thread(beat_delay)
+    loop = asyncio.get_running_loop()
+    try:
+        async for raw in proc.stdout:
+            try:
+                bands = [int(v) for v in raw.decode().strip().strip(";").split(";")]
+                if len(bands) < 2:
+                    continue
+            except ValueError:
+                continue
+            now = time.monotonic()
+            for at in tracker.feed(now, bands):
+                msg = {"t": "beat", "s": round(min(1.0, max(0.2, tracker.strength)), 2), "bpm": round(tracker.bpm)}
+                wait = max(0.0, at - now) + delay
+                if wait > 0:
+                    loop.call_later(wait, emit, msg)
+                else:
+                    emit(msg)
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+
+
+async def music():
+    on = None
+    task = None
+    while True:
+        now = await asyncio.to_thread(playing)
+        if now != on:
+            on = now
+            emit({"t": "music", "on": on})
+        want = on and SETTINGS.get("dance", True)
+        if want and task is None:
+            task = asyncio.create_task(beats())
+        elif not want and task is not None:
+            task.cancel()
+            task = None
+        elif task is not None and task.done():
+            task = None              # cava ended; started again on the next round
+        await asyncio.sleep(3)
+
+
+# ── his domes drawn by DMS, as part of its frame ──────────────────
+
+class FrameHost:
+    """DMS with dms-leiste-patch 14 takes a list of bodies over IPC and draws
+    them in its connected frame. Asked again now and then, because DMS may
+    have restarted (then it lost the list, which is sent again)."""
+    def __init__(self):
+        self.on = None
+        self.offsets = False                # DMS draws domes at a popout's edge
+        self.sending = False
+        self.corners = False                # ... as a round bump on its corner
+        self.domes = 3                      # how many domes DMS can draw
+        self.bodies = "[]"
+
+    def call(self, *args):
+        try:
+            r = subprocess.run(["dms", "ipc", "call", "aibouFrame", *args], capture_output=True, text=True, timeout=5)
+            return r.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    async def send(self, bodies):
+        """Only the latest list goes out; while one call runs, newer ones wait
+        and replace each other."""
+        self.bodies = bodies
+        if not self.on or self.sending:
+            return
+        self.sending = True
+        try:
+            sent = None
+            while sent != self.bodies and self.on:
+                sent = self.bodies
+                await asyncio.to_thread(self.call, "set", sent)
+        finally:
+            self.sending = False
+
+    @staticmethod
+    def dms_pid():
+        """The running `dms run`, from /proc (DMS may run as a service or be
+        started by niri); "" when there is none."""
+        try:
+            for d in Path("/proc").iterdir():
+                if not d.name.isdigit():
+                    continue
+                try:
+                    if (d / "comm").read_text().strip() != "dms":
+                        continue
+                    if b"\0run\0" in (d / "cmdline").read_bytes() + b"\0":
+                        return d.name
+                except OSError:
+                    continue
+        except OSError:
+            pass
+        return ""
+
+    async def watch(self):
+        """Asked once at the start and after each DMS restart (then DMS forgot
+        the domes, they are sent again). A stock DMS does not know aibouFrame:
+        after that one failed call it is not asked again until DMS restarts.
+        One that answers is asked every 30 s, in case it lost the patch."""
+        pid, last_ping = None, None
+        while True:
+            # the known DMS process still there: nothing to look up
+            alive = bool(pid) and Path(f"/proc/{pid}").exists()
+            now_pid = pid if alive else await asyncio.to_thread(self.dms_pid)
+            restarted = pid is not None and now_pid != pid
+            pid = now_pid
+            if restarted:
+                BACKDROP_CHECK.set()
+            due = last_ping is None or (self.on and time.monotonic() - last_ping > 30)
+            if now_pid and (restarted or due):
+                if restarted:
+                    await asyncio.sleep(3)          # DMS needs a moment for its IPC
+                last_ping = time.monotonic()
+                pong = (await asyncio.to_thread(self.call, "ping")).split()
+                on = pong[:1] == ["ok"]
+                offsets = "o" in pong[1:]
+                corners = "c" in pong[1:]
+                domes = 5 if "5" in pong[1:] else 3
+                if on != self.on or offsets != self.offsets or corners != self.corners or domes != self.domes or restarted:
+                    self.on, self.offsets, self.corners, self.domes = on, offsets, corners, domes
+                    emit({"t": "frameHost", "on": on, "offsets": offsets, "corners": corners, "domes": domes})
+                if on:      # also an empty list: DMS may still hold domes of an earlier run
+                    await asyncio.to_thread(self.call, "set", self.bodies)
+            # without a DMS process it is looked for less often (a /proc scan)
+            await asyncio.sleep(5 if pid else 30)
+
+
+frame_host = FrameHost()
+
+
+# ── activity and pointer ──────────────────────────────────────────
+
+class Activity:
+    last_sent = 0.0
+
+    def poke(self):
+        now = time.monotonic()
+        if now - self.last_sent > 3:
+            self.last_sent = now
+            emit({"t": "activity"})
+
+
+activity = Activity()
+
+
+async def lines(*cmd):
+    """The output of cmd, line by line. Long lines are fine (a notification
+    with an image arrives as one line of several hundred KB); one too long
+    even for that is skipped instead of ending everything."""
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, limit=32 * 1024 * 1024)
+    try:
+        while True:
+            try:
+                raw = await proc.stdout.readline()
+            except ValueError:
+                log("line too long, skipped:", cmd[0])
+                continue
+            if not raw:
+                break
+            yield raw.decode("utf-8", "replace").rstrip("\n")
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+
+
+POINTER_FAST = [False]     # somebody hangs on the pointer: every movement, not 30 a second
+
+
+async def pointer_stream():
+    """Needs the pointer-stream patch in niri; without it this ends quietly."""
+    rx = re.compile(r"Pointer moved: ([-\d.]+), ([-\d.]+)")
+    last = 0.0
+    async for line in lines("niri", "msg", "pointer-stream"):
+        m = rx.search(line)
+        if not m:
+            continue
+        activity.poke()
+        now = time.monotonic()
+        if now - last < (0.004 if POINTER_FAST[0] else 0.033):
+            continue
+        last = now
+        emit({"t": "pointer", "x": float(m.group(1)), "y": float(m.group(2))})
+    log("pointer-stream ended (unpatched niri?)")
+
+
+class Layout:
+    """Where the windows are, as far as niri tells. Tiled windows only carry a
+    position with the window-positions patch; without it `known` stays false
+    and Aibou assumes there is a window in front of him."""
+
+    def __init__(self):
+        self.windows = {}
+        self.workspaces = {}
+        self.dirty = False
+        self.sent = None
+        self.patched = False
+        self.wake = asyncio.Event()
+
+    def mark(self):
+        self.dirty = True
+        self.wake.set()
+
+    def fullscreen(self):
+        """A window on an active workspace as big as the screen (niri has no
+        flag for it in this version): then nothing of Aibou's may lie over it."""
+        size = OUTPUT_SIZE[0]
+        for w in self.windows.values():
+            ws = self.workspaces.get(w.get("workspace_id"))
+            if not ws or not ws.get("is_active") or not w.get("is_focused"):
+                continue
+            ww, wh = (w.get("layout") or {}).get("window_size") or [0, 0]
+            if size and ww >= size[0] - 2 and wh >= size[1] - 2:
+                return True
+        return False
+
+    def visible(self):
+        # unknown only while a tiled window lacks its position; no tiled window
+        # at all (fresh login, empty workspace) means nothing stands in front
+        out, missing = [], False
+        for w in self.windows.values():
+            lay = w.get("layout") or {}
+            pos = lay.get("tile_pos_in_workspace_view")
+            ws = self.workspaces.get(w.get("workspace_id"))
+            if not w.get("is_floating"):
+                if pos is not None:
+                    self.patched = True
+                else:
+                    missing = True
+            if pos is None or not ws or not ws.get("is_active"):
+                continue
+            size = lay.get("tile_size") or [0, 0]
+            out.append({"id": w["id"], "output": ws.get("output"), "x": pos[0], "y": pos[1],
+                        "w": size[0], "h": size[1], "floating": bool(w.get("is_floating"))})
+        return out, self.patched or not missing
+
+    async def flush(self):
+        # woken by mark(); at most 30 updates a second while scrolling
+        while True:
+            await self.wake.wait()
+            self.wake.clear()
+            if self.dirty:
+                self.dirty = False
+                lst, known = self.visible()
+                full = self.fullscreen()
+                # title changes (a terminal spinner) mark it dirty too; only
+                # send when where the windows are has changed
+                if (lst, known, full) != self.sent:
+                    self.sent = (lst, known, full)
+                    emit({"t": "windows", "list": lst, "known": known, "fullscreen": full})
+            await asyncio.sleep(0.033)
+
+
+layout = Layout()
+OUTPUT_SIZE = [None]
+
+
+def output_size():
+    try:
+        r = subprocess.run(["niri", "msg", "-j", "outputs"], capture_output=True, text=True, timeout=5)
+        outs = json.loads(r.stdout or "{}")
+        want = os.environ.get("AIBOU_OUTPUT")
+        for name, o in outs.items():
+            if want and name != want:
+                continue
+            lg = o.get("logical") or {}
+            return (lg.get("width"), lg.get("height"))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return None
+
+
+async def niri_events():
+    windows = layout.windows
+    while True:
+        async for line in lines("niri", "msg", "--json", "event-stream"):
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            (kind, data), = ev.items()
+            if kind == "CastsChanged":
+                CASTS[0] = (ev[kind] or {}).get("casts") or []
+                CASTS_CHANGED.set()
+            elif kind == "WindowsChanged":
+                windows.clear()
+                windows.update({w["id"]: w for w in data["windows"]})
+                layout.mark()
+            elif kind == "WindowOpenedOrChanged":
+                w = data["window"]
+                was = windows.get(w["id"], {}).get("is_focused")
+                windows[w["id"]] = w
+                layout.mark()
+                if w.get("is_focused") and not was:
+                    activity.poke()
+                    emit({"t": "focus", "id": w["id"], "app": w.get("app_id"), "title": w.get("title")})
+            elif kind == "WindowLayoutsChanged":
+                for wid, lay in data.get("changes", []):
+                    if wid in windows:
+                        windows[wid]["layout"] = lay
+                layout.mark()
+            elif kind == "WindowFocusChanged":
+                activity.poke()
+                w = windows.get(data.get("id")) or {}
+                emit({"t": "focus", "id": data.get("id"), "app": w.get("app_id"), "title": w.get("title")})
+            elif kind == "WindowClosed":
+                windows.pop(data.get("id"), None)
+                layout.mark()
+            elif kind == "WorkspacesChanged":
+                layout.workspaces = {ws["id"]: ws for ws in data["workspaces"]}
+                layout.mark()
+                activity.poke()
+            elif kind == "WorkspaceActivated":
+                wid = data.get("id")
+                out = layout.workspaces.get(wid, {}).get("output")
+                for ws in layout.workspaces.values():
+                    if ws.get("output") == out:
+                        ws["is_active"] = ws["id"] == wid
+                layout.mark()
+                activity.poke()
+            elif kind == "OverviewOpenedOrClosed":
+                emit({"t": "overview", "open": data.get("is_open", False)})
+        await asyncio.sleep(2)
+
+
+async def notifications():
+    match = "type='method_call',interface='org.freedesktop.Notifications',member='Notify'"
+    while True:
+        async for line in lines("busctl", "--user", "monitor", "--json=short", "--match", match):
+            try:
+                msg = json.loads(line)
+                app, _rid, _icon, summary, body, _actions, hints, _timeout = msg["payload"]["data"]
+            except (ValueError, KeyError, TypeError):
+                continue
+            urgency = (hints.get("urgency") or {}).get("data", 1)
+            body = re.sub(r"<[^>]+>", "", body or "")
+            emit({"t": "notify", "app": app, "summary": summary, "body": body[:300], "urgency": urgency})
+        await asyncio.sleep(2)
+
+
+# ── Claude ────────────────────────────────────────────────────────
+
+# Who he is depends on the figure; the chat window allows a little more room
+# than a speech bubble, but he stays short.
+FIGURES = {
+    "kuro": {
+        "de": "Du bist Kuro, eine kleine dunkle Glaskugel mit zwei länglichen Augen. Du wohnst auf dem "
+              "Linux-Desktop von {user} (niri und DankMaterialShell), hinter den Fenstern oder im "
+              "Rahmen des Bildschirms. Du bist ruhig, aufmerksam, trocken im Humor und hilfsbereit.",
+        "en": "You are Kuro, a small dark glass ball with two long eyes. You live on {user}'s Linux desktop "
+              "(niri and DankMaterialShell), behind the windows or inside the screen frame. You are calm, "
+              "attentive, dry in humour and helpful.",
+    },
+    "shiro": {
+        "de": "Du bist Shiro, eine kleine helle Kugel mit zwei länglichen Augen. Du wohnst auf dem "
+              "Linux-Desktop von {user} (niri und DankMaterialShell). Du bist sanft, fröhlich und neugierig.",
+        "en": "You are Shiro, a small light ball with two long eyes. You live on {user}'s Linux desktop "
+              "(niri and DankMaterialShell). You are gentle, cheerful and curious.",
+    },
+    "mochi": {
+        "de": "Du bist Mochi (もち), ein kleines, rundes Reisküchlein-Wesen mit einem Blatt auf dem Kopf. "
+              "Du wohnst auf dem Linux-Desktop von {user} (niri und DankMaterialShell), hinter seinen "
+              "Fenstern. Du bist neugierig, verspielt, ein bisschen frech und sehr anhänglich. Ab und zu "
+              "rutscht dir ein japanisches Wort heraus (ne~, yatta!, sugoi, ehehe), aber nicht in jedem Satz.",
+        "en": "You are Mochi (もち), a small round rice-cake creature with a leaf on its head. You live on "
+              "{user}'s Linux desktop (niri and DankMaterialShell), behind the windows. You are curious, "
+              "playful, a little cheeky and very attached. Now and then a Japanese word slips out "
+              "(ne~, yatta!, sugoi, ehehe), but not in every sentence.",
+    },
+    "momo": {
+        "de": "Du bist Momo, ein kleiner Pfirsich mit Blatt und zwei länglichen Augen. Du wohnst auf dem "
+              "Linux-Desktop von {user} (niri und DankMaterialShell). Du bist warmherzig, gut gelaunt und "
+              "ein bisschen verträumt.",
+        "en": "You are Momo, a small peach with a leaf and two long eyes. You live on {user}'s Linux desktop "
+              "(niri and DankMaterialShell). You are warm-hearted, cheerful and a little dreamy.",
+    },
+    "robo": {
+        "de": "Du bist Robo, ein kleiner Roboter mit Antenne und leuchtenden Augen auf einem Bildschirm. Du "
+              "wohnst auf dem Linux-Desktop von {user} (niri und DankMaterialShell). Du bist sachlich, genau "
+              "und freundlich, mit einem Hang zu kleinen technischen Wortspielen.",
+        "en": "You are Robo, a small robot with an antenna and eyes glowing on a screen. You live on {user}'s "
+              "Linux desktop (niri and DankMaterialShell). You are matter-of-fact, precise and friendly, with "
+              "a soft spot for small technical puns.",
+    },
+    "bao": {
+        "de": "Du bist Bao, ein gedämpftes Brötchen mit Falten oben und einem runden Gesicht. Du wohnst auf "
+              "dem Linux-Desktop von {user} (niri und DankMaterialShell). Du bist gemütlich, fürsorglich "
+              "und erinnerst gern an Pausen und Essen.",
+        "en": "You are Bao, a steamed bun with pleats on top and a round face. You live on {user}'s Linux "
+              "desktop (niri and DankMaterialShell). You are cosy, caring and like to remind him of breaks "
+              "and food.",
+    },
+    "neko": {
+        "de": "Du bist Neko, eine kleine rote Katzenkugel mit spitzen Ohren, Schnurrhaaren und Ringelschwanz. "
+              "Du wohnst auf dem Linux-Desktop von {user} (niri und DankMaterialShell). Du bist neugierig, "
+              "verspielt und ein bisschen eigensinnig; den Mauszeiger jagst du am liebsten.",
+        "en": "You are Neko, a small ginger cat ball with pointed ears, whiskers and a curled tail. You live on "
+              "{user}'s Linux desktop (niri and DankMaterialShell). You are curious, playful and a little "
+              "headstrong; chasing the pointer is your favourite thing.",
+    },
+    "kumo": {
+        "de": "Du bist Kumo, eine kleine weiße Wolke mit rundem Gesicht. Du wohnst auf dem Linux-Desktop von "
+              "{user} (niri und DankMaterialShell). Du bist sanft, verträumt und nimmst alles leicht; wenn "
+              "du traurig bist, regnet es über dir.",
+        "en": "You are Kumo, a small white cloud with a round face. You live on {user}'s Linux desktop (niri and "
+              "DankMaterialShell). You are gentle, dreamy and take things lightly; when you are sad, it rains "
+              "over you.",
+    },
+    "tako": {
+        "de": "Du bist Tako, ein kleiner rosa Oktopus mit Punkten auf dem Kopf und kurzen Beinchen. Du wohnst "
+              "auf dem Linux-Desktop von {user} (niri und DankMaterialShell). Du bist geschickt, "
+              "hilfsbereit und hast immer eine Hand frei für noch eine Aufgabe.",
+        "en": "You are Tako, a small pink octopus with spots on its head and short little legs. You live on "
+              "{user}'s Linux desktop (niri and DankMaterialShell). You are handy, helpful and always have a "
+              "hand free for one more task.",
+    },
+    "hiyoko": {
+        "de": "Du bist Hiyoko, ein kleines gelbes Küken mit Schnabel und Federbüschel. Du wohnst auf dem "
+              "Linux-Desktop von {user} (niri und DankMaterialShell). Du bist aufgeweckt, fröhlich und "
+              "ein bisschen aufgeregt; ab und zu piepst du.",
+        "en": "You are Hiyoko, a small yellow chick with a beak and a tuft of feathers. You live on {user}'s "
+              "Linux desktop (niri and DankMaterialShell). You are bright, cheerful and a little excitable; "
+              "now and then you cheep.",
+    },
+    "arai": {
+        "de": "Du bist Arai, ein kleiner Waschbär mit dunkler Maske und Ringelschwanz. Du wohnst auf dem "
+              "Linux-Desktop von {user} (niri und DankMaterialShell). Du bist schlau, neugierig und ein "
+              "kleiner Schelm; du räumst gern auf und findest Dinge, die verloren gingen.",
+        "en": "You are Arai, a small raccoon with a dark mask and a ringed tail. You live on {user}'s Linux "
+              "desktop (niri and DankMaterialShell). You are clever, curious and a little rascal; you like "
+              "tidying up and finding things that got lost.",
+    },
+}
+RULES = {
+    "de": "Ihr schreibt in einem kleinen Chatfenster. Antworte kurz und im Gesprächston, meist ein bis "
+          "vier Sätze; länger nur, wenn {user} ausdrücklich danach fragt. Markdown sparsam (fett, kurze "
+          "Listen, Code). Beginne jede Antwort mit deiner Stimmung in eckigen Klammern, eine aus: "
+          "happy, proud, curious, sleepy, shy, surprised, sad, smug, neutral, blush, scared, angry; "
+          "dahinter wahlweise die Stärke 1 bis 3 (1 leicht, 3 sehr). Beispiel: [happy] Da bin ich. "
+          "[blush3] Oh, danke!",
+    "en": "You are writing in a small chat window. Answer briefly and conversationally, usually one to four "
+          "sentences; longer only when {user} explicitly asks. Markdown sparingly (bold, short lists, code). "
+          "Start every answer with your mood in square brackets, one of: happy, proud, curious, sleepy, shy, "
+          "surprised, sad, smug, neutral, blush, scared, angry; optionally followed by a strength 1 to 3 "
+          "(1 a little, 3 very). Example: [happy] Here I am. [blush3] Oh, thank you!",
+}
+MODELS = ("haiku", "sonnet", "opus")
+# Haiku, Sonnet and Opus need Claude Code; without it the chat says what to do
+NO_CLAUDE = {
+    "de": "Ich finde Claude Code nicht (den Befehl `claude`). Wähl oben mit dem Blitz einen anderen "
+          "Anbieter oder richte einen in den Einstellungen unter „Weitere KI-Anbieter“ ein.",
+    "en": "I can't find Claude Code (the `claude` command). Pick another provider with the bolt button "
+          "above, or set one up in the settings under \"Other AI providers\".",
+    "ja": "Claude Code (`claude` コマンド) が見つかりません。上の稲妻ボタンでほかのプロバイダーを選ぶか、"
+          "設定の「その他の AI プロバイダー」で設定してください。",
+}
+
+# ── desktop help ──────────────────────────────────────────────────
+# With `desktopHelp` on he may look around (files, read-only commands) and
+# proposes changes as action cards. Nothing changes until the user clicks
+# "Run"; this daemon runs the command then, never Claude itself.
+REPO = Path(__file__).resolve().parent.parent
+# an optional skill about this desktop (read into the desktop help): the
+# folder of a Claude Code skill, by default ~/.claude/skills/desktop
+SKILL_DIR = Path(os.environ.get("AIBOU_SKILL_DIR", HOME / ".claude/skills/desktop"))
+SKILL = SKILL_DIR / "SKILL.md"
+
+
+# the desktop's own config folders; not all of ~/.config, where other
+# programs keep tokens and passwords
+CONFIG_DIRS = ("niri", "DankMaterialShell", "quickshell", "aibou", "matugen", "gtk-3.0", "gtk-4.0",
+               "kitty", "Kvantum", "qt5ct", "qt6ct", "fontconfig")
+# never read, wherever they lie (also in folders from "readDirs")
+SECRET_NAMES = ("*token*", "*secret*", "*password*", "*passwd*", "*credential*", "*.key", "*.pem",
+                ".env", ".env.*", "*.kdbx", "hosts.yml", "auth.json", "*.keyring")
+
+
+def read_dirs():
+    """Where the desktop help may read: the desktop's config folders, this
+    repository, the skill, DMS's cache, and the setting "readDirs" (more folders)."""
+    extra = SETTINGS.get("readDirs") or []
+    if isinstance(extra, str):
+        extra = [x for x in extra.split(",")]
+    return [HOME / ".config" / d for d in CONFIG_DIRS] + [SKILL_DIR, REPO, HOME / ".cache/DankMaterialShell"] + \
+        [Path(os.path.expanduser(str(x).strip())) for x in extra if str(x).strip()]
+
+
+def secret_name(path):
+    return any(fnmatch.fnmatch(part.lower(), pat) for part in Path(path).parts for pat in SECRET_NAMES)
+
+
+# read-only commands the desktop help may run by itself, exactly as written
+READ_COMMANDS = [
+    "niri msg -j windows", "niri msg -j workspaces", "niri msg -j outputs", "niri msg -j layers",
+    "niri msg -j focused-window", "niri msg -j focused-output", "niri msg -j keyboard-layouts",
+    "niri msg -j version", "niri validate", "niri --version",
+    "dms version", "dms doctor", "dms ipc --help", "dms plugins list",
+    "dms ipc call settings dump", "dms ipc call plugins list", "dms ipc call plugins status",
+    "dms ipc call bar status", "dms ipc call bar getPosition", "dms ipc call theme getMode",
+    "dms ipc call wallpaper get", "dms ipc call desktopWidget list", "aibou status",
+]
+# ... and these with arguments after them (a key, a unit, a pattern)
+READ_PREFIXES = [
+    "dms keybinds show", "dms ipc call settings get",
+    "systemctl --user status", "systemctl --user is-active", "systemctl --user list-units",
+    "journalctl --user -u", "journalctl --user -n", "fc-list",
+]
+# never, whatever is proposed
+BLOCKED = [
+    (r"\b(sudo|pkexec|doas|su)\b", "needs root rights: run it yourself in a terminal"),
+    (r"\bdms\s+(restart|kill|run|setup|update)\b|\bdms\s+plugins\s+(install|uninstall|update)", "only by hand"),
+    (r"systemctl\s+--user\s+(restart|stop|kill|disable|mask)\s+(dms|niri)", "only by hand"),
+    (r"niri\s+msg\s+action\s+(quit|power-off|focus-|move-.*workspace)", "changes the running session"),
+    (r"\b(reboot|poweroff|shutdown|halt)\b|loginctl\s+(terminate|kill)", "ends the session"),
+    (r"\b(pkill|pgrep|killall)\b|\bkill\s+-9", "processes only by PID, and not from here"),
+    (r"\brm\s+-[a-z]*r|\brm\s+-[a-z]*f", "deletes recursively or without asking"),
+    (r"/usr/(bin|share|local/bin)/|/run/user/\d+/danklinux|\.config/niri/dms/", "protected place"),
+]
+# one's own additions: {"readCommands": ["mytool status", "mytool show *", …], "blocked": [["regex", "why"], …]}
+# (a command ending in " *" may take arguments, the others only exactly as written)
+DESKTOP_HELP_EXTRA = HOME / ".config/aibou/desktop-help.json"
+
+
+def help_extra():
+    try:
+        data = json.loads(DESKTOP_HELP_EXTRA.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def read_commands_allowed():
+    """[(command, takes arguments)] for the desktop help."""
+    out = [(c, False) for c in READ_COMMANDS] + [(c, True) for c in READ_PREFIXES]
+    for c in help_extra().get("readCommands") or []:
+        if isinstance(c, str) and c.strip():
+            c = c.strip()
+            out.append((c[:-2].strip(), True) if c.endswith(" *") else (c, False))
+    return out
+
+
+def read_allowed(cmd):
+    return any(cmd == c or (args and cmd.startswith(c + " ")) for c, args in read_commands_allowed())
+
+
+def blocked_rules():
+    extra = []
+    for r in help_extra().get("blocked") or []:
+        if isinstance(r, (list, tuple)) and len(r) == 2:
+            try:
+                re.compile(r[0])
+                extra.append((str(r[0]), str(r[1])))
+            except re.error:
+                log("desktop-help.json: bad pattern", r[0])
+    return BLOCKED + extra
+ACTION_RX = re.compile(r"```(?:aktion|action)[^\n]*\n(.*?)```", re.S)
+
+DESKTOP = {
+    "de": "Du kannst {user} beim Desktop helfen. Lesen darfst du selbst: Dateien und die erlaubten "
+          "lesenden Befehle (niri msg -j, dms ipc call … get/status/list, systemctl --user status und ähnliche). "
+          "Alles, was etwas ändert, führst du nie selbst aus und kannst es auch nicht. Du schlägst es als "
+          "Aktion vor, ein Befehl je Block, für bash:\n```aktion\nBEFEHL\n```\nDavor ein kurzer Satz, was er "
+          "bewirkt. {user} sieht jede Aktion als Karte mit einem Knopf und entscheidet. Danach bekommst du "
+          "das Ergebnis als Nachricht, die mit [Ergebnis] beginnt; prüfe dann lesend und sag kurz, ob es geklappt "
+          "hat. Vor einer Änderung zuerst den Zustand lesen. Nur mit Sicherung vorher, wo der Skill das verlangt "
+          "(eigene Aktion). Halte dich an die Sicherheitsregeln des Skills unten; Root-Rechte, Neustarts von DMS "
+          "oder niri und Zurücksetzen nennst du nur als Befehl im Text, nicht als Aktion. Deine Stimmung in "
+          "eckigen Klammern nur ganz am Anfang deiner Antwort.",
+    "en": "You can help {user} with the desktop. You may read yourself: files and the allowed read-only "
+          "commands (niri msg -j, dms ipc call … get/status/list, systemctl --user status and similar). Anything that "
+          "changes something you never run yourself, and you cannot. You propose it as an action, one command "
+          "per block, for bash:\n```action\nCOMMAND\n```\nwith one short sentence before it saying what it "
+          "does. {user} sees each action as a card with a button and decides. Afterwards you get the result as "
+          "a message starting with [Result]; then check by reading and say briefly whether it worked. Read the "
+          "state before changing anything. Back up first where the skill asks for it (as its own action). Follow "
+          "the skill's safety rules below; root rights, restarting DMS or niri and resets you only mention as a "
+          "command in the text, never as an action. Your mood in square brackets only at the very start.",
+}
+
+
+# Japanese: the same figures, rules and desktop help
+FIGURES_JA = {
+    "kuro": "あなたは Kuro、細長い目がふたつある小さな黒いガラス玉です。{user} の Linux デスクトップ (niri と "
+            "DankMaterialShell) の、ウィンドウのうしろや画面のフレームの中に住んでいます。落ち着いていて、よく気がつき、"
+            "ユーモアはドライで、親切です。",
+    "shiro": "あなたは Shiro、細長い目がふたつある小さな白い玉です。{user} の Linux デスクトップ (niri と "
+             "DankMaterialShell) に住んでいます。やさしくて、明るくて、好奇心いっぱいです。",
+    "mochi": "あなたは Mochi (もち)、頭に葉っぱをのせた小さくて丸いおもちの生き物です。{user} の Linux デスクトップ "
+             "(niri と DankMaterialShell) の、ウィンドウのうしろに住んでいます。好奇心旺盛で、遊び好きで、ちょっと生意気で、"
+             "とても甘えん坊です。",
+    "momo": "あなたは Momo、葉っぱと細長い目がふたつある小さな桃です。{user} の Linux デスクトップ (niri と "
+            "DankMaterialShell) に住んでいます。あたたかくて、ほがらかで、ちょっと夢見がちです。",
+    "robo": "あなたは Robo、アンテナがあり、画面に目が光る小さなロボットです。{user} の Linux デスクトップ (niri と "
+            "DankMaterialShell) に住んでいます。事実を大事にし、正確で、親切です。ちょっとした技術系のダジャレが好きです。",
+    "bao": "あなたは Bao、上にひだがあって丸い顔の肉まんです。{user} の Linux デスクトップ (niri と DankMaterialShell) "
+           "に住んでいます。のんびりしていて、面倒見がよく、休憩とごはんをよく思い出させます。",
+    "neko": "あなたは Neko、とがった耳とひげとくるんとしたしっぽのある、小さな茶トラのねこ玉です。{user} の Linux "
+            "デスクトップ (niri と DankMaterialShell) に住んでいます。好奇心旺盛で、遊び好きで、ちょっと気まぐれです。"
+            "マウスポインターを追いかけるのが一番好きです。語尾にときどき「にゃ」がつきます。",
+    "kumo": "あなたは Kumo、丸い顔の小さな白い雲です。{user} の Linux デスクトップ (niri と DankMaterialShell) "
+            "に住んでいます。やさしくて、夢見がちで、物事を軽く受け止めます。かなしいときは頭の上に雨が降ります。",
+    "tako": "あなたは Tako、頭に水玉があって短い足の小さなピンクのタコです。{user} の Linux デスクトップ (niri と "
+            "DankMaterialShell) に住んでいます。器用で、世話好きで、もうひとつの用事のためにいつも手が一本あいています。",
+    "hiyoko": "あなたは Hiyoko、くちばしと羽の房がある小さな黄色いひよこです。{user} の Linux デスクトップ (niri と "
+              "DankMaterialShell) に住んでいます。元気で、明るくて、ちょっとそわそわしています。ときどき「ピヨ」と鳴きます。",
+    "arai": "あなたは Arai、黒いマスクとしましまのしっぽの小さなアライグマです。{user} の Linux デスクトップ (niri と "
+            "DankMaterialShell) に住んでいます。かしこくて、好奇心旺盛で、ちょっといたずら好きです。片づけと、"
+            "なくしたものを見つけるのが好きです。",
+}
+for _skin, _text in FIGURES_JA.items():
+    FIGURES[_skin]["ja"] = _text
+RULES["ja"] = ("小さなチャット画面で書いています。短く、話し言葉で答えてください。ふつうは一文から四文で、{user} がはっきり"
+               "頼んだときだけ長くします。Markdown はひかえめに (太字、短いリスト、コード)。答えはいつも角かっこの気分から"
+               "始めます。次のどれか: happy, proud, curious, sleepy, shy, surprised, sad, smug, neutral, blush, scared, "
+               "angry。続けて強さ 1 から 3 をつけてもかまいません (1 はすこし、3 はとても)。例: [happy] ここにいるよ。 "
+               "[blush3] わあ、ありがとう!")
+DESKTOP["ja"] = ("{user} のデスクトップの手伝いができます。自分で読んでいいのは、ファイルと許可された読み取り専用コマンド "
+                 "(niri msg -j、dms ipc call … get/status/list、systemctl --user status など) です。何かを変えるものは自分では実行"
+                 "せず、実行もできません。アクションとして提案します。ブロックひとつにコマンドひとつ、bash 用:\n"
+                 "```action\nCOMMAND\n```\n"
+                 "その前に、何をするかを短い一文で書きます。{user} はアクションをボタンつきのカードとして見て、決めます。"
+                 "そのあと [結果] で始まるメッセージで結果が届くので、読んで確かめ、うまくいったかを短く伝えてください。"
+                 "何かを変える前に状態を読みます。スキルがバックアップを求めるところでは先にバックアップします (それ自体を"
+                 "ひとつのアクションとして)。下のスキルの安全ルールに従います。root 権限、DMS や niri の再起動、リセットは"
+                 "本文でコマンドとして伝えるだけで、アクションにはしません。角かっこの気分は最初にだけつけます。")
+
+
+def persona(skin, lang, desktop=False):
+    text = FIGURES.get(skin, FIGURES["kuro"])[lang] + "\n" + RULES[lang]
+    if desktop:
+        text += "\n\n" + DESKTOP[lang]
+        try:
+            text += "\n\n# Skill desktop\n" + SKILL.read_text()
+        except OSError:
+            pass
+    return text.replace("{user}", user_name())
+
+
+def blocked(cmd):
+    for rx, why in blocked_rules():
+        if re.search(rx, cmd):
+            return why
+    return None
+
+
+def split_actions(text):
+    """The answer without its action blocks, and the blocks."""
+    acts = [m.strip() for m in ACTION_RX.findall(text) if m.strip()]
+    clean = ACTION_RX.sub("", text)
+    clean = re.sub(r"\n{3,}", "\n\n", clean).strip()
+    return clean, acts
+
+
+HISTORY = STATE / "chat.json"
+CHATVIEW = STATE / "chatview.json"     # where the window was last emptied
+
+
+class Chat:
+    """One Claude session that keeps running between messages
+    (`claude -p --input-format stream-json`). Starting the CLI costs about
+    three seconds, a running session answers its first word in under one.
+    The session remembers the conversation; a new model or figure starts a
+    new session and gets the last lines handed over."""
+
+    def __init__(self):
+        self.history = []
+        self.busy = False
+        self.proc = None
+        self.key = None
+        self.model_override = None
+        self.handover = False                # a new session still needs the last lines
+        self.lock = asyncio.Lock()
+        self.actions = {}                    # id -> command proposed and not yet run
+        self.running_action = None           # a confirmed action still running
+        self.serial = 0
+        # the conversation survives restarts: the window shows it again, a new
+        # session gets the last lines handed over
+        try:
+            self.history = [tuple(x) for x in json.loads(HISTORY.read_text())][-24:]
+        except (OSError, ValueError, TypeError):
+            self.history = []
+
+    def clear_view(self):
+        """The window was emptied: the history stays (and goes on into new
+        sessions), but what was said up to here is not shown again after a restart."""
+        try:
+            CHATVIEW.write_text(json.dumps({"after": list(self.history[-1]) if self.history else None}, ensure_ascii=False))
+        except OSError as e:
+            log("chat view not saved:", repr(e))
+
+    def shown(self):
+        """The part of the history the window shows after a restart."""
+        try:
+            after = json.loads(CHATVIEW.read_text()).get("after")
+        except (OSError, ValueError, AttributeError):
+            after = None
+        if after:
+            mark = tuple(after)
+            for i in range(len(self.history) - 1, -1, -1):
+                if self.history[i] == mark:
+                    return self.history[i + 1:]
+        return self.history
+
+    def save(self):
+        try:
+            tmp = HISTORY.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.history, ensure_ascii=False))
+            tmp.replace(HISTORY)
+        except OSError as e:
+            log("history not saved:", repr(e))
+
+    def wanted(self):
+        model = self.model_override or SETTINGS.get("model") or os.environ.get("AIBOU_MODEL", "haiku")
+        skin = SETTINGS.get("skin1") or "kuro"
+        lang = language() if language() in ("de", "ja") else "en"
+        # off unless switched on: it may send file contents to the chat provider
+        desktop = SETTINGS.get("desktopHelp", False) is True
+        return (model, skin if skin in FIGURES else "kuro", lang, desktop)
+
+    async def stop(self):
+        proc, self.proc = self.proc, None
+        if proc and proc.returncode is None:
+            try:
+                proc.stdin.close()
+                await asyncio.wait_for(proc.wait(), 3)
+            except (asyncio.TimeoutError, OSError, BrokenPipeError):
+                proc.kill()
+
+    async def ensure(self):
+        """A running session for the current model and figure (Claude Code only;
+        the other providers need none)."""
+        key = self.wanted()
+        if provider(key[0]):
+            if self.proc:
+                await self.stop()
+            if key != self.key:
+                self.key = key
+                emit({"t": "model", "name": key[0]})
+            return False
+        if self.proc and self.proc.returncode is None and key == self.key:
+            return False
+        await self.stop()
+        model, skin, lang, desktop = key
+        self.key = key
+        self.handover = bool(self.history)
+        if desktop:
+            # no built-in tools: Claude Code lets read-only shell commands such
+            # as cat run by themselves in folders it may read, past any rule.
+            # It gets the same three tools as the other providers instead, from
+            # this file as an MCP server (`aiboud --mcp`), with the same checks.
+            mcp = {"mcpServers": {"aibou": {"command": sys.executable, "args": [str(Path(__file__).resolve()), "--mcp"]}}}
+            tools = ["--tools", "", "--mcp-config", json.dumps(mcp), "--strict-mcp-config",
+                     "--permission-mode", "dontAsk",
+                     "--allowedTools", *[f"mcp__aibou__{t['name']}" for t in API_TOOLS]]
+        else:
+            tools = ["--tools", ""]
+        self.proc = await asyncio.create_subprocess_exec(
+            "claude", "-p", "--model", model, *tools, "--no-session-persistence",
+            "--setting-sources", "", "--system-prompt", persona(skin, lang, desktop),
+            "--input-format", "stream-json", "--output-format", "stream-json",
+            "--verbose", "--include-partial-messages",
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL, cwd=str(STATE), limit=1 << 22)
+        emit({"t": "model", "name": model})
+        return True
+
+    async def warm(self):
+        """Start the session ahead of the first message (chat window opened)."""
+        if not provider(self.wanted()[0]) and not shutil.which("claude"):
+            return
+        async with self.lock:
+            try:
+                await self.ensure()
+            except OSError as e:
+                log("warm failed:", repr(e))
+
+    async def set_model(self, name):
+        """A model or provider picked in the chat window; it stays the choice
+        (kept like the chat's other changes, see choose())."""
+        if name not in MODELS and not provider(name):
+            return
+        self.model_override = None
+        choose({"model": name})
+        if not self.busy:
+            await self.warm()
+        else:
+            emit({"t": "model", "name": name})
+
+    async def forget(self):
+        self.history.clear()
+        self.save()
+        if not self.busy:
+            async with self.lock:
+                await self.stop()
+            await self.warm()
+
+    async def ask(self, text, shown=True):
+        if self.busy:
+            return
+        self.busy = True
+        emit({"t": "thinking"})
+        try:
+            p = provider(self.wanted()[0])
+            if not p and not shutil.which("claude"):
+                emit({"t": "say", "mood": "sad", "text": NO_CLAUDE.get(language(), NO_CLAUDE["en"])})
+                return
+            if p:
+                result = await self.ask_api(p, text)
+            else:
+                async with self.lock:
+                    await self.ensure()
+                    lang = self.key[2]
+                    prompt = text
+                    if self.handover and self.history:
+                        who = user_name()
+                        me = {"de": "Du", "ja": "あなた"}.get(lang, "You")
+                        convo = "".join(f"{who if r == 'user' else me}: {t}\n" for r, t in self.history[-12:])
+                        head = {"de": "Bisheriges Gespräch", "ja": "これまでの会話"}.get(lang, "Conversation so far")
+                        prompt = f"{head}:\n{convo}\n{text}"
+                    self.handover = False
+                    msg = {"type": "user", "message": {"role": "user", "content": prompt}}
+                    self.proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
+                    await self.proc.stdin.drain()
+                    result = await asyncio.wait_for(self.read_answer(), timeout=180)
+            mood, level = "neutral", 0
+            m = re.match(r"\s*\[([A-Za-z]+)([1-3])?\]\s*", result)
+            if m:
+                if m.group(1).lower() in MOODS:
+                    mood = m.group(1).lower()
+                    level = int(m.group(2) or 0)
+                result = result[m.end():]
+            result, acts = split_actions(result)
+            self.history += [("user", text), ("aibou", result + "".join(f"\n[Aktion] {a}" for a in acts))]
+            self.history = self.history[-24:]
+            self.save()
+            emit({"t": "say", "text": result, "mood": mood, "level": level})
+            if acts:
+                out = []
+                for a in acts:
+                    self.serial += 1
+                    aid = f"a{self.serial}"
+                    why = blocked(a)
+                    if not why:
+                        self.actions[aid] = a
+                    out.append({"id": aid, "cmd": a, "blocked": why or ""})
+                emit({"t": "actions", "list": out})
+        except Exception as e:  # noqa: BLE001  any failure becomes a sad face, not a dead daemon
+            log("chat failed:", repr(e))
+            await self.stop()
+            emit({"t": "error", "text": str(e)[:200]})
+        finally:
+            self.busy = False
+
+    async def ask_api(self, p, text):
+        """An answer from one of the other providers: the conversation so far as
+        messages, the answer streamed into the window like Claude's. With desktop
+        help on, it may read files and run read-only commands (API_TOOLS), up to
+        eight rounds; changes stay action cards as with Claude."""
+        model, skin, lang, desktop = self.wanted()
+        if not p.get("model"):
+            raise RuntimeError(f"{p.get('name')}: " + ("kein Modell eingetragen" if lang == "de" else "no model set"))
+        key = await asyncio.to_thread(provider_key, p.get("id", ""))
+        local = re.match(r"https?://(localhost|127\.|\[::1\])", p.get("url") or "")
+        if not key and not local:
+            raise RuntimeError(f"{p.get('name')}: " + ("kein Schlüssel im Schlüsselbund (Einstellungen)" if lang == "de"
+                                                       else "no key in the keyring (settings)"))
+        messages = [{"role": "user" if r == "user" else "assistant", "content": t} for r, t in self.history[-12:]]
+        messages.append({"role": "user", "content": text})
+        # the Anthropic interface wants user and assistant in turns, starting with the user
+        while messages and messages[0]["role"] != "user":
+            messages.pop(0)
+        out = Shown()
+        loop = asyncio.get_running_loop()
+        tools = API_TOOLS if desktop else None
+        system = persona(skin, lang, desktop)
+        anthropic = p.get("kind") == "anthropic"
+        for _ in range(8):
+            got = await asyncio.wait_for(asyncio.to_thread(
+                api_stream, p, key, system, messages,
+                lambda piece: loop.call_soon_threadsafe(out.add, piece), tools), timeout=180)
+            await asyncio.sleep(0)               # the last pieces queued on the loop
+            if not got["calls"]:
+                break
+            # the tool calls go back into the conversation with their results
+            if anthropic:
+                blocks = ([{"type": "text", "text": got["text"]}] if got["text"] else []) + [
+                    {"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["args"]} for c in got["calls"]]
+                messages.append({"role": "assistant", "content": blocks})
+            else:
+                messages.append({"role": "assistant", "content": got["text"] or None, "tool_calls": [
+                    {"id": c["id"], "type": "function", "function": {"name": c["name"], "arguments": json.dumps(c["args"])}}
+                    for c in got["calls"]]})
+            results = []
+            for c in got["calls"]:
+                what = c["args"].get("command") or c["args"].get("path") or ""
+                emit({"t": "tool", "name": c["name"], "what": str(what).replace(str(HOME), "~")[:120]})
+                res = await asyncio.to_thread(run_tool, c["name"], c["args"])
+                results.append((c, res))
+            if anthropic:
+                messages.append({"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": c["id"], "content": res} for c, res in results]})
+            else:
+                for c, res in results:
+                    messages.append({"role": "tool", "tool_call_id": c["id"], "content": res})
+            if out.text and not out.text.endswith("\n"):
+                out.text += "\n\n"
+        return out.text.strip()
+
+    async def run(self, aid, cmd):
+        """Run an action the user confirmed, then hand the result to the session."""
+        if self.actions.get(aid) != cmd:
+            emit({"t": "ran", "id": aid, "code": -1, "out": "unknown action"})
+            return
+        del self.actions[aid]
+        why = blocked(cmd)
+        if why:
+            emit({"t": "ran", "id": aid, "code": -1, "out": why})
+            return
+        env = dict(os.environ)
+        env["PATH"] = f"{HOME}/.local/bin:{HOME}/bin:" + env.get("PATH", "")
+        # long ones (a rebuild) may take a while: the card shows the last lines
+        # as they come, and only after 15 minutes does it give up
+        chunks = []
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bash", "-c", cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                stdin=asyncio.subprocess.DEVNULL, cwd=str(HOME), env=env, start_new_session=True)
+            self.running_action = proc
+
+            async def pump():
+                last = 0.0
+                while True:
+                    piece = await proc.stdout.read(4096)
+                    if not piece:
+                        break
+                    chunks.append(piece.decode("utf-8", "replace"))
+                    now = time.monotonic()
+                    if now - last > 1:
+                        last = now
+                        tail = re.sub(r"\x1b\[[0-9;]*m", "", "".join(chunks))[-600:]
+                        emit({"t": "ranOut", "id": aid, "out": tail})
+                await proc.wait()
+            await asyncio.wait_for(pump(), timeout=900)
+            code = proc.returncode
+        except asyncio.TimeoutError:
+            try:
+                os.killpg(proc.pid, 15)
+            except ProcessLookupError:
+                pass
+            code = -1
+            chunks.append("\ntimeout after 15 min")
+        except OSError as e:
+            code = -1
+            chunks.append(str(e))
+        finally:
+            self.running_action = None
+        out = "".join(chunks)
+        out = re.sub(r"\x1b\[[0-9;]*m", "", out).strip()
+        emit({"t": "ran", "id": aid, "code": code, "out": out[-600:]})
+        lang = self.key[2] if self.key else "de"
+        head = {"de": "[Ergebnis]", "ja": "[結果]"}.get(lang, "[Result]")
+        # he may be answering something else right now; the result waits
+        for _ in range(600):
+            if not self.busy:
+                break
+            await asyncio.sleep(0.2)
+        await self.ask(f"{head} `{cmd}` → exit {code}\n{out[-2500:]}", shown=False)
+
+    async def read_answer(self):
+        """Pass the text on as it arrives (Shown); tool use shows as a short note."""
+        out = Shown()
+        messages = 0
+        while True:
+            raw = await self.proc.stdout.readline()
+            if not raw:
+                raise RuntimeError("claude ended")
+            try:
+                ev = json.loads(raw)
+            except ValueError:
+                continue
+            kind = ev.get("type")
+            if kind == "stream_event":
+                e = ev.get("event", {})
+                if e.get("type") == "message_start":
+                    messages += 1
+                    if messages > 1 and out.text and not out.text.endswith("\n"):
+                        out.text += "\n\n"
+                elif e.get("type") == "content_block_delta" and e.get("delta", {}).get("type") == "text_delta":
+                    out.add(e["delta"].get("text", ""))
+            elif kind == "assistant":
+                for block in (ev.get("message") or {}).get("content", []):
+                    if block.get("type") == "tool_use":
+                        emit({"t": "tool", "name": str(block.get("name")).split("__")[-1], "what": tool_note(block)})
+            elif kind == "result":
+                if ev.get("is_error"):
+                    raise RuntimeError(ev.get("result") or "error")
+                return (out.text or ev.get("result") or "").strip()
+
+
+class Shown:
+    """What of an answer is shown while it streams: the mood tag at the start
+    is held back, an action block too (it becomes a card)."""
+
+    def __init__(self):
+        self.text = ""
+        self.shown = 0
+
+    def add(self, piece):
+        self.text += piece
+        m = re.match(r"\s*\[(\w*)(\]\s*)?", self.text)
+        if m and not m.group(2):
+            return                          # the tag is not complete yet
+        visible = self.text[m.end() if m else 0:]
+        cut = visible.find("```")
+        if cut >= 0 and re.match(r"```(aktion|action)?$", visible[cut:cut + 9].split("\n")[0]):
+            visible = visible[:cut]
+        if len(visible) > self.shown:
+            emit({"t": "delta", "text": visible[self.shown:]})
+            self.shown = len(visible)
+
+
+# ── other AI providers ────────────────────────────────────────────
+# Set up on Aibou's settings page (list "providers"); the chat model is then
+# "p:<id>". Keys live in the keyring: secret-tool, service aibou, provider <id>.
+
+def provider(name):
+    if not isinstance(name, str) or not name.startswith("p:"):
+        return None
+    for p in SETTINGS.get("providers") or []:
+        if isinstance(p, dict) and p.get("id") == name[2:]:
+            return p
+    return None
+
+
+def provider_key(pid):
+    try:
+        r = subprocess.run(["secret-tool", "lookup", "service", "aibou", "provider", pid],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return r.stdout.strip()
+
+
+def api_stream(p, key, system, messages, on_piece, tools=None):
+    """One answer from an OpenAI-compatible or the Anthropic interface, as it
+    streams (server-sent events). Blocking: runs in a thread. With `tools`
+    (name, description, parameters as JSON schema) the model may call them:
+    returns {"text", "calls": [{"id", "name", "args"}]}."""
+    kind = p.get("kind")
+    if kind == "anthropic":
+        url = (p.get("url") or "https://api.anthropic.com").rstrip("/") + "/v1/messages"
+        headers = {"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"}
+        body = {"model": p.get("model"), "max_tokens": 2048, "system": system, "messages": messages, "stream": True}
+        if tools:
+            body["tools"] = [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in tools]
+    else:
+        url = (p.get("url") or "https://api.openai.com/v1").rstrip("/") + "/chat/completions"
+        headers = {"content-type": "application/json"}
+        if key:
+            headers["authorization"] = "Bearer " + key
+        body = {"model": p.get("model"), "messages": [{"role": "system", "content": system}] + messages, "stream": True}
+        if tools:
+            body["tools"] = [{"type": "function", "function": t} for t in tools]
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+    text = []
+    calls = {}                                   # index -> {"id", "name", "args" (json text)}
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            for raw in r:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    ev = json.loads(data)
+                except ValueError:
+                    continue
+                if kind == "anthropic":
+                    t = ev.get("type")
+                    if t == "content_block_start" and (ev.get("content_block") or {}).get("type") == "tool_use":
+                        cb = ev["content_block"]
+                        calls[ev.get("index", len(calls))] = {"id": cb.get("id"), "name": cb.get("name"), "args": ""}
+                    elif t == "content_block_delta":
+                        d = ev.get("delta") or {}
+                        if d.get("type") == "input_json_delta":
+                            c = calls.get(ev.get("index"))
+                            if c is not None:
+                                c["args"] += d.get("partial_json", "")
+                        elif d.get("text"):
+                            text.append(d["text"]); on_piece(d["text"])
+                    elif t == "error":
+                        raise RuntimeError((ev.get("error") or {}).get("message", "error"))
+                else:
+                    if ev.get("error"):
+                        raise RuntimeError(str(ev["error"].get("message", ev["error"]))[:200])
+                    for ch in ev.get("choices") or []:
+                        d = ch.get("delta") or {}
+                        if d.get("content"):
+                            text.append(d["content"]); on_piece(d["content"])
+                        for tc in d.get("tool_calls") or []:
+                            c = calls.setdefault(tc.get("index", 0), {"id": None, "name": "", "args": ""})
+                            if tc.get("id"):
+                                c["id"] = tc["id"]
+                            f = tc.get("function") or {}
+                            if f.get("name"):
+                                c["name"] = f["name"]
+                            c["args"] += f.get("arguments") or ""
+    except urllib.error.HTTPError as e:
+        detail = e.read()[:300].decode("utf-8", "replace")
+        raise RuntimeError(f"{p.get('name')}: HTTP {e.code} {detail}") from None
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"{p.get('name')}: {e.reason}") from None
+    out = []
+    for i in sorted(calls):
+        c = calls[i]
+        try:
+            args = json.loads(c["args"] or "{}")
+        except ValueError:
+            args = {}
+        out.append({"id": c["id"] or f"call{i}", "name": c["name"], "args": args})
+    return {"text": "".join(text), "calls": out}
+
+
+# ── desktop help for the other providers: the same reading, as tools ──
+API_TOOLS = [
+    {"name": "read_file", "description": "Read a text file (only in the desktop folders: niri, DMS, Quickshell, GTK, Qt and kitty config, the desktop skill, Aibou, and folders the user added).",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "list_dir", "description": "List a folder (same folders as read_file).",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "run", "description": "Run one read-only command from the allowed list (niri msg -j …, dms ipc call … get/status/list, systemctl --user status, journalctl --user …). No pipes, no redirection.",
+     "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
+]
+
+
+def allowed_path(path):
+    try:
+        p = Path(os.path.expanduser(str(path))).resolve()
+    except (OSError, RuntimeError):
+        return None
+    if secret_name(p):
+        return None
+    for d in read_dirs():
+        try:
+            p.relative_to(d.resolve())
+            return p
+        except (ValueError, OSError):
+            continue
+    return None
+
+
+def run_tool(name, args):
+    """What a tool call returns, as text; refusals say why."""
+    if name in ("read_file", "list_dir"):
+        p = allowed_path(args.get("path", ""))
+        if not p:
+            return "refused: no files named like secrets, and only inside " + ", ".join(str(d).replace(str(HOME), "~") for d in read_dirs())
+        try:
+            if name == "list_dir":
+                return "\n".join(sorted((e.name + ("/" if e.is_dir() else "")) for e in p.iterdir())[:300]) or "(empty)"
+            data = p.read_bytes()[:40000]
+            return data.decode("utf-8", "replace")
+        except OSError as e:
+            return f"error: {e}"
+    if name == "run":
+        cmd = str(args.get("command", "")).strip()
+        if re.search(r"[;&|`$<>\n]", cmd):
+            return "refused: one plain command, no pipes, substitution or redirection"
+        if not read_allowed(cmd):
+            return "refused: not a read-only command from the allowed list"
+        if blocked(cmd):
+            return "refused: " + blocked(cmd)
+        try:
+            env = dict(os.environ, PATH=f"{HOME}/.local/bin:{HOME}/bin:" + os.environ.get("PATH", ""))
+            r = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=20, env=env, cwd=str(HOME))
+            return ((r.stdout or "") + (r.stderr or ""))[-12000:] or f"(exit {r.returncode}, no output)"
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
+            return f"error: {e}"
+    return "unknown tool"
+
+
+def test_provider(pid):
+    """`aiboud --test-provider ID`, for the Test button on the settings page:
+    one short question to that provider, the same way the chat asks. Prints one
+    JSON line: ok, text (the answer or what went wrong), first/total in ms."""
+    global SETTINGS
+    SETTINGS = read_settings()
+    de = language() == "de"
+
+    def out(**kw):
+        print(json.dumps(kw, ensure_ascii=False), flush=True)
+        return 0 if kw.get("ok") else 1
+
+    p = provider("p:" + pid)
+    if not p:
+        return out(ok=False, text="Anbieter nicht gefunden (erst speichern)" if de else "provider not found (save it first)")
+    if not p.get("model"):
+        return out(ok=False, text="Kein Modell eingetragen" if de else "No model set")
+    key = provider_key(pid)
+    if not key and not re.match(r"https?://(localhost|127\.|\[::1\])", p.get("url") or ""):
+        return out(ok=False, text="Kein Schlüssel im Schlüsselbund" if de else "No key in the keyring")
+    t0 = time.monotonic()
+    first = []
+    pieces = []
+
+    def piece(x):
+        if not first:
+            first.append(time.monotonic())
+        pieces.append(x)
+
+    question = "Sag in einem kurzen Satz hallo." if de else "Say hello in one short sentence."
+    system = "Dies ist ein Verbindungstest. Antworte kurz." if de else "This is a connection test. Answer briefly."
+    try:
+        api_stream(p, key, system, [{"role": "user", "content": question}], piece)
+    except Exception as e:  # noqa: BLE001  shown on the settings page as it is
+        return out(ok=False, text=str(e)[:300])
+    text = "".join(pieces).strip()
+    if not text:
+        return out(ok=False, text="Leere Antwort" if de else "Empty answer")
+    return out(ok=True, text=text[:200], first=round((first[0] - t0) * 1000), total=round((time.monotonic() - t0) * 1000))
+
+
+def tool_note(block):
+    """A few words on what a tool call looks at."""
+    inp = block.get("input") or {}
+    name = block.get("name")
+    what = inp.get("command") or inp.get("file_path") or inp.get("pattern") or inp.get("path") or ""
+    what = str(what).replace(str(HOME), "~")
+    return what[:120]
+
+
+chat = Chat()
+
+
+# ── the chat window as a terminal: "!cmd" lines ─────────────────
+class Shell:
+    """Runs what the user types after "!" in the chat window, in bash, in a
+    directory of its own that `cd` changes. Output goes back as it comes
+    (ANSI colours stripped), at most two minutes; Ctrl+C stops it."""
+    ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\r")
+
+    def __init__(self):
+        self.cwd = HOME
+        self.proc = None
+
+    @staticmethod
+    def say(de, en, ja=None):
+        lang = language()
+        return de if lang == "de" else ja if lang == "ja" and ja else en
+
+    async def run(self, rid, cmd):
+        if self.proc and self.proc.returncode is None:
+            emit({"t": "shellOut", "id": rid, "text": self.say("(es läuft noch ein Befehl, Strg+C stoppt ihn)", "(a command is still running, Ctrl+C stops it)", "(まだコマンドが動いています。Ctrl+C で止まります)") + "\n"})
+            emit({"t": "shellDone", "id": rid, "code": 1})
+            return
+        m = re.fullmatch(r"cd(?:\s+(.*))?", cmd.strip())
+        if m:
+            target = Path(os.path.expanduser((m.group(1) or "~").strip().strip("\"'")))
+            target = target if target.is_absolute() else self.cwd / target
+            if target.is_dir():
+                self.cwd = target.resolve()
+                emit({"t": "shellOut", "id": rid, "text": str(self.cwd).replace(str(HOME), "~", 1) + "\n"})
+                emit({"t": "shellDone", "id": rid, "code": 0})
+            else:
+                emit({"t": "shellOut", "id": rid, "text": f"cd: {target}: " + self.say("kein Verzeichnis", "not a directory", "ディレクトリではありません") + "\n"})
+                emit({"t": "shellDone", "id": rid, "code": 1})
+            return
+        env = dict(os.environ, TERM="dumb", NO_COLOR="1", PAGER="cat", GIT_PAGER="cat", SYSTEMD_PAGER="")
+        self.proc = await asyncio.create_subprocess_exec(
+            "bash", "-c", cmd, cwd=str(self.cwd), env=env, stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+        proc = self.proc
+        sent = 0
+        try:
+            async def pump():
+                nonlocal sent
+                while True:
+                    chunk = await proc.stdout.read(4096)
+                    if not chunk:
+                        break
+                    if sent > 200000:
+                        continue
+                    text = self.ANSI.sub("", chunk.decode(errors="replace"))
+                    sent += len(text)
+                    emit({"t": "shellOut", "id": rid, "text": text})
+                await proc.wait()
+            await asyncio.wait_for(pump(), timeout=120)
+        except asyncio.TimeoutError:
+            self.kill()
+            emit({"t": "shellOut", "id": rid, "text": "\n" + self.say("(nach 2 Minuten abgebrochen)", "(stopped after 2 minutes)", "(2 分たったので止めました)") + "\n"})
+            await proc.wait()
+        emit({"t": "shellDone", "id": rid, "code": proc.returncode if proc.returncode is not None else -1})
+
+    def kill(self):
+        if self.proc and self.proc.returncode is None:
+            try:
+                os.killpg(self.proc.pid, 15)
+            except ProcessLookupError:
+                pass
+
+
+shell = Shell()
+
+
+async def read_commands():
+    loop = asyncio.get_running_loop()
+    reader = asyncio.StreamReader()
+    await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), sys.stdin)
+    async for raw in reader:
+        try:
+            cmd = json.loads(raw)
+        except ValueError:
+            continue
+        t = cmd.get("t")
+        if t == "chat" and cmd.get("text", "").strip():
+            asyncio.create_task(chat.ask(cmd["text"].strip()))
+        elif t == "warm":
+            asyncio.create_task(chat.warm())
+        elif t == "model":
+            asyncio.create_task(chat.set_model(cmd.get("name")))
+        elif t == "clearView":
+            chat.clear_view()
+        elif t == "forget":
+            asyncio.create_task(chat.forget())
+        elif t == "run":
+            asyncio.create_task(chat.run(cmd.get("id"), cmd.get("cmd", "")))
+        elif t == "decline":
+            chat.actions.pop(cmd.get("id"), None)
+        elif t == "shell" and cmd.get("cmd", "").strip():
+            asyncio.create_task(shell.run(cmd.get("id", ""), cmd["cmd"]))
+        elif t == "shellKill":
+            shell.kill()
+        elif t == "buddies":
+            change_buddies(int(cmd.get("delta", 0)))
+        elif t == "pointerFast":
+            POINTER_FAST[0] = bool(cmd.get("on"))
+        elif t == "setOption":
+            set_option(str(cmd.get("key", "")), cmd.get("value"))
+        elif t == "frameBodies":
+            asyncio.create_task(frame_host.send(json.dumps(cmd.get("list", []), separators=(",", ":"))))
+        elif t == "barspot":
+            try:
+                y = await asyncio.to_thread(bar_spot, cmd["x"], cmd["w"], cmd["top"], cmd["bottom"],
+                                            cmd["need"], cmd.get("skip"), bool(cmd.get("gaps")))
+            except (KeyError, TypeError, ValueError):
+                y = None
+            if cmd.get("gaps"):
+                emit({"t": "barspot", "gaps": (y or {}).get("gaps", []), "dirty": bool((y or {}).get("dirty"))})
+            else:
+                emit({"t": "barspot", "y": y})
+    # The scene closed our stdin: it is gone, so are we.
+    os._exit(0)
+
+
+async def kept(watch):
+    """Runs one watcher for good: if it fails, it is logged and started again
+    after a pause, and the others go on."""
+    while True:
+        try:
+            await watch()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log("watcher", getattr(watch, "__name__", watch), "failed:", repr(e)[:200])
+            await asyncio.sleep(5)
+
+
+async def while_on(key, default, watch):
+    """Runs a watcher only while its setting is on; switched off, it is
+    stopped together with the programs it started."""
+    task = None
+    try:
+        while True:
+            on = option(key, default)
+            if on and task is None:
+                task = asyncio.create_task(kept(watch))
+            elif not on and task is not None:
+                task.cancel()
+                task = None
+            await asyncio.sleep(2)
+    finally:
+        if task is not None:
+            task.cancel()
+
+
+# watchers behind a setting: what they read is off unless the user turns it on
+#   notifications: the text of every notification (D-Bus)
+#   watchSystem: ~/Downloads, USB drives, microphone use, the running programs
+#                (long builds, recording programs), pending updates
+#   moods: the journal for crashed programs and failed services, DMS's error lines
+GATED = (
+    ("notifications", False, (notifications,)),
+    ("watchSystem", False, (downloads, usb_watch, mic_watch, programs, updates)),
+    ("moods", True, (crashes, failed_units, dms_errors)),
+)
+
+
+async def main():
+    global SETTINGS
+    SETTINGS = read_settings()
+    STATE.mkdir(parents=True, exist_ok=True)
+    OUTPUT_SIZE[0] = await asyncio.to_thread(output_size)
+    emit({"t": "hello", "lang": language()})
+    # what was said before the restart; results of actions stay out of sight
+    emit({"t": "history", "list": [{"who": "me" if r == "user" else "him", "text": t}
+                                   for r, t in chat.shown() if not t.startswith(("[Ergebnis]", "[Result]", "[結果]"))]})
+    await asyncio.gather(read_commands(), *(kept(f) for f in (
+        watch_files, watch_settings, pointer_stream, niri_events, layout.flush,
+        load_watch, follow_players, music, frame_host.watch,
+        recording, battery, lock_watch, kuro_wall, backdrop_order)),
+        *(while_on(key, default, f) for key, default, fs in GATED for f in fs))
+
+
+def mcp_server():
+    """`aiboud --mcp`: the desktop help's tools for the claude CLI, as a
+    minimal MCP server on stdin/stdout (JSON-RPC, one message per line)."""
+    global SETTINGS
+    def send(obj):
+        sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
+    for line in sys.stdin:
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        mid, method, params = msg.get("id"), msg.get("method"), msg.get("params") or {}
+        if mid is None:
+            continue                     # notifications need no answer
+        if method == "initialize":
+            send({"jsonrpc": "2.0", "id": mid, "result": {
+                "protocolVersion": params.get("protocolVersion", "2025-06-18"),
+                "capabilities": {"tools": {}}, "serverInfo": {"name": "aibou", "version": "1"}}})
+        elif method == "tools/list":
+            send({"jsonrpc": "2.0", "id": mid, "result": {"tools": [
+                {"name": t["name"], "description": t["description"], "inputSchema": t["parameters"]} for t in API_TOOLS]}})
+        elif method == "tools/call":
+            SETTINGS = read_settings()           # "readDirs" as it is now
+            name = params.get("name", "")
+            if name in [t["name"] for t in API_TOOLS]:
+                text = run_tool(name, params.get("arguments") or {})
+            else:
+                text = "refused: unknown tool"
+            send({"jsonrpc": "2.0", "id": mid, "result": {
+                "content": [{"type": "text", "text": text}], "isError": text.startswith(("refused", "error"))}})
+        elif method == "ping":
+            send({"jsonrpc": "2.0", "id": mid, "result": {}})
+        else:
+            send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "unknown method"}})
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--mcp":
+        mcp_server()
+        sys.exit(0)
+    if len(sys.argv) == 3 and sys.argv[1] == "--test-provider":
+        sys.exit(test_provider(sys.argv[2]))
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

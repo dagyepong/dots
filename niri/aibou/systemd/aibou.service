@@ -1,0 +1,20 @@
+[Unit]
+Description=Aibou, the desktop companions
+PartOf=graphical-session.target
+After=graphical-session.target dms.service
+
+[Service]
+# no crash dialog on the desktop; systemd restarts it instead
+Environment=QS_DISABLE_CRASH_HANDLER=1
+# all windows drawn on one thread, animations on a 16 ms timer: while
+# figures move, about half the CPU of the threaded loop at 165 Hz (measured
+# 29 % instead of 50 % with five figures playing ball)
+Environment=QSG_RENDER_LOOP=basic
+Environment=QSG_USE_SIMPLE_ANIMATION_DRIVER=1
+# the helper knows where the repository is (it is a link into it)
+ExecStart=%h/.local/bin/aibou run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

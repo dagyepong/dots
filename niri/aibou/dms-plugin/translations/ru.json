@@ -1,0 +1,317 @@
+{
+  "His own": {
+    "His own": "Свой"
+  },
+  "Accent colour": {
+    "Accent colour": "Акцентный цвет"
+  },
+  "Fixed colour": {
+    "Fixed colour": "Фиксированный цвет"
+  },
+  "None": {
+    "None": "Нет"
+  },
+  "Usage": {
+    "Usage": "Нагрузка"
+  },
+  "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": {
+    "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": "В покое Aibou нужно меньше 1 % CPU и около 130 MB памяти. Нагрузка возникает почти только при движении: каждый отрисованный кадр стоит CPU в Qt и в графическом драйвере, поэтому она растёт с частотой обновления. Значения ниже измерены при 2560×1600 и 165 Hz на Intel Iris Xe."
+  },
+  "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": {
+    "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": "Сочетания клавиш: Mod+Alt+M вперёд, Mod+Alt+C окно чата, Mod+Alt+Z уснуть или проснуться, Mod+Alt+B мяч, Mod+Alt+Shift+M вкл. или выкл."
+  },
+  "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": {
+    "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": "Сам Aibou не установлен: этот плагин только его переключатель и настройки. Установка с github.com/satoshoe-dev/aibou (см. README там)."
+  },
+  "Your name": {
+    "Your name": "Твоё имя"
+  },
+  "How the figures greet you and talk to you. Empty: the first name of your account.": {
+    "How the figures greet you and talk to you. Empty: the first name of your account.": "Так фигурки приветствуют тебя и обращаются к тебе. Пусто: имя из твоей учётной записи."
+  },
+  "First name": {
+    "First name": "Имя"
+  },
+  "Main figure": {
+    "Main figure": "Главная фигурка"
+  },
+  "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": {
+    "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": "Kuro — тёмный стеклянный шар с двумя вытянутыми глазами, в цвет рамки. Mochi — рисовый пирожок с лицом, Shiro — светлый шар с вытянутыми глазами, Momo — персик, Robo — маленький робот со светящимися глазами, Bao — паровая булочка, Neko — кошка, Kumo — облако, Tako — осьминог, Hiyoko — цыплёнок, Arai — енот. Нагрузка у всех одинаковая."
+  },
+  "Colour": {
+    "Colour": "Цвет"
+  },
+  "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": {
+    "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": "Свой цвет, акцентный цвет (меняется вместе с ним) или фиксированный цвет на выбор. Kuro остаётся стеклянным и принимает цвет как оттенок."
+  },
+  "Used when Colour is set to Fixed colour.": {
+    "Used when Colour is set to Fixed colour.": "Действует, если в пункте «Цвет» выбран «Фиксированный цвет»."
+  },
+  "Second figure": {
+    "Second figure": "Вторая фигурка"
+  },
+  "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": {
+    "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": "Приходит на площадку и играет с остальными. Каждая дополнительная фигурка добавляет в среднем около 2–3 % CPU, три бодрствующие фигурки по замерам около 8,5 %. Mod+Alt+Plus / Minus добавляет или убирает одну."
+  },
+  "Third figure": {
+    "Third figure": "Третья фигурка"
+  },
+  "Fourth figure": {
+    "Fourth figure": "Четвёртая фигурка"
+  },
+  "Fifth figure": {
+    "Fifth figure": "Пятая фигурка"
+  },
+  "Outline": {
+    "Outline": "Контур"
+  },
+  "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": {
+    "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": "Тонкое кольцо вокруг фигурки и её рук. Рисуется и поверх купола, когда она сидит в рамке."
+  },
+  "Hands": {
+    "Hands": "Руки"
+  },
+  "Small balls as hands. Barely measurable.": {
+    "Small balls as hands. Barely measurable.": "Маленькие шарики вместо рук. Почти не измеримо."
+  },
+  "Eyes follow the pointer": {
+    "Eyes follow the pointer": "Глаза следят за указателем"
+  },
+  "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": {
+    "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": "До 1–2 % CPU, пока указатель движется рядом, иначе 0."
+  },
+  "Activity": {
+    "Activity": "Активность"
+  },
+  "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": {
+    "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": "Как часто фигурка сама отправляется гулять. Минимальная: тает в рамке и в основном просто наблюдает, так что не мешает работать. Максимальная: всегда в пути, никогда сама не тает в рамке и зовёт друга на несколько минут, когда одна. Замер с одной фигуркой: обычная в среднем около 3 % CPU, спокойная около 1 %, оживлённая около 5 %."
+  },
+  "Minimal": {
+    "Minimal": "Минимальная"
+  },
+  "Calm": {
+    "Calm": "Спокойная"
+  },
+  "Normal": {
+    "Normal": "Обычная"
+  },
+  "Lively": {
+    "Lively": "Оживлённая"
+  },
+  "Maximal": {
+    "Maximal": "Максимальная"
+  },
+  "Ball game": {
+    "Ball game": "Игра в мяч"
+  },
+  "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": {
+    "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": "Около 20 % CPU во время игры. Игра длится максимум чуть больше минуты и бывает лишь изредка."
+  },
+  "Fall asleep after": {
+    "Fall asleep after": "Засыпать через"
+  },
+  "Minutes without activity.": {
+    "Minutes without activity.": "Минуты без активности."
+  },
+  "Sleep animation": {
+    "Sleep animation": "Анимация сна"
+  },
+  "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": {
+    "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": "Дыхание и «z» во сне. Около 0,5 % CPU на фигурку. Выкл.: спит неподвижно, 0 %."
+  },
+  "Notifications": {
+    "Notifications": "Уведомления"
+  },
+  "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": {
+    "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": "Показывает уведомления в облачке. Для этого Aibou читает заголовок и текст каждого уведомления на сессионной шине; они остаются на этом компьютере. Практически 0."
+  },
+  "Frame": {
+    "Frame": "Рамка"
+  },
+  "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": {
+    "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": "Пока ты работаешь, фигурка тает в нижней рамке экрана, видно только купол с глазами. При работе: после примерно 45 с непрерывной активности, обратно через 2,5 мин тишины. Всегда: рамка её дом. Экономит CPU, потому что фигурка не двигается."
+  },
+  "While busy": {
+    "While busy": "При работе"
+  },
+  "Always": {
+    "Always": "Всегда"
+  },
+  "Never": {
+    "Never": "Никогда"
+  },
+  "Where in the frame": {
+    "Where in the frame": "Где в рамке"
+  },
+  "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": {
+    "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": "Нижняя рамка: погружается там, где стоит. Панель: перекатывается к панели и выпирает из её внутреннего края (панель слева или справа). Ближайшее: панель, если фигурка рядом с ней, иначе нижняя рамка."
+  },
+  "Nearest": {
+    "Nearest": "Ближайшее"
+  },
+  "Bottom frame": {
+    "Bottom frame": "Нижняя рамка"
+  },
+  "Bar": {
+    "Bar": "Панель"
+  },
+  "Colour in the frame": {
+    "Colour in the frame": "Цвет в рамке"
+  },
+  "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": {
+    "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": "Цвет рамки: купол принимает цвет и прозрачность рамки и выглядит как её часть. Свой цвет: купол сохраняет цвет, выбранный выше."
+  },
+  "Frame colour": {
+    "Frame colour": "Цвет рамки"
+  },
+  "His colour": {
+    "His colour": "Свой цвет"
+  },
+  "In the bar": {
+    "In the bar": "В панели"
+  },
+  "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": {
+    "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": "Выпуклость: купол с глазами выступает из внутреннего края панели. Только лицо: ничего не выступает, видно только его лицо внутри панели, в свободном месте между значками. Если места нет, он всё же выступает куполом. Свободное место ищется на снимке панели (grim), который остаётся на этом компьютере."
+  },
+  "Bulge": {
+    "Bulge": "Выпуклость"
+  },
+  "Face only": {
+    "Face only": "Только лицо"
+  },
+  "Feels the machine": {
+    "Feels the machine": "Чувствует компьютер"
+  },
+  "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": {
+    "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": "При высокой нагрузке (CPU какое-то время выше примерно 60 %, память выше 82 % или горячий процессор) он начинает потеть, при очень высокой нагрузке жмурится. Когда программа падает или служба отказывает, он сердится и говорит, что сломалось; для этого он следит за системным журналом и журналом DMS. Проверка каждые 2 с, практически 0."
+  },
+  "Dances to music": {
+    "Dances to music": "Танцует под музыку"
+  },
+  "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": {
+    "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": "Когда плеер играет музыку, фигурка прыгает в такт, в рамке её купол пульсирует вместе с музыкой. Ритм берётся из баса cava; небольшой cava работает только пока играет музыка: около 1 % CPU, плюс прыжки. С экономией батареи при работе от батареи танцует на каждый второй удар."
+  },
+  "Chat": {
+    "Chat": "Чат"
+  },
+  "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": {
+    "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": "Чат с Claude в отдельном окне; он запрыгивает в него. Сессия продолжает работать в фоне, поэтому ответ начинается примерно через секунду и приходит слово за словом. То, что вы пишете, уходит в Anthropic или к провайдеру, выбранному ниже. Строка, начинающаяся с !, выполняется как команда в bash, как в терминале. Локально 0; каждый ответ расходует квоту Claude."
+  },
+  "Desktop help": {
+    "Desktop help": "Помощь с рабочим столом"
+  },
+  "Chat model": {
+    "Chat model": "Модель чата"
+  },
+  "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": {
+    "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": "Haiku отвечает быстрее всех, Sonnet и Opus думают глубже; всем трём нужен Claude Code (команда claude). Провайдеров, настроенных ниже, тоже можно выбрать здесь. Переключение в окне чата меняет и эту настройку."
+  },
+  "New provider": {
+    "New provider": "Новый провайдер"
+  },
+  "Other AI providers": {
+    "Other AI providers": "Другие ИИ-провайдеры"
+  },
+  "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": {
+    "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": "Любой сервис с OpenAI-совместимым интерфейсом (OpenAI, OpenRouter, Mistral, Groq, Gemini или локально: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) или напрямую Anthropic API. Ключи хранятся в системной связке ключей. С помощью с рабочим столом они тоже могут читать файлы и выполнять команды только для чтения (как инструменты)."
+  },
+  "Name in the chat window": {
+    "Name in the chat window": "Имя в окне чата"
+  },
+  "Address (base URL)": {
+    "Address (base URL)": "Адрес (базовый URL)"
+  },
+  "Key saved in the keyring (type a new one to replace it)": {
+    "Key saved in the keyring (type a new one to replace it)": "Ключ сохранён в связке ключей (введи новый, чтобы заменить его)"
+  },
+  "API key (Enter saves it to the keyring; not needed for local models)": {
+    "API key (Enter saves it to the keyring; not needed for local models)": "API-ключ (Enter сохраняет его в связку ключей; для локальных моделей не нужен)"
+  },
+  "Testing …": {
+    "Testing …": "Проверка …"
+  },
+  "Test": {
+    "Test": "Проверить"
+  },
+  "No answer from the test": {
+    "No answer from the test": "Проверка не получила ответа"
+  },
+  "Add provider": {
+    "Add provider": "Добавить провайдера"
+  },
+  "Battery saver": {
+    "Battery saver": "Экономия батареи"
+  },
+  "On battery: no ball game, fewer walks, falls asleep sooner.": {
+    "On battery: no ball game, fewer walks, falls asleep sooner.": "От батареи: без игры в мяч, реже гуляет, раньше засыпает."
+  },
+  "Stay in front": {
+    "Stay in front": "Всегда впереди"
+  },
+  "Stays above the windows instead of behind them. Costs the same, but he is always visible.": {
+    "Stays above the windows instead of behind them. Costs the same, but he is always visible.": "Остаётся поверх окон, а не за ними. Нагрузка та же, но фигурку видно всегда."
+  },
+  "Could not switch Aibou": {
+    "Could not switch Aibou": "Не удалось переключить Aibou"
+  },
+  "Aibou did not respond": {
+    "Aibou did not respond": "Aibou не отвечает"
+  },
+  "Off": {
+    "Off": "Выкл."
+  },
+  "Stays in front of the windows": {
+    "Stays in front of the windows": "Остаётся перед окнами"
+  },
+  "Lives behind the windows": {
+    "Lives behind the windows": "Живёт за окнами"
+  },
+  "Bring to front": {
+    "Bring to front": "Вперёд"
+  },
+  "Into the frame": {
+    "Into the frame": "В рамку"
+  },
+  "Sleep / wake": {
+    "Sleep / wake": "Сон / пробуждение"
+  },
+  "Ball": {
+    "Ball": "Мяч"
+  },
+  "Quick actions": {
+    "Quick actions": "Быстрые действия"
+  },
+  "Switch Aibou on to use these.": {
+    "Switch Aibou on to use these.": "Сначала включи Aibou."
+  },
+  "Happy": {
+    "Happy": "Рад"
+  },
+  "Angry": {
+    "Angry": "Злится"
+  },
+  "Scared": {
+    "Scared": "Страшно"
+  },
+  "Blushing": {
+    "Blushing": "Смущён"
+  },
+  "Grappling gun": {
+    "Grappling gun": "Пистолет-кошка"
+  },
+  "Banana": {
+    "Banana": "Банан"
+  },
+  "In the frame": {
+    "In the frame": "В рамке"
+  },
+  "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": {
+    "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": "В чате он может заглядывать в рабочий стол (файлы, команды только для чтения вроде niri msg -j windows и dms ipc get) и знает навык рабочего стола. Он читает только папки настроек рабочего стола (niri, DMS, Quickshell, GTK, Qt, kitty) и папки, которые вы добавите; файлы с именами вроде токена, пароля или ключа всегда отклоняются. Изменения он только предлагает карточкой; ничего не выполняется, пока вы не нажмёте «Выполнить». Права root, перезапуск DMS или niri и сбросы всегда заблокированы. То, что он читает, уходит провайдеру чата вместе с вашим сообщением."
+  },
+  "Notices what happens": {
+    "Notices what happens": "Замечает, что происходит"
+  },
+  "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": {
+    "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": "Он реагирует, когда в ~/Downloads появляется загрузка, подключается USB-накопитель, программа использует микрофон или записывает экран, заканчивается долгая сборка или обновление пакетов, или ждут обновления. Для этого он следит за ~/Downloads, событиями USB и аудиопотоками, каждые 15 с смотрит на имена запущенных программ и раз в 3 часа запускает checkupdates. Ничего не покидает компьютер. Практически 0."
+  }
+}

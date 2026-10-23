@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+# private notes, kept beside the code but not published
+STAND-*.md
+TODO.md
+TESTPROTOKOLL.md
+docs/PLAN.md
+*.bak-*
+docs/README-alt.de.md
+shell/.demo/

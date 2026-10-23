@@ -1,0 +1,317 @@
+{
+  "His own": {
+    "His own": "自身颜色"
+  },
+  "Accent colour": {
+    "Accent colour": "强调色"
+  },
+  "Fixed colour": {
+    "Fixed colour": "固定颜色"
+  },
+  "None": {
+    "None": "无"
+  },
+  "Usage": {
+    "Usage": "资源占用"
+  },
+  "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": {
+    "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": "静止时 Aibou 占用不到 1 % CPU，内存约 130 MB。开销几乎只来自移动：每绘制一帧都要在 Qt 和显卡驱动中消耗 CPU，所以开销随刷新率上升。以下数值在 Intel Iris Xe、2560×1600、165 Hz 下测得。"
+  },
+  "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": {
+    "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": "快捷键：Mod+Alt+M 移到前面，Mod+Alt+C 聊天窗口，Mod+Alt+Z 睡觉或唤醒，Mod+Alt+B 球，Mod+Alt+Shift+M 开启或关闭。"
+  },
+  "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": {
+    "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": "Aibou 本身尚未安装：这个插件只是它的开关和设置。请从 github.com/satoshoe-dev/aibou 安装（见那里的 README）。"
+  },
+  "Your name": {
+    "Your name": "你的名字"
+  },
+  "How the figures greet you and talk to you. Empty: the first name of your account.": {
+    "How the figures greet you and talk to you. Empty: the first name of your account.": "角色问候你、称呼你时用的名字。留空：使用你账户的名字。"
+  },
+  "First name": {
+    "First name": "名字"
+  },
+  "Main figure": {
+    "Main figure": "主角色"
+  },
+  "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": {
+    "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": "Kuro 是一颗带两只长眼睛的深色玻璃球，颜色与边框一致。Mochi 是一块有脸的年糕，Shiro 是一颗带长眼睛的浅色球，Momo 是桃子，Robo 是眼睛会发光的小机器人，Bao 是包子，Neko 是猫，Kumo 是云，Tako 是章鱼，Hiyoko 是小鸡，Arai 是浣熊。开销都一样。"
+  },
+  "Colour": {
+    "Colour": "颜色"
+  },
+  "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": {
+    "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": "它自身的颜色、强调色（随之变化）或自选的固定颜色。Kuro 仍是玻璃，颜色只作为着色。"
+  },
+  "Used when Colour is set to Fixed colour.": {
+    "Used when Colour is set to Fixed colour.": "颜色设为“固定颜色”时使用。"
+  },
+  "Second figure": {
+    "Second figure": "第二个角色"
+  },
+  "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": {
+    "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": "来到游乐场，和其他角色一起玩。每多一个角色平均多占约 2–3 % CPU，三个醒着的角色实测约 8.5 %。Mod+Alt+Plus / Minus 添加或移除一个。"
+  },
+  "Third figure": {
+    "Third figure": "第三个角色"
+  },
+  "Fourth figure": {
+    "Fourth figure": "第四个角色"
+  },
+  "Fifth figure": {
+    "Fifth figure": "第五个角色"
+  },
+  "Outline": {
+    "Outline": "轮廓"
+  },
+  "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": {
+    "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": "围绕它和它双手的一圈细环。它融入边框时也会画在圆顶上。"
+  },
+  "Hands": {
+    "Hands": "双手"
+  },
+  "Small balls as hands. Barely measurable.": {
+    "Small balls as hands. Barely measurable.": "用小球当手。几乎测不出开销。"
+  },
+  "Eyes follow the pointer": {
+    "Eyes follow the pointer": "眼睛跟随指针"
+  },
+  "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": {
+    "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": "指针在它附近移动时最多约 1–2 % CPU，其余时候为 0。"
+  },
+  "Activity": {
+    "Activity": "活跃度"
+  },
+  "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": {
+    "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": "它自己出去走动的频率。最低：它融入边框，大多只是看着，工作时不会碍事。最高：总在外面活动，从不自己融入边框，独自一个时会叫一个朋友来待几分钟。单个角色实测：普通平均约 3 % CPU，安静约 1 %，活泼约 5 %。"
+  },
+  "Minimal": {
+    "Minimal": "最低"
+  },
+  "Calm": {
+    "Calm": "安静"
+  },
+  "Normal": {
+    "Normal": "普通"
+  },
+  "Lively": {
+    "Lively": "活泼"
+  },
+  "Maximal": {
+    "Maximal": "最高"
+  },
+  "Ball game": {
+    "Ball game": "玩球"
+  },
+  "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": {
+    "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": "游戏期间约 20 % CPU。一局最多一分钟出头，而且只是偶尔才有。"
+  },
+  "Fall asleep after": {
+    "Fall asleep after": "入睡时间"
+  },
+  "Minutes without activity.": {
+    "Minutes without activity.": "无操作的分钟数。"
+  },
+  "Sleep animation": {
+    "Sleep animation": "睡眠动画"
+  },
+  "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": {
+    "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": "睡觉时呼吸并冒出“z”。每个角色约 0.5 % CPU。关闭：它一动不动地睡，0 %。"
+  },
+  "Notifications": {
+    "Notifications": "通知"
+  },
+  "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": {
+    "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": "以气泡显示通知。为此 Aibou 会读取会话总线上每条通知的标题和正文；这些内容不会离开这台电脑。几乎为 0。"
+  },
+  "Frame": {
+    "Frame": "边框"
+  },
+  "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": {
+    "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": "你工作时，它会融入屏幕底部的边框，只露出一个带眼睛的圆顶。工作时：持续活动约 45 s 后融入，安静 2.5 min 后再出来。总是：边框就是它的家。因为它保持不动，可以节省 CPU。"
+  },
+  "While busy": {
+    "While busy": "工作时"
+  },
+  "Always": {
+    "Always": "总是"
+  },
+  "Never": {
+    "Never": "从不"
+  },
+  "Where in the frame": {
+    "Where in the frame": "在边框的哪里"
+  },
+  "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": {
+    "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": "底部边框：它在所站的位置沉进去。状态栏：它滚过去，从状态栏的内侧边缘鼓出来（状态栏在左侧或右侧时）。最近：离状态栏近时去状态栏，否则去底部边框。"
+  },
+  "Nearest": {
+    "Nearest": "最近"
+  },
+  "Bottom frame": {
+    "Bottom frame": "底部边框"
+  },
+  "Bar": {
+    "Bar": "状态栏"
+  },
+  "Colour in the frame": {
+    "Colour in the frame": "边框中的颜色"
+  },
+  "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": {
+    "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": "边框颜色：圆顶采用边框的颜色和透明度，看起来就像边框的一部分。自身颜色：圆顶保留上面选的颜色。"
+  },
+  "Frame colour": {
+    "Frame colour": "边框颜色"
+  },
+  "His colour": {
+    "His colour": "自身颜色"
+  },
+  "In the bar": {
+    "In the bar": "在状态栏中"
+  },
+  "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": {
+    "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": "鼓包：带眼睛的圆顶从栏的内侧边缘鼓出来。只露脸：什么都不突出，只在栏内图标之间的空位露出他的脸。没有空位时，他还是会鼓出来。空位是从栏的截图（grim）中找的，截图不会离开这台电脑。"
+  },
+  "Bulge": {
+    "Bulge": "鼓包"
+  },
+  "Face only": {
+    "Face only": "只露脸"
+  },
+  "Feels the machine": {
+    "Feels the machine": "感知电脑状态"
+  },
+  "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": {
+    "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": "负载高时（CPU 一段时间超过约 60 %、内存超过 82 % 或处理器过热）他会冒汗，负载很高时会紧闭双眼。程序崩溃或服务失败时他会生气，并说出哪里坏了；为此他会跟踪系统日志和 DMS 的日志。每 2 秒检查一次，几乎为 0。"
+  },
+  "Dances to music": {
+    "Dances to music": "随音乐跳舞"
+  },
+  "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": {
+    "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": "播放器放音乐时它会跟着节拍跳，在边框里则是圆顶跟着跳动。节拍取自 cava 的低音，只在播放音乐时运行一个小 cava：约 1 % CPU，再加上跳动的开销。使用电池且开启省电时，它每隔一拍跳一次。"
+  },
+  "Chat": {
+    "Chat": "聊天"
+  },
+  "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": {
+    "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": "在独立窗口里通过 Claude 聊天；他会跳进去。会话在后台持续运行，所以回答大约一秒后开始，逐词出现。你写的内容会发送给 Anthropic 或下面选择的服务商。以 ! 开头的一行会像在终端里一样作为 bash 命令运行。本地为 0；每次回答都计入 Claude 额度。"
+  },
+  "Desktop help": {
+    "Desktop help": "桌面帮助"
+  },
+  "Chat model": {
+    "Chat model": "聊天模型"
+  },
+  "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": {
+    "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": "Haiku 回答最快，Sonnet 和 Opus 思考更深入；三者都需要 Claude Code（claude 命令）。下面设置的服务商也可以在这里选择。在聊天窗口中切换也会更改此设置。"
+  },
+  "New provider": {
+    "New provider": "新服务商"
+  },
+  "Other AI providers": {
+    "Other AI providers": "其他 AI 服务商"
+  },
+  "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": {
+    "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": "任何提供 OpenAI 兼容接口的服务（OpenAI、OpenRouter、Mistral、Groq、Gemini，或本地的 Ollama http://localhost:11434/v1、LM Studio http://localhost:1234/v1），也可以直接用 Anthropic API。密钥保存在系统密钥环中。开启桌面帮助后，它们也可以读取文件并运行只读命令（作为工具）。"
+  },
+  "Name in the chat window": {
+    "Name in the chat window": "聊天窗口中的名称"
+  },
+  "Address (base URL)": {
+    "Address (base URL)": "地址（基础 URL）"
+  },
+  "Key saved in the keyring (type a new one to replace it)": {
+    "Key saved in the keyring (type a new one to replace it)": "密钥已保存在密钥环中（输入新密钥即可替换）"
+  },
+  "API key (Enter saves it to the keyring; not needed for local models)": {
+    "API key (Enter saves it to the keyring; not needed for local models)": "API 密钥（按 Enter 保存到密钥环；本地模型不需要）"
+  },
+  "Testing …": {
+    "Testing …": "测试中 …"
+  },
+  "Test": {
+    "Test": "测试"
+  },
+  "No answer from the test": {
+    "No answer from the test": "测试没有回应"
+  },
+  "Add provider": {
+    "Add provider": "添加服务商"
+  },
+  "Battery saver": {
+    "Battery saver": "省电"
+  },
+  "On battery: no ball game, fewer walks, falls asleep sooner.": {
+    "On battery: no ball game, fewer walks, falls asleep sooner.": "使用电池时：不玩球，少出去走动，更早入睡。"
+  },
+  "Stay in front": {
+    "Stay in front": "保持在前"
+  },
+  "Stays above the windows instead of behind them. Costs the same, but he is always visible.": {
+    "Stays above the windows instead of behind them. Costs the same, but he is always visible.": "待在窗口上方而不是后面。开销不变，但它始终可见。"
+  },
+  "Could not switch Aibou": {
+    "Could not switch Aibou": "无法切换 Aibou"
+  },
+  "Aibou did not respond": {
+    "Aibou did not respond": "Aibou 没有响应"
+  },
+  "Off": {
+    "Off": "关闭"
+  },
+  "Stays in front of the windows": {
+    "Stays in front of the windows": "待在窗口前面"
+  },
+  "Lives behind the windows": {
+    "Lives behind the windows": "住在窗口后面"
+  },
+  "Bring to front": {
+    "Bring to front": "移到前面"
+  },
+  "Into the frame": {
+    "Into the frame": "进入边框"
+  },
+  "Sleep / wake": {
+    "Sleep / wake": "睡觉 / 唤醒"
+  },
+  "Ball": {
+    "Ball": "球"
+  },
+  "Quick actions": {
+    "Quick actions": "快捷操作"
+  },
+  "Switch Aibou on to use these.": {
+    "Switch Aibou on to use these.": "先开启 Aibou 才能使用。"
+  },
+  "Happy": {
+    "Happy": "开心"
+  },
+  "Angry": {
+    "Angry": "生气"
+  },
+  "Scared": {
+    "Scared": "害怕"
+  },
+  "Blushing": {
+    "Blushing": "害羞"
+  },
+  "Grappling gun": {
+    "Grappling gun": "抓钩枪"
+  },
+  "Banana": {
+    "Banana": "香蕉"
+  },
+  "In the frame": {
+    "In the frame": "在边框中"
+  },
+  "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": {
+    "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": "在聊天中他可以查看桌面（文件、只读命令，如 niri msg -j windows 和 dms ipc get），并了解桌面技能。他只读取桌面的配置文件夹（niri、DMS、Quickshell、GTK、Qt、kitty）以及你添加的文件夹；名称像令牌、密码或密钥的文件一律拒绝。更改他只以卡片形式提议；在你点击“运行”之前什么都不会执行。root 权限、重启 DMS 或 niri 以及重置始终被阻止。他读取的内容会随你的消息发送给聊天服务商。"
+  },
+  "Notices what happens": {
+    "Notices what happens": "留意发生的事"
+  },
+  "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": {
+    "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": "当下载落入 ~/Downloads、插入 USB 驱动器、有程序使用麦克风或录制屏幕、长时间的构建或软件包操作结束、或有更新等待时，他会做出反应。为此他会监视 ~/Downloads、USB 事件和音频流，每 15 秒查看一次正在运行的程序名称，并每 3 小时运行一次 checkupdates。没有任何内容离开这台电脑。几乎为 0。"
+  }
+}

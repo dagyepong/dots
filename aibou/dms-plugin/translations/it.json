@@ -1,0 +1,317 @@
+{
+  "His own": {
+    "His own": "Suo"
+  },
+  "Accent colour": {
+    "Accent colour": "Colore d'accento"
+  },
+  "Fixed colour": {
+    "Fixed colour": "Colore fisso"
+  },
+  "None": {
+    "None": "Nessuno"
+  },
+  "Usage": {
+    "Usage": "Consumo"
+  },
+  "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": {
+    "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": "A riposo Aibou usa meno dell'1 % di CPU e circa 130 MB di memoria. I costi nascono quasi solo dal movimento: ogni fotogramma disegnato costa CPU in Qt e nel driver grafico, quindi crescono con la frequenza di aggiornamento. I valori qui sotto sono misurati a 2560×1600 e 165 Hz su Intel Iris Xe."
+  },
+  "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": {
+    "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": "Scorciatoie: Mod+Alt+M in primo piano, Mod+Alt+C finestra della chat, Mod+Alt+Z dormire o svegliare, Mod+Alt+B palla, Mod+Alt+Shift+M acceso o spento."
+  },
+  "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": {
+    "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": "Aibou stesso non è installato: questo plugin è solo il suo interruttore e le sue impostazioni. Installalo da github.com/satoshoe-dev/aibou (vedi il README lì)."
+  },
+  "Your name": {
+    "Your name": "Il tuo nome"
+  },
+  "How the figures greet you and talk to you. Empty: the first name of your account.": {
+    "How the figures greet you and talk to you. Empty: the first name of your account.": "Come le figure ti salutano e ti chiamano. Vuoto: il nome del tuo account."
+  },
+  "First name": {
+    "First name": "Nome"
+  },
+  "Main figure": {
+    "Main figure": "Figura principale"
+  },
+  "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": {
+    "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": "Kuro è una sfera di vetro scura con due occhi allungati, nel colore della cornice. Mochi è un dolcetto di riso con una faccia, Shiro una sfera chiara con occhi allungati, Momo una pesca, Robo un piccolo robot con occhi luminosi, Bao un panino al vapore, Neko un gatto, Kumo una nuvola, Tako un polpo, Hiyoko un pulcino, Arai un procione. Costano tutte uguale."
+  },
+  "Colour": {
+    "Colour": "Colore"
+  },
+  "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": {
+    "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": "Il suo colore, il colore d'accento (cambia insieme a esso) o un colore fisso a scelta. Kuro resta di vetro e prende il colore come tinta."
+  },
+  "Used when Colour is set to Fixed colour.": {
+    "Used when Colour is set to Fixed colour.": "Vale quando in Colore è scelto Colore fisso."
+  },
+  "Second figure": {
+    "Second figure": "Seconda figura"
+  },
+  "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": {
+    "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": "Entra nel parco giochi e gioca con le altre. Ogni figura in più costa in media circa il 2–3 % di CPU, tre figure sveglie misurate circa l'8,5 %. Mod+Alt+Plus / Minus ne aggiunge o ne toglie una."
+  },
+  "Third figure": {
+    "Third figure": "Terza figura"
+  },
+  "Fourth figure": {
+    "Fourth figure": "Quarta figura"
+  },
+  "Fifth figure": {
+    "Fifth figure": "Quinta figura"
+  },
+  "Outline": {
+    "Outline": "Contorno"
+  },
+  "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": {
+    "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": "Un sottile anello intorno a lui e alle sue mani. Disegnato anche sulla cupola quando si fonde nella cornice."
+  },
+  "Hands": {
+    "Hands": "Mani"
+  },
+  "Small balls as hands. Barely measurable.": {
+    "Small balls as hands. Barely measurable.": "Piccole sfere come mani. Quasi non misurabile."
+  },
+  "Eyes follow the pointer": {
+    "Eyes follow the pointer": "Gli occhi seguono il puntatore"
+  },
+  "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": {
+    "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": "Fino a circa l'1–2 % di CPU mentre il puntatore si muove vicino a lui, altrimenti 0."
+  },
+  "Activity": {
+    "Activity": "Attività"
+  },
+  "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": {
+    "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": "Quanto spesso parte da solo. Minima: si fonde nella cornice e per lo più guarda soltanto, così non disturba mentre lavori. Massima: sempre in giro, non si fonde mai da solo e chiama un amico per qualche minuto quando è solo. Misurato con una figura: normale in media circa 3 % di CPU, tranquilla circa 1 %, vivace circa 5 %."
+  },
+  "Minimal": {
+    "Minimal": "Minima"
+  },
+  "Calm": {
+    "Calm": "Tranquilla"
+  },
+  "Normal": {
+    "Normal": "Normale"
+  },
+  "Lively": {
+    "Lively": "Vivace"
+  },
+  "Maximal": {
+    "Maximal": "Massima"
+  },
+  "Ball game": {
+    "Ball game": "Gioco della palla"
+  },
+  "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": {
+    "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": "Circa 20 % di CPU durante una partita. Una partita dura al massimo poco più di un minuto e capita solo ogni tanto."
+  },
+  "Fall asleep after": {
+    "Fall asleep after": "Addormentarsi dopo"
+  },
+  "Minutes without activity.": {
+    "Minutes without activity.": "Minuti senza attività."
+  },
+  "Sleep animation": {
+    "Sleep animation": "Animazione del sonno"
+  },
+  "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": {
+    "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": "Respiro e una \"z\" mentre dorme. Circa 0,5 % di CPU per figura. Spenta: dorme immobile a 0 %."
+  },
+  "Notifications": {
+    "Notifications": "Notifiche"
+  },
+  "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": {
+    "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": "Mostra le notifiche come fumetto. Per farlo Aibou legge titolo e testo di ogni notifica sul bus di sessione; restano su questo computer. Praticamente 0."
+  },
+  "Frame": {
+    "Frame": "Cornice"
+  },
+  "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": {
+    "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": "Mentre lavori si fonde nella parte inferiore della cornice dello schermo, si vede solo una cupola con gli occhi. Mentre lavori: dopo circa 45 s di attività continua, esce di nuovo dopo 2,5 min di quiete. Sempre: la cornice è la sua casa. Risparmia CPU, perché sta fermo."
+  },
+  "While busy": {
+    "While busy": "Mentre lavori"
+  },
+  "Always": {
+    "Always": "Sempre"
+  },
+  "Never": {
+    "Never": "Mai"
+  },
+  "Where in the frame": {
+    "Where in the frame": "Dove nella cornice"
+  },
+  "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": {
+    "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": "Cornice inferiore: sprofonda dove si trova. Barra: rotola fin lì e sporge dal bordo interno della barra (barra a sinistra o a destra). Più vicina: la barra se è vicino, altrimenti la cornice inferiore."
+  },
+  "Nearest": {
+    "Nearest": "Più vicina"
+  },
+  "Bottom frame": {
+    "Bottom frame": "Cornice inferiore"
+  },
+  "Bar": {
+    "Bar": "Barra"
+  },
+  "Colour in the frame": {
+    "Colour in the frame": "Colore nella cornice"
+  },
+  "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": {
+    "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": "Colore della cornice: la cupola prende colore e trasparenza della cornice e sembra farne parte. Il suo colore: la cupola mantiene il colore scelto sopra."
+  },
+  "Frame colour": {
+    "Frame colour": "Colore della cornice"
+  },
+  "His colour": {
+    "His colour": "Il suo colore"
+  },
+  "In the bar": {
+    "In the bar": "Nella barra"
+  },
+  "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": {
+    "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": "Gobba: una cupola con gli occhi spunta dal bordo interno della barra. Solo viso: non sporge niente, si vede solo il suo viso dentro la barra, in un punto libero tra le icone. Se non c'è posto, spunta comunque come gobba. Il punto libero viene cercato in uno screenshot della barra (grim) che resta su questo computer."
+  },
+  "Bulge": {
+    "Bulge": "Rigonfiamento"
+  },
+  "Face only": {
+    "Face only": "Solo la faccia"
+  },
+  "Feels the machine": {
+    "Feels the machine": "Sente il computer"
+  },
+  "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": {
+    "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": "Con carico alto (CPU sopra il 60 % circa per un po', memoria sopra l'82 % o processore caldo) comincia a sudare, con carico molto alto strizza gli occhi. Se un programma va in crash o un servizio fallisce si arrabbia e dice cosa si è rotto; per questo segue il journal di sistema e il log di DMS. Controlla ogni 2 s, praticamente 0."
+  },
+  "Dances to music": {
+    "Dances to music": "Balla con la musica"
+  },
+  "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": {
+    "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": "Quando un lettore riproduce musica saltella a tempo, nella cornice la sua cupola pulsa insieme. Il ritmo viene dai bassi di cava, un piccolo cava gira solo mentre suona la musica: circa 1 % di CPU, più i salti. Con il risparmio batteria attivo, a batteria balla un battito sì e uno no."
+  },
+  "Chat": {
+    "Chat": "Chat"
+  },
+  "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": {
+    "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": "Chat con Claude in una finestra propria; lui ci salta dentro. La sessione resta attiva in background, quindi le risposte iniziano dopo circa un secondo e arrivano parola per parola. Quello che scrivi va ad Anthropic o al fornitore scelto sotto. Una riga che inizia con ! viene eseguita come comando in bash, come in un terminale. 0 in locale; ogni risposta conta sulla quota di Claude."
+  },
+  "Desktop help": {
+    "Desktop help": "Aiuto per il desktop"
+  },
+  "Chat model": {
+    "Chat model": "Modello della chat"
+  },
+  "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": {
+    "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": "Haiku risponde più in fretta, Sonnet e Opus ragionano più a fondo; tutti e tre richiedono Claude Code (il comando claude). Anche i fornitori configurati sotto si possono scegliere qui. Cambiare nella finestra della chat modifica anche questa impostazione."
+  },
+  "New provider": {
+    "New provider": "Nuovo fornitore"
+  },
+  "Other AI providers": {
+    "Other AI providers": "Altri fornitori di IA"
+  },
+  "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": {
+    "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": "Qualsiasi servizio con un'interfaccia compatibile con OpenAI (OpenAI, OpenRouter, Mistral, Groq, Gemini, o in locale: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) oppure direttamente l'API di Anthropic. Le chiavi sono conservate nel portachiavi di sistema. Con l'aiuto per il desktop attivo, anche loro possono leggere file ed eseguire comandi di sola lettura (come strumenti)."
+  },
+  "Name in the chat window": {
+    "Name in the chat window": "Nome nella finestra della chat"
+  },
+  "Address (base URL)": {
+    "Address (base URL)": "Indirizzo (URL di base)"
+  },
+  "Key saved in the keyring (type a new one to replace it)": {
+    "Key saved in the keyring (type a new one to replace it)": "Chiave salvata nel portachiavi (digitane una nuova per sostituirla)"
+  },
+  "API key (Enter saves it to the keyring; not needed for local models)": {
+    "API key (Enter saves it to the keyring; not needed for local models)": "Chiave API (Invio la salva nel portachiavi; non serve per i modelli locali)"
+  },
+  "Testing …": {
+    "Testing …": "Test in corso …"
+  },
+  "Test": {
+    "Test": "Prova"
+  },
+  "No answer from the test": {
+    "No answer from the test": "Nessuna risposta dal test"
+  },
+  "Add provider": {
+    "Add provider": "Aggiungi fornitore"
+  },
+  "Battery saver": {
+    "Battery saver": "Risparmio batteria"
+  },
+  "On battery: no ball game, fewer walks, falls asleep sooner.": {
+    "On battery: no ball game, fewer walks, falls asleep sooner.": "A batteria: niente gioco della palla, meno passeggiate, si addormenta prima."
+  },
+  "Stay in front": {
+    "Stay in front": "Sempre in primo piano"
+  },
+  "Stays above the windows instead of behind them. Costs the same, but he is always visible.": {
+    "Stays above the windows instead of behind them. Costs the same, but he is always visible.": "Resta sopra le finestre invece che dietro. Costa lo stesso, ma è sempre visibile."
+  },
+  "Could not switch Aibou": {
+    "Could not switch Aibou": "Impossibile attivare o disattivare Aibou"
+  },
+  "Aibou did not respond": {
+    "Aibou did not respond": "Aibou non ha risposto"
+  },
+  "Off": {
+    "Off": "Spento"
+  },
+  "Stays in front of the windows": {
+    "Stays in front of the windows": "Resta davanti alle finestre"
+  },
+  "Lives behind the windows": {
+    "Lives behind the windows": "Vive dietro le finestre"
+  },
+  "Bring to front": {
+    "Bring to front": "In primo piano"
+  },
+  "Into the frame": {
+    "Into the frame": "Entra nella cornice"
+  },
+  "Sleep / wake": {
+    "Sleep / wake": "Dormi / sveglia"
+  },
+  "Ball": {
+    "Ball": "Palla"
+  },
+  "Quick actions": {
+    "Quick actions": "Azioni rapide"
+  },
+  "Switch Aibou on to use these.": {
+    "Switch Aibou on to use these.": "Accendi Aibou per usarle."
+  },
+  "Happy": {
+    "Happy": "Felice"
+  },
+  "Angry": {
+    "Angry": "Arrabbiato"
+  },
+  "Scared": {
+    "Scared": "Spaventato"
+  },
+  "Blushing": {
+    "Blushing": "Imbarazzato"
+  },
+  "Grappling gun": {
+    "Grappling gun": "Rampino"
+  },
+  "Banana": {
+    "Banana": "Banana"
+  },
+  "In the frame": {
+    "In the frame": "Nella cornice"
+  },
+  "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": {
+    "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": "Nella chat può consultare il desktop (file, comandi di sola lettura come niri msg -j windows e dms ipc get) e conosce la skill del desktop. Legge solo le cartelle di configurazione del desktop (niri, DMS, Quickshell, GTK, Qt, kitty) e le cartelle che aggiungi; i file con nomi da token, password o chiavi vengono sempre rifiutati. Le modifiche le propone solo come scheda; non parte niente finché non premi Esegui. Permessi di root, riavvio di DMS o niri e ripristini sono sempre bloccati. Quello che legge va al fornitore della chat insieme al tuo messaggio."
+  },
+  "Notices what happens": {
+    "Notices what happens": "Si accorge di cosa succede"
+  },
+  "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": {
+    "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": "Reagisce quando un download arriva in ~/Downloads, viene inserita un'unità USB, un programma usa il microfono o registra lo schermo, finisce una lunga compilazione o un aggiornamento dei pacchetti, o ci sono aggiornamenti in attesa. Per questo osserva ~/Downloads, gli eventi USB e i flussi audio, guarda i nomi dei programmi in esecuzione ogni 15 s ed esegue checkupdates ogni 3 ore. Niente lascia il computer. Praticamente 0."
+  }
+}

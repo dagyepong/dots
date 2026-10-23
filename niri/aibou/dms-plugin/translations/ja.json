@@ -1,0 +1,317 @@
+{
+  "His own": {
+    "His own": "固有の色"
+  },
+  "Accent colour": {
+    "Accent colour": "アクセントカラー"
+  },
+  "Fixed colour": {
+    "Fixed colour": "固定色"
+  },
+  "None": {
+    "None": "なし"
+  },
+  "Usage": {
+    "Usage": "負荷"
+  },
+  "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": {
+    "At rest Aibou needs under 1 % CPU and about 130 MB of memory. Costs come almost only from movement: every drawn frame costs CPU in Qt and the graphics driver, so they rise with the refresh rate. Figures below were measured at 2560×1600 and 165 Hz on Intel Iris Xe.": "待機中の Aibou は CPU 1 % 未満、メモリ約 130 MB です。負荷はほぼ動きからだけ生まれます。描画するフレームごとに Qt とグラフィックドライバーで CPU を使うため、リフレッシュレートが高いほど増えます。以下の値は 2560×1600、165 Hz、Intel Iris Xe で測定したものです。"
+  },
+  "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": {
+    "Shortcuts: Mod+Alt+M bring to front, Mod+Alt+C chat window, Mod+Alt+Z sleep or wake, Mod+Alt+B ball, Mod+Alt+Shift+M on or off.": "ショートカット：Mod+Alt+M 前面に出す、Mod+Alt+C チャットウィンドウ、Mod+Alt+Z 寝かせる／起こす、Mod+Alt+B ボール、Mod+Alt+Shift+M オン／オフ。"
+  },
+  "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": {
+    "Aibou itself is not installed: this plugin is only its switch and settings. Install it from github.com/satoshoe-dev/aibou (see the README there).": "Aibou 本体がインストールされていません。このプラグインはスイッチと設定だけです。github.com/satoshoe-dev/aibou からインストールしてください（手順はそこの README を参照）。"
+  },
+  "Your name": {
+    "Your name": "あなたの名前"
+  },
+  "How the figures greet you and talk to you. Empty: the first name of your account.": {
+    "How the figures greet you and talk to you. Empty: the first name of your account.": "キャラクターがあなたに挨拶し、呼びかけるときの名前。空欄の場合はアカウントの名を使います。"
+  },
+  "First name": {
+    "First name": "名前"
+  },
+  "Main figure": {
+    "Main figure": "メインキャラクター"
+  },
+  "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": {
+    "Kuro is a dark glass ball with two long eyes, in the colour of the frame. Mochi is a rice cake with a face, Shiro a light ball with long eyes, Momo a peach, Robo a small robot with glowing eyes, Bao a steamed bun, Neko a cat, Kumo a cloud, Tako an octopus, Hiyoko a chick, Arai a raccoon. All cost the same.": "Kuro は細長い目が二つある暗いガラスの玉で、フレームと同じ色です。Mochi は顔のあるお餅、Shiro は細長い目の明るい玉、Momo は桃、Robo は目が光る小さなロボット、Bao は肉まん、Neko は猫、Kumo は雲、Tako はタコ、Hiyoko はひよこ、Arai はアライグマです。負荷はどれも同じです。"
+  },
+  "Colour": {
+    "Colour": "色"
+  },
+  "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": {
+    "His own colour, the accent colour (changes along with it) or a fixed colour of your choice. Kuro stays glass and takes the colour as a tint.": "キャラクター固有の色、アクセントカラー（一緒に変わります）、または好きな固定色。Kuro はガラスのままで、色は色味として加わります。"
+  },
+  "Used when Colour is set to Fixed colour.": {
+    "Used when Colour is set to Fixed colour.": "「色」で「固定色」を選んだときに使います。"
+  },
+  "Second figure": {
+    "Second figure": "2 番目のキャラクター"
+  },
+  "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": {
+    "Joins the playground and plays with the others. Each extra figure adds about 2–3 % CPU on average, three awake figures measured about 8.5 %. Mod+Alt+Plus / Minus adds or removes one.": "遊び場に加わり、ほかのキャラクターと遊びます。1 体増えるごとに CPU が平均で約 2–3 % 増え、起きている 3 体では約 8.5 % でした。Mod+Alt+Plus / Minus で 1 体追加・削除します。"
+  },
+  "Third figure": {
+    "Third figure": "3 番目のキャラクター"
+  },
+  "Fourth figure": {
+    "Fourth figure": "4 番目のキャラクター"
+  },
+  "Fifth figure": {
+    "Fifth figure": "5 番目のキャラクター"
+  },
+  "Outline": {
+    "Outline": "輪郭"
+  },
+  "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": {
+    "A thin ring around him and his hands. Also drawn over the dome when he melts into the frame.": "本体と手の周りの細いリング。フレームに溶け込んでいるときはドームの上にも描きます。"
+  },
+  "Hands": {
+    "Hands": "手"
+  },
+  "Small balls as hands. Barely measurable.": {
+    "Small balls as hands. Barely measurable.": "小さな玉の手。負荷はほとんど測れないほどです。"
+  },
+  "Eyes follow the pointer": {
+    "Eyes follow the pointer": "目がポインターを追う"
+  },
+  "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": {
+    "Up to about 1–2 % CPU while the pointer moves near him, otherwise 0.": "近くでポインターが動いている間は CPU 約 1–2 %、それ以外は 0 です。"
+  },
+  "Activity": {
+    "Activity": "活発さ"
+  },
+  "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": {
+    "How often he sets off on his own. Minimal: he melts into the frame and mostly just watches, so he does not get in the way while you work. Maximal: always out and about, never melts in by himself, and calls a friend over for a few minutes when he is alone. Measured with one figure: normal about 3 % CPU on average, calm about 1 %, lively about 5 %.": "自分から動き出す頻度。最小：フレームに溶け込んでほぼ眺めているだけなので、作業の邪魔になりません。最大：いつも動き回り、自分からは溶け込まず、ひとりのときは数分間友だちを呼びます。1 体で測定：普通で平均 CPU 約 3 %、おだやかで約 1 %、元気で約 5 %。"
+  },
+  "Minimal": {
+    "Minimal": "最小"
+  },
+  "Calm": {
+    "Calm": "おだやか"
+  },
+  "Normal": {
+    "Normal": "普通"
+  },
+  "Lively": {
+    "Lively": "元気"
+  },
+  "Maximal": {
+    "Maximal": "最大"
+  },
+  "Ball game": {
+    "Ball game": "ボール遊び"
+  },
+  "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": {
+    "About 20 % CPU during a game. A game lasts a little over a minute at most and comes only now and then.": "遊んでいる間は CPU 約 20 %。1 回の遊びは長くても 1 分ちょっとで、たまにしか始まりません。"
+  },
+  "Fall asleep after": {
+    "Fall asleep after": "眠るまでの時間"
+  },
+  "Minutes without activity.": {
+    "Minutes without activity.": "操作がない時間（分）。"
+  },
+  "Sleep animation": {
+    "Sleep animation": "睡眠アニメーション"
+  },
+  "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": {
+    "Breathing and a \"z\" while asleep. About 0.5 % CPU per figure. Off, he sleeps without moving at 0 %.": "眠っている間の呼吸と「z」。1 体あたり CPU 約 0.5 %。オフにすると動かずに眠り、0 % です。"
+  },
+  "Notifications": {
+    "Notifications": "通知"
+  },
+  "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": {
+    "Shows notifications as a speech bubble. For this Aibou reads the title and text of every notification on the session bus; they stay on this computer. Practically 0.": "通知を吹き出しで見せます。そのために Aibou はセッションバス上のすべての通知のタイトルと本文を読みます。通知はこのコンピューターの外に出ません。ほぼ 0。"
+  },
+  "Frame": {
+    "Frame": "フレーム"
+  },
+  "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": {
+    "While you work he melts into the bottom of the screen frame, only a dome with eyes shows. While busy: after about 45 s of steady activity, out again after 2.5 min of quiet. Always: the frame is his home. Saves CPU, because he stays still.": "作業中は画面フレームの下端に溶け込み、目のあるドームだけがのぞきます。作業中のみ：約 45 秒操作が続くと溶け込み、2.5 分操作がないとまた出てきます。常に：フレームが住まいです。じっとしているので CPU を節約できます。"
+  },
+  "While busy": {
+    "While busy": "作業中のみ"
+  },
+  "Always": {
+    "Always": "常に"
+  },
+  "Never": {
+    "Never": "しない"
+  },
+  "Where in the frame": {
+    "Where in the frame": "フレームのどこに"
+  },
+  "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": {
+    "Bottom frame: he sinks in where he stands. Bar: he rolls over and bulges out of the bar's inner edge (bar on the left or right). Nearest: the bar when he is close to it, otherwise the bottom frame.": "下フレーム：その場で沈み込みます。バー：転がって移動し、バーの内側の縁からふくらみ出ます（バーが左か右にある場合）。近い方：バーの近くにいればバー、それ以外は下フレーム。"
+  },
+  "Nearest": {
+    "Nearest": "近い方"
+  },
+  "Bottom frame": {
+    "Bottom frame": "下フレーム"
+  },
+  "Bar": {
+    "Bar": "バー"
+  },
+  "Colour in the frame": {
+    "Colour in the frame": "フレーム内の色"
+  },
+  "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": {
+    "Frame colour: the dome takes the colour and transparency of the frame and looks like part of it. His colour: the dome keeps the colour chosen above.": "フレームの色：ドームがフレームの色と透明度になり、フレームの一部のように見えます。固有の色：ドームは上で選んだ色のままです。"
+  },
+  "Frame colour": {
+    "Frame colour": "フレームの色"
+  },
+  "His colour": {
+    "His colour": "固有の色"
+  },
+  "In the bar": {
+    "In the bar": "バーの中"
+  },
+  "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": {
+    "Bulge: a dome with eyes bulges out of the bar's inner edge. Face only: nothing sticks out, only his face shows inside the bar, in a free spot between the icons. If there is no room, he bulges out after all. The free spot is found in a screenshot of the bar (grim) that stays on this computer.": "ふくらみ: 目のあるドームがバーの内側の縁からふくらみます。顔だけ: 何もはみ出さず、バーの中のアイコンの間の空いた場所に顔だけが見えます。場所がなければ、やはりふくらみます。空いた場所はバーのスクリーンショット (grim) から探し、その画像はこのコンピューターの外に出ません。"
+  },
+  "Bulge": {
+    "Bulge": "ふくらみ"
+  },
+  "Face only": {
+    "Face only": "顔だけ"
+  },
+  "Feels the machine": {
+    "Feels the machine": "マシンの状態を感じる"
+  },
+  "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": {
+    "Under high load (CPU over about 60 % for a while, memory over 82 % or a hot processor) he starts to sweat, under very high load he squeezes his eyes shut. When a program crashes or a service fails he gets angry and says what broke; for that he follows the system journal and DMS's log. Checks every 2 s, practically 0.": "負荷が高いとき (CPU がしばらく約 60 % 超、メモリ 82 % 超、またはプロセッサが熱いとき) は汗をかき、とても高いと目をぎゅっとつぶります。プログラムがクラッシュしたりサービスが失敗したりすると怒って、何が壊れたかを言います。そのためにシステムジャーナルと DMS のログを追っています。2 秒ごとに確認、ほぼ 0。"
+  },
+  "Dances to music": {
+    "Dances to music": "音楽に合わせて踊る"
+  },
+  "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": {
+    "When a player plays music he hops to the beat, in the frame his dome pulses along. The beat comes from cava's bass, a small cava runs only while music plays: about 1 % CPU, plus the hops. With the battery saver on battery he dances to every other beat.": "プレーヤーで音楽が流れるとビートに合わせて跳ね、フレーム内ではドームが一緒に脈打ちます。ビートは cava の低音から取り、小さな cava は音楽の再生中だけ動きます：CPU 約 1 % とジャンプの分。バッテリー節約がオンでバッテリー駆動中は、2 拍に 1 回踊ります。"
+  },
+  "Chat": {
+    "Chat": "チャット"
+  },
+  "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": {
+    "Chat through Claude in its own window; he jumps into it. The session keeps running in the background, so answers start after about one second and arrive word by word. What you write goes to Anthropic or the provider chosen below. A line starting with ! runs as a command in bash, like in a terminal. 0 locally; each answer counts against the Claude quota.": "専用ウィンドウで Claude とチャットします。彼はその中に飛び込みます。セッションはバックグラウンドで動き続けるので、答えは約 1 秒で始まり、一語ずつ届きます。書いた内容は Anthropic か、下で選んだプロバイダーに送られます。! で始まる行はターミナルと同じように bash のコマンドとして実行されます。ローカルでは 0。答えごとに Claude の利用枠を使います。"
+  },
+  "Desktop help": {
+    "Desktop help": "デスクトップのヘルプ"
+  },
+  "Chat model": {
+    "Chat model": "チャットモデル"
+  },
+  "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": {
+    "Haiku answers fastest, Sonnet and Opus think deeper; all three need Claude Code (the claude command). The providers set up below can be chosen here too. Switching in the chat window changes this setting as well.": "Haiku がいちばん速く答え、Sonnet と Opus はより深く考えます。3 つとも Claude Code (claude コマンド) が必要です。下で設定したプロバイダーもここで選べます。チャット画面で切り替えると、この設定も変わります。"
+  },
+  "New provider": {
+    "New provider": "新しいプロバイダー"
+  },
+  "Other AI providers": {
+    "Other AI providers": "その他の AI プロバイダー"
+  },
+  "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": {
+    "Any service with an OpenAI-compatible interface (OpenAI, OpenRouter, Mistral, Groq, Gemini, or local: Ollama http://localhost:11434/v1, LM Studio http://localhost:1234/v1) or the Anthropic API directly. Keys are kept in the system keyring. With desktop help on, they may read files and run read-only commands too (as tools).": "OpenAI 互換インターフェースを持つサービス（OpenAI、OpenRouter、Mistral、Groq、Gemini、またはローカル：Ollama http://localhost:11434/v1、LM Studio http://localhost:1234/v1）か、Anthropic API を直接使えます。キーはシステムのキーリングに保存します。デスクトップのヘルプがオンなら、これらもファイルを読み、読み取り専用コマンドを実行できます（ツールとして）。"
+  },
+  "Name in the chat window": {
+    "Name in the chat window": "チャットウィンドウでの名前"
+  },
+  "Address (base URL)": {
+    "Address (base URL)": "アドレス（ベース URL）"
+  },
+  "Key saved in the keyring (type a new one to replace it)": {
+    "Key saved in the keyring (type a new one to replace it)": "キーはキーリングに保存済み（置き換えるには新しいキーを入力）"
+  },
+  "API key (Enter saves it to the keyring; not needed for local models)": {
+    "API key (Enter saves it to the keyring; not needed for local models)": "API キー（Enter でキーリングに保存。ローカルモデルでは不要）"
+  },
+  "Testing …": {
+    "Testing …": "テスト中 …"
+  },
+  "Test": {
+    "Test": "テスト"
+  },
+  "No answer from the test": {
+    "No answer from the test": "テストの応答がありません"
+  },
+  "Add provider": {
+    "Add provider": "プロバイダーを追加"
+  },
+  "Battery saver": {
+    "Battery saver": "バッテリー節約"
+  },
+  "On battery: no ball game, fewer walks, falls asleep sooner.": {
+    "On battery: no ball game, fewer walks, falls asleep sooner.": "バッテリー駆動中：ボール遊びなし、出歩く回数を減らし、早めに眠ります。"
+  },
+  "Stay in front": {
+    "Stay in front": "常に前面"
+  },
+  "Stays above the windows instead of behind them. Costs the same, but he is always visible.": {
+    "Stays above the windows instead of behind them. Costs the same, but he is always visible.": "ウィンドウの後ろではなく上にいます。負荷は同じですが、いつも見えます。"
+  },
+  "Could not switch Aibou": {
+    "Could not switch Aibou": "Aibou を切り替えられませんでした"
+  },
+  "Aibou did not respond": {
+    "Aibou did not respond": "Aibou が応答しません"
+  },
+  "Off": {
+    "Off": "オフ"
+  },
+  "Stays in front of the windows": {
+    "Stays in front of the windows": "ウィンドウの前にいます"
+  },
+  "Lives behind the windows": {
+    "Lives behind the windows": "ウィンドウの後ろで暮らしています"
+  },
+  "Bring to front": {
+    "Bring to front": "前面に出す"
+  },
+  "Into the frame": {
+    "Into the frame": "フレームへ"
+  },
+  "Sleep / wake": {
+    "Sleep / wake": "寝かせる／起こす"
+  },
+  "Ball": {
+    "Ball": "ボール"
+  },
+  "Quick actions": {
+    "Quick actions": "クイックアクション"
+  },
+  "Switch Aibou on to use these.": {
+    "Switch Aibou on to use these.": "使うには Aibou をオンにしてください。"
+  },
+  "Happy": {
+    "Happy": "うれしい"
+  },
+  "Angry": {
+    "Angry": "怒り"
+  },
+  "Scared": {
+    "Scared": "こわい"
+  },
+  "Blushing": {
+    "Blushing": "照れ"
+  },
+  "Grappling gun": {
+    "Grappling gun": "ロープガン"
+  },
+  "Banana": {
+    "Banana": "バナナ"
+  },
+  "In the frame": {
+    "In the frame": "フレーム内"
+  },
+  "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": {
+    "In the chat he may look things up on the desktop (files, read-only commands like niri msg -j windows and dms ipc get) and knows the desktop skill. He reads only the desktop's config folders (niri, DMS, Quickshell, GTK, Qt, kitty) and folders you add; files named like tokens, passwords or keys are always refused. Changes he only proposes as a card; nothing runs until you click Run. Root rights, restarting DMS or niri and resets are always blocked. What he reads goes to the chat provider along with your message.": "チャットでデスクトップのことを調べられます (ファイル、niri msg -j windows や dms ipc get のような読み取り専用コマンド)。デスクトップのスキルも知っています。読むのはデスクトップの設定フォルダー (niri、DMS、Quickshell、GTK、Qt、kitty) と、あなたが追加したフォルダーだけです。トークン、パスワード、鍵のような名前のファイルはいつも拒否します。変更はカードとして提案するだけで、「実行」を押すまで何も動きません。root 権限、DMS や niri の再起動、リセットはいつもブロックされます。読んだ内容はメッセージと一緒にチャットのプロバイダーに送られます。"
+  },
+  "Notices what happens": {
+    "Notices what happens": "起きたことに気づく"
+  },
+  "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": {
+    "He reacts when a download lands in ~/Downloads, a USB drive is plugged in, a program uses the microphone or records the screen, a long build or package run ends, or updates are waiting. For this he watches ~/Downloads, USB events and the audio streams, looks at the names of the running programs every 15 s and runs checkupdates every 3 hours. Nothing leaves the computer. Practically 0.": "~/Downloads にダウンロードが届いたとき、USB ドライブが挿されたとき、プログラムがマイクを使ったり画面を録画したりしたとき、長いビルドやパッケージ処理が終わったとき、アップデートが待っているときに反応します。そのために ~/Downloads、USB のイベント、音声ストリームを見張り、15 秒ごとに動いているプログラムの名前を見て、3 時間ごとに checkupdates を実行します。何もコンピューターの外に出ません。ほぼ 0。"
+  }
+}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# aibou: switch the desktop companion on and off, or talk to it over IPC.
+#   aibou on | off | toggle | state        service (state prints on/off)
+#   aibou run                              the scene itself (what the service starts)
+#   aibou <function> [args]                IPC, e.g. front, chat, sleep, play, status
+set -euo pipefail
+shell_dir="$(readlink -f "$(dirname "$(readlink -f "$0")")/../shell")"
+case "${1:-state}" in
+    on)     systemctl --user enable --now aibou.service >/dev/null 2>&1 ;;
+    off)    systemctl --user disable --now aibou.service >/dev/null 2>&1 ;;
+    toggle) if systemctl --user is-active -q aibou.service; then "$0" off; else "$0" on; fi ;;
+    state)  systemctl --user is-active -q aibou.service && echo on || echo off ;;
+    run)    exec qs -p "$shell_dir" ;;
+    -h|--help|help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *)      systemctl --user is-active -q aibou.service || { echo "aibou is off" >&2; exit 1; }
+            exec qs -p "$shell_dir" ipc call aibou "$@" ;;
+esac

@@ -1,0 +1,24 @@
+{
+    "id": "aibou",
+    "name": "Aibou",
+    "description": "Control Center tile and settings for Aibou, small companions that live behind your windows",
+    "version": "1.0.0",
+    "author": "satoshoe",
+    "license": "MIT",
+    "type": "widget",
+    "capabilities": [
+        "control-center"
+    ],
+    "component": "./AibouWidget.qml",
+    "settings": "./AibouSettings.qml",
+    "icon": "mood",
+    "requires_dms": ">=1.6.1",
+    "dependencies": [
+        "aibou"
+    ],
+    "permissions": [
+        "settings_read",
+        "settings_write",
+        "process"
+    ]
+}
