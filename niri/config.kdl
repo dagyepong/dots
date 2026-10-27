@@ -90,7 +90,7 @@ layout {
 // ==============================================================================
 // START-UP SERVICES
 // ==============================================================================
-spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/SEELE-wall.png"
+spawn-sh-at-startup "swaybg -i ~/Pictures/wallpaper/noir-anime-2.png"
 spawn-sh-at-startup "gentoo-pipewire-launcher restart"
 //spawn-sh-at-startup "quickshell -p ~/.config/niri/ai-usage-widget/shell.qml"
 //spawn-sh-at-startup "qs -p ~/.config/sekaipop/shell.qml"
