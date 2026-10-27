@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Cosmic Noir",
+  "version": "1.0",
+  "description": "Charcoal theme from the COSMIC Noir rice: sage icons, one loud orange accent.",
+  "icons": {
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "theme": {
+    "colors": {
+      "frame": [23, 23, 23],
+      "frame_inactive": [23, 23, 23],
+      "frame_incognito": [23, 23, 23],
+      "frame_incognito_inactive": [23, 23, 23],
+      "background_tab": [23, 23, 23],
+      "background_tab_inactive": [23, 23, 23],
+      "background_tab_incognito": [23, 23, 23],
+      "background_tab_incognito_inactive": [23, 23, 23],
+      "toolbar": [34, 34, 34],
+      "tab_text": [242, 86, 35],
+      "tab_background_text": [136, 165, 125],
+      "tab_background_text_inactive": [136, 165, 125],
+      "tab_background_text_incognito": [136, 165, 125],
+      "tab_background_text_incognito_inactive": [136, 165, 125],
+      "bookmark_text": [204, 208, 207],
+      "toolbar_button_icon": [136, 165, 125],
+      "omnibox_background": [58, 59, 58],
+      "omnibox_text": [204, 208, 207],
+      "ntp_background": [23, 23, 23],
+      "ntp_text": [204, 208, 207],
+      "ntp_link": [242, 86, 35]
+    }
+  }
+}

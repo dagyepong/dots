@@ -8,25 +8,41 @@ All patched so they work in COSMIC's own apps.
 
 | Variant | Preview | Body | Contrast on `#171717` | Goes with |
 | ------- | ------- | ---- | ------------------- | --------- |
-| **Orange** (default) | ![](../assets/cursors/Oxygen-Noir-Orange.png) | `#F25623` | 5.2:1 | Orange folders |
+| **Orange** (default) | ![](../assets/cursors/Oxygen-Noir-Orange.png) | `#FF5F1F` neon | 5.9:1 | Orange folders |
 | **Sage** | ![](../assets/cursors/Oxygen-Noir-Sage.png) | `#88A57D` | 6.6:1 | Sage folders |
 | **Dark** | ![](../assets/cursors/Oxygen-Noir-Dark.png) | `#2A2A2A` | 1.2:1 | Dark folders |
 
 Each variant is a normal folder here (`Oxygen-Noir-<Variant>/index.theme` + `cursors/`),
 already fixed for COSMIC. Nothing is downloaded at install time.
 
-The colours are made with [`recolour.py`](https://github.com/atraxsrc/cosmic-darkgold-theme/blob/master/cursors/recolour.py) from cosmic-darkgold-theme: every body pixel keeps
+The colours are made with [`recolour.py`](recolour.py) (the script from
+cosmic-darkgold-theme, plus `--spread` and `--glow`): every body pixel keeps
 its shading and takes the hue and saturation of the target colour, the white border,
 black outline and shadow stay as they are, and the COSMIC symlinks are carried over.
 Any coloured variant works as the base. To add a colour:
 
 ```bash
-../cosmic-darkgold-theme/cursors/recolour.py --base cursors/Oxygen-Noir-Orange \
+./cursors/recolour.py --base cursors/Oxygen-Noir-Orange \
   --out cursors/Oxygen-Noir-Teal --name "Oxygen Noir Teal" --colour '#2F8F8F' \
   --preview assets/cursors/Oxygen-Noir-Teal.png --bg '#171717'
 ```
 
 then add `Teal` to `VARIANTS` in `install.sh` and `uninstall.sh`.
+
+Orange is the fluorescent one. The Oxygen shading runs 0.18 above and below the
+target lightness, which turns the Pop!_OS orange `#F25623` rust at the rim and salmon
+on top. Orange uses neon `#FF5F1F` with the shading held to 0.11 and the highlight
+turned 6 degrees towards yellow, so the rim is `#E64200`, the body `#FF6316` and the
+gloss `#FF9857`, all fully saturated:
+
+```bash
+./cursors/recolour.py --base cursors/Oxygen-Noir-Sage \
+  --out cursors/Oxygen-Noir-Orange --name "Oxygen Noir Orange" \
+  --colour '#FF5F1F' --spread 0.11 --glow 6 \
+  --preview assets/cursors/Oxygen-Noir-Orange.png --bg '#171717'
+```
+
+For the plain `#F25623` instead, pass that colour with `--spread 0.11` and no `--glow`.
 
 ## Install
 
@@ -116,8 +132,9 @@ compositor got the variable. With `--user`, look in `~/.local/share/icons` inste
 - Cursor artwork: the original **Oxygen** cursor designs from the
   [KDE Oxygen project](https://invent.kde.org/plasma/oxygen), in the colour
   variants collected by [**wo2ni/Oxygen-Cursors**](https://github.com/wo2ni/Oxygen-Cursors).
-- This repo recolours them to the Noir palette with [`recolour.py`](https://github.com/atraxsrc/cosmic-darkgold-theme/blob/master/cursors/recolour.py) from cosmic-darkgold-theme
-  and adds the COSMIC symlinks and the scripts.
+- This repo recolours them to the Noir palette with [`recolour.py`](recolour.py)
+  (from [cosmic-darkgold-theme](https://github.com/atraxsrc/cosmic-darkgold-theme/blob/master/cursors/recolour.py),
+  with `--spread` and `--glow` added here) and adds the COSMIC symlinks and the scripts.
 - The upstream repo has **no LICENSE file**, so the licence of the artwork is
   not stated there. The MIT licence of this repo does not cover the cursor files;
   they keep whatever terms KDE's Oxygen artwork carries.
