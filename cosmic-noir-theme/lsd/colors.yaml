@@ -1,0 +1,41 @@
+# 256-colour codes nearest the Noir palette on charcoal (lsd 1.0.0 does not
+# accept #hex here): 202 orange, 208 ember, 108 sage, 144 khaki, 246 grey-sage,
+# 243 muted, 240 dim.
+user: 144
+group: 243
+permission:
+  read: 243
+  write: 144
+  exec: 202
+  exec-sticky: 202
+  no-access: 240
+  octal: 246
+  acl: 246
+  context: 246
+date:
+  hour-old: 144
+  day-old: 108
+  older: 240
+size:
+  none: 240
+  small: 108
+  medium: 144
+  large: 202
+inode:
+  valid: 108
+  invalid: 202
+links:
+  valid: 246
+  invalid: 202
+tree-edge: 240
+git-status:
+  default: 240
+  unmodified: 240
+  ignored: 240
+  new-in-index: 108
+  new-in-workdir: 108
+  typechange: 144
+  deleted: 202
+  renamed: 246
+  modified: 208
+  conflicted: 202
