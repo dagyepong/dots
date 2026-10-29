@@ -305,7 +305,7 @@ echo "sys-boot/limine" >> /etc/portage/package.accept_keywords/limine
 Install Limine and core system utilities:
 
 ```bash
-emerge --ask sys-boot/limine sys-kernel/installkernel sys-fs/btrfs-progs sys-fs/cryptsetup
+emerge --oneshot sys-boot/limine sys-kernel/installkernel sys-fs/btrfs-progs sys-fs/cryptsetup
 ```
 
 Install Limine to your EFI partition:
