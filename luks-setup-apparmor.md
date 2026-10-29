@@ -316,19 +316,19 @@ cp /usr/share/limine/BOOTX64.EFI /efi/EFI/Gentoo/limine.efi
 ```
 Create your limine.cfg on the EFI partition:
 ```bash
-nano /efi/limine.cfg
+nano /efi/EFI/Gentoo/limine.conf
 ```
 
 (Paste your configuration using your actual LUKS and Btrfs UUIDs obtained via blkid):
 
 ```bash
-TIMEOUT=3
+timeout: 3
 
 /Gentoo Linux
-    PROTOCOL=linux
-    KERNEL_PATH=boot:///vmlinuz
-    MODULE_PATH=boot:///initrd
-    CMDLINE=rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_UUID rootfstype=btrfs rootflags=subvol=@ lsm=landlock,lockdown,yama,integrity,apparmor,bpf
+    protocol: linux
+    kernel_path: boot():/vmlinuz
+    module_path: boot():/initrd
+    cmdline: rd.luks.uuid=af61070f-509a-47c4-a2b8-f2f2fd486420 root=UUID=497262da-6958-4f8b-becf-e967fe6ee277 rootfstype=btrfs rootflags=subvol=@
 ```
 
 Set up the automation script so kernel upgrades update Limine automatically:
