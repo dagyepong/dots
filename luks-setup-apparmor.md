@@ -314,7 +314,7 @@ Install Limine to your EFI partition:
 mkdir -p /efi/EFI/Gentoo
 cp /usr/share/limine/BOOTX64.EFI /efi/EFI/Gentoo/limine.efi
 ```
-Create your limine.cfg on the EFI partition:
+Create your limine.conf on the EFI partition:
 ```bash
 nano /efi/EFI/Gentoo/limine.conf
 ```
