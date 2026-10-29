@@ -282,3 +282,132 @@ rc-update add apparmor boot
 ```
 
 
+
+
+##Limine Bootloader##
+
+6. Stage 6: Bootloader & Kernel Adaptation (Using Limine instead of EFISTUB/uefi-mkconfig)
+
+Instead of the uefi-mkconfig steps in your guide, execute these adapted commands inside your chroot:
+
+    Adjust Portage package flags for installkernel:
+
+```bash
+
+mkdir -p /etc/portage/package.use
+echo "sys-kernel/installkernel dracut -uki -systemd" > /etc/portage/package.use/installkernel
+echo "sys-boot/limine" >> /etc/portage/package.use/installkernel
+
+mkdir -p /etc/portage/package.accept_keywords
+echo "sys-boot/limine" >> /etc/portage/package.accept_keywords/limine
+```
+
+Install Limine and core system utilities:
+
+```bash
+emerge --ask sys-boot/limine sys-kernel/installkernel sys-fs/btrfs-progs sys-fs/cryptsetup
+```
+
+Install Limine to your EFI partition:
+
+```bash
+mkdir -p /efi/EFI/Gentoo
+cp /usr/share/limine/BOOTX64.EFI /efi/EFI/Gentoo/limine.efi
+```
+Create your limine.cfg on the EFI partition:
+```bash
+nano /efi/limine.cfg
+```
+
+(Paste your configuration using your actual LUKS and Btrfs UUIDs obtained via blkid):
+
+```bash
+TIMEOUT=3
+
+/Gentoo Linux
+    PROTOCOL=linux
+    KERNEL_PATH=boot:///vmlinuz
+    MODULE_PATH=boot:///initrd
+    CMDLINE=rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_UUID rootfstype=btrfs rootflags=subvol=@ lsm=landlock,lockdown,yama,integrity,apparmor,bpf
+```
+
+Set up the automation script so kernel upgrades update Limine automatically:
+
+```bash
+mkdir -p /etc/kernel/install.d
+nano /etc/kernel/install.d/99-limine.install
+```
+
+(Paste this automation hook):
+
+```bash
+#!/bin/bash
+COMMAND="$1"
+KERNEL_VERSION="$2"
+BOOT_DIR="$3"
+KERNEL_IMAGE="$4"
+EFI_BOOT="/efi"
+
+case "$COMMAND" in
+    add)
+        cp "${KERNEL_IMAGE}" "${EFI_BOOT}/vmlinuz"
+        if [ -f "${BOOT_DIR}/initrd" ]; then
+            cp "${BOOT_DIR}/initrd" "${EFI_BOOT}/initrd"
+        elif [ -f "${BOOT_DIR}/initramfs-${KERNEL_VERSION}.img" ]; then
+            cp "${BOOT_DIR}/initramfs-${KERNEL_VERSION}.img" "${EFI_BOOT}/initrd"
+        fi
+        echo "Limine files updated for kernel ${KERNEL_VERSION}"
+        ;;
+    remove)
+        rm -f "${EFI_BOOT}/vmlinuz" "${EFI_BOOT}/initrd"
+        echo "Limine kernel files removed."
+        ;;
+esac
+```
+
+Make it executable:
+```bash
+chmod +x /etc/kernel/install.d/99-limine.install
+```
+
+Configure Dracut (/etc/dracut.conf.d/gentoo.conf):
+
+```bash
+mkdir -p /etc/dracut.conf.d
+nano /etc/dracut.conf.d/gentoo.conf
+```
+```bash
+hostonly="no"
+add_dracutmodules+=" crypt btrfs dm "
+add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
+force_drivers+=" dm_crypt btrfs "
+```
+
+Register Limine in your motherboard's NVRAM:
+
+```bash
+emerge --ask sys-boot/efibootmgr
+```
+
+
+```bash
+efibootmgr --create --disk /dev/nvme0n1 --part 1 --label "Gentoo Limine" --loader /EFI/Gentoo/limine.efi
+```
+
+You should use --disk /dev/nvme0n1 --part 1.
+
+Here is why:
+
+    --disk /dev/nvme0n1 specifies the whole physical drive where your partition lives.
+
+    --part 1 specifies partition number 1 on that drive (which corresponds to your /dev/nvme0n1p1 EFI partition).
+
+efibootmgr expects the whole disk name for the --disk flag, and uses the separate --part flag to point to partition 1. So keeping it as --disk /dev/nvme0n1 --part 1 is precisely how it is supposed to be written!
+
+
+The Final Step: Now, emerge your kernel:
+```bash
+emerge --ask sys-kernel/linux-firmware  sys-firmware/sof-firmware
+```
+
+
