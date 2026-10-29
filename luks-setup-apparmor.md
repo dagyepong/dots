@@ -373,7 +373,7 @@ chmod +x /etc/kernel/install.d/99-limine.install
 Configure Dracut (/etc/dracut.conf.d/gentoo.conf):
 
 ```bash
-mkdir -p /etc/dracut.conf.d
+mkdir -p /etc/dracut.conf.d #if directory isnt present
 nano /etc/dracut.conf.d/gentoo.conf
 ```
 ```bash
