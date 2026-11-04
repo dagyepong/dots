@@ -18,9 +18,8 @@ mkdir -p /mnt/gentoo
 mount LABEL=GentooRoot /mnt/gentoo/
 
 # Create subvolumes
-for sub in @ @home @.snapshots @usr @opt @srv @db @log @tmp @crash @spool @portage @NetworkManager @binpkgs @distfiles @boot; do
-    btrfs subvolume create "/mnt/gentoo/$sub"
-done
+for sub in @ @home @.snapshots @usr @opt @srv @db @log @tmp @crash @spool @portage @NetworkManager @binpkgs @distfiles @boot; do btrfs subvolume create "/mnt/gentoo/$sub"; done
+
 
 umount -l /mnt/gentoo
 mount -o subvol=@ LABEL=GentooRoot /mnt/gentoo
