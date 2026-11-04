@@ -1,0 +1,231 @@
+1. Disk Partitioning & Encryption
+```bash
+
+cfdisk /dev/nvme0n1
+```
+
+Encryption & Filesystems:
+```bash
+
+cryptsetup luksFormat --type luks2 --cipher aes-xts-plain64 --key-size 512 --pbkdf argon2id --pbkdf-memory 1048576 --iter-time 4000 --label "GentooLuks" /dev/nvme0n1p2cryptsetup open /dev/nvme0n1p2 root
+mkfs.vfat -n GentooBoot -F 32 /dev/nvme0n1p1mkfs.btrfs -L GentooRoot /dev/mapper/root
+```
+
+2. Btrfs Subvolumes & Mounts
+```bash
+
+mkdir -p /mnt/gentoo
+mount LABEL=GentooRoot /mnt/gentoo/
+
+# Create subvolumes
+for sub in @ @home @.snapshots @usr @opt @srv @db @log @tmp @crash @spool @portage @NetworkManager @binpkgs @distfiles @boot; do
+    btrfs subvolume create "/mnt/gentoo/$sub"
+done
+
+umount -l /mnt/gentoo
+mount -o subvol=@ LABEL=GentooRoot /mnt/gentoo
+
+# Create mountpoints
+mkdir -p /mnt/gentoo/{home,.snapshots,usr,opt,srv,boot,efi,var/{db,log,tmp,crash,spool,lib/{portage,NetworkManager},cache/{binpkgs,distfiles}}}
+
+# Mount subvolumes
+mount -o subvol=@home LABEL=GentooRoot /mnt/gentoo/home
+mount -o subvol=@.snapshots LABEL=GentooRoot /mnt/gentoo/.snapshots
+mount -o subvol=@usr LABEL=GentooRoot /mnt/gentoo/usr
+mount -o subvol=@opt LABEL=GentooRoot /mnt/gentoo/opt
+mount -o subvol=@srv LABEL=GentooRoot /mnt/gentoo/srv
+mount -o subvol=@db LABEL=GentooRoot /mnt/gentoo/var/db
+mount -o subvol=@log LABEL=GentooRoot /mnt/gentoo/var/log
+mount -o subvol=@tmp LABEL=GentooRoot /mnt/gentoo/var/tmp
+mount -o subvol=@crash LABEL=GentooRoot /mnt/gentoo/var/crash
+mount -o subvol=@spool LABEL=GentooRoot /mnt/gentoo/var/spool
+mount -o subvol=@portage LABEL=GentooRoot /mnt/gentoo/var/lib/portage
+mount -o subvol=@NetworkManager LABEL=GentooRoot /mnt/gentoo/var/lib/NetworkManager
+mount -o subvol=@binpkgs LABEL=GentooRoot /mnt/gentoo/var/cache/binpkgs
+mount -o subvol=@distfiles LABEL=GentooRoot /mnt/gentoo/var/cache/distfiles
+mount -o subvol=@boot LABEL=GentooRoot /mnt/gentoo/boot
+
+# Mount EFI partition
+mount LABEL=GentooBoot /mnt/gentoo/efi
+```
+
+Stage3 & Portage Configuration
+
+```bash
+cd /mnt/gentoo
+wget https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-hardened-openrc/stage3-amd64-hardened-openrc-latest.tar.xz
+tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner -C /mnt/gentoo
+
+# Edit /mnt/gentoo/etc/portage/make.conf
+# Add:
+# COMMON_FLAGS="-march=native -O2 -pipe"
+# CFLAGS="${COMMON_FLAGS}"
+# CXXFLAGS="${COMMON_FLAGS}"
+# FCFLAGS="${COMMON_FLAGS}"
+# FFLAGS="${COMMON_FLAGS}"
+# LC_MESSAGES=C.UTF-8
+# ACCEPT_LICENSE="*"
+# USE="dist-kernel apparmor"
+# FEATURES="${FEATURES} getbinpkg binpkg-request-signature"
+
+cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
+```
+
+Chroot
+
+```bash
+mount --types proc /proc /mnt/gentoo/proc
+mount --rbind /sys /mnt/gentoo/sys
+mount --make-rslave /mnt/gentoo/sys
+mount --rbind /dev /mnt/gentoo/dev
+mount --make-rslave /mnt/gentoo/dev
+mount --bind /run /mnt/gentoo/run
+mount --make-slave /mnt/gentoo/run
+
+chroot /mnt/gentoo /bin/bash
+source /etc/profile
+export PS1="(chroot) ${PS1}"
+```
+
+System Setup
+```bash
+emerge-webrsync
+getuto
+eselect profile set default/linux/amd64/23.0/hardened
+
+emerge --ask --oneshot app-portage/cpuid2cpuflags
+echo "*/* $(cpuid2cpuflags)" > /etc/portage/package.use/00cpu-flags
+emerge -avuDUg @world
+
+emerge --ask app-editors/nano net-misc/networkmanager sys-fs/btrfs-progs sys-fs/cryptsetup sys-kernel/linux-firmware sys-firmware/sof-firmware sys-apps/apparmor sec-policy/apparmor-profiles
+```
+
+Localization:
+
+```bash
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+locale-gen
+eselect locale set en_US.utf8
+ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+```
+
+Kernel & Limine Bootloader:
+
+```bash
+mkdir -p /etc/portage/package.use
+echo "sys-kernel/installkernel dracut -uki -systemd" > /etc/portage/package.use/installkernel
+echo "sys-boot/limine" >> /etc/portage/package.use/installkernel
+
+mkdir -p /etc/portage/package.accept_keywords
+echo "sys-boot/limine" >> /etc/portage/package.accept_keywords/limine
+
+emerge --oneshot sys-boot/limine sys-kernel/installkernel sys-fs/btrfs-progs sys-fs/cryptsetup
+```
+
+Dracut Config (/etc/dracut.conf.d/gentoo.conf):
+
+```bash
+hostonly="no"
+add_dracutmodules+=" crypt btrfs dm "
+add_drivers+=" dm_crypt encrypted nvme ahci btrfs "
+force_drivers+=" dm_crypt btrfs "
+```
+
+Limine Automation Script (/etc/kernel/install.d/99-limine.install):
+
+```bash
+
+#!/bin/bash
+COMMAND="$1"
+KERNEL_VERSION="$2"
+BOOT_DIR="$3"
+KERNEL_IMAGE="$4"
+EFI_BOOT="/efi"
+
+case "$COMMAND" in
+    add)
+        cp "${KERNEL_IMAGE}" "${EFI_BOOT}/vmlinuz"
+        if [ -f "${BOOT_DIR}/initrd" ]; then
+            cp "${BOOT_DIR}/initrd" "${EFI_BOOT}/initrd"
+        elif [ -f "${BOOT_DIR}/initramfs-${KERNEL_VERSION}.img" ]; then
+            cp "${BOOT_DIR}/initramfs-${KERNEL_VERSION}.img" "${EFI_BOOT}/initrd"
+        else
+            cp ${BOOT_DIR}/*.img "${EFI_BOOT}/initrd" 2>/dev/null
+        fi
+        ;;
+    remove)
+        rm -f "${EFI_BOOT}/vmlinuz" "${EFI_BOOT}/initrd"
+        ;;
+esac
+```
+
+```bash
+chmod +x /etc/kernel/install.d/99-limine.install
+```
+
+Limine Config & Binaries:
+
+```bash
+mkdir -p /efi/EFI/Gentoo
+cp /usr/share/limine/BOOTX64.EFI /efi/EFI/Gentoo/limine.efi
+
+nano /efi/EFI/Gentoo/limine.conf
+```
+
+Paste this into limine.conf (Replace UUIDs with blkid results):
+
+```bash
+
+timeout: 3
+
+/Gentoo Linux
+    protocol: linux
+    kernel_path: boot():/vmlinuz
+    module_path: boot():/initrd
+    cmdline: rd.luks.uuid=YOUR_LUKS_UUID root=UUID=YOUR_BTRFS_ROOT_UUID rootfstype=btrfs rootflags=subvol=@ lsm=landlock,lockdown,yama,integrity,apparmor,bpf rw
+```
+
+Install Kernel & Register Bootloader:
+
+```bash
+emerge --ask sys-kernel/gentoo-kernel
+emerge --ask sys-boot/efibootmgr
+efibootmgr --create --disk /dev/nvme0n1 --part 1 --label "Gentoo Limine" --loader /EFI/Gentoo/limine.efi
+```
+
+7. Final System Config
+
+fstab:
+
+```bash
+
+LABEL=GentooRoot / btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@ 0 0
+LABEL=GentooRoot /home btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@home 0 0
+LABEL=GentooRoot /.snapshots btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@.snapshots 0 0
+LABEL=GentooRoot /usr btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@usr 0 0
+LABEL=GentooRoot /opt btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@opt 0 0
+LABEL=GentooRoot /srv btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@srv 0 0
+LABEL=GentooRoot /var/db btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@db 0 0
+LABEL=GentooRoot /var/log btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@log 0 0
+LABEL=GentooRoot /var/tmp btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@tmp 0 0
+LABEL=GentooRoot /var/crash btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@crash 0 0
+LABEL=GentooRoot /var/spool btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@spool 0 0
+LABEL=GentooRoot /var/lib/portage btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@portage 0 0
+LABEL=GentooRoot /var/lib/NetworkManager btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@NetworkManager 0 0
+LABEL=GentooRoot /var/cache/binpkgs btrfs rw,noatime,ssd,discard=async,space_cache=v2,compress-force=zstd:1,subvol=@binpkgs 0 0
+LABEL=GentooRoot /var/cache/distfiles btrfs rw,noatime,ssd,discard=async,space_cache=v2,compress-force=zstd:1,subvol=@distfiles 0 0
+LABEL=GentooRoot /boot btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=@boot 0 0
+LABEL=GentooBoot /efi vfat rw,nosuid,nodev,noexec,fmask=0077,dmask=0077,utf8,discard 0 2
+```
+
+Finalizing:
+
+```bash
+passwd root
+useradd -m -s /bin/bash -G audio,video,wheel username
+passwd username
+echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers.d/wheel
+echo "gentoo" > /etc/hostname
+rc-update add NetworkManager default
+rc-update add apparmor boot
+```
