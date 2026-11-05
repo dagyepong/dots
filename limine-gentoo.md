@@ -332,3 +332,83 @@ exit && umount -R /mnt/gentoo && reboot
 
 
 
+
+Setting up tuigreet (a terminal-based greeter for greetd) to launch the niri Wayland compositor requires configuring greetd to run tuigreet and passing the proper session launch command for niri. Because niri is a Wayland compositor, it requires environment variables and a session wrapper or direct command execution.
+
+Here is the complete step-by-step guide to installing, configuring, and launching tuigreet with niri on an OpenRC system.
+
+1. Install greetd, tuigreet, and niri
+Inside your chroot or live environment, install the required packages:
+
+
+```bash
+emerge --ask sys-apps/greetd gui-apps/tuigreet 
+```
+
+```bash
+rc-update add display-manager default
+```
+
+Configure greetd
+greetd manages login sessions via its configuration file located at /etc/greetd/config.toml.
+
+Create and configure the file:
+
+```bash
+mkdir -p /etc/greetd
+
+cat << 'EOF' > /etc/greetd/config.toml
+[terminal]
+# The vt to run the greeter on
+vt = 7
+
+[default_session]
+# Command to run tuigreet as the greeter
+command = "tuigreet --time --remember --remember-user-session --sessions /usr/share/wayland-sessions:/usr/share/xsessions --asterisks"
+
+# Run the greeter as the greetd user
+user = "greeter"
+EOF
+```
+
+Ensure Niri Session File Exists
+Verify that a desktop session file exists for niri so tuigreet can automatically detect and launch it. Usually, gui-wm/niri installs this file automatically, but you can create it manually if it's missing:
+
+```bash
+mkdir -p /usr/share/wayland-sessions
+
+cat << 'EOF' > /usr/share/wayland-sessions/niri.desktop
+[Desktop Entry]
+Name=Niri
+Comment=A scrollable-tiling Wayland compositor
+Exec=dbus-run-session niri --session
+Type=Application
+DesktopNames=niri
+EOF
+```
+Also change display-manager conf:
+
+```bash
+ 󱞩 sudo cat /etc/conf.d/display-manager 
+Password: 
+# We always try and start the DM on a static VT. The various DMs normally
+# default to using VT7. If you wish to use the display-manager init
+# script, then you should ensure that the VT checked is the same VT your
+# DM wants to use.
+# We do this check to ensure that you haven't accidentally configured
+# something to run on the VT in your /etc/inittab file so that
+# you don't get a dead keyboard.
+# sddm ignores this env var and is configured at build-time to use VT7.
+CHECKVT=7
+
+# What display manager do you use ?
+#     [ xdm | greetd | gdm | sddm | gpe | lightdm | entrance ]
+# NOTE: If this is set in /etc/rc.conf, that setting will override this one.
+DISPLAYMANAGER="greetd"
+```
+
+Restart service:
+
+```bash
+sudo rc-service  display-manager restart
+```
