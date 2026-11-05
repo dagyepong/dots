@@ -1,46 +1,85 @@
-// ╭──────────────────────────────────────────────────────────────────────────╮
-// │                                                                          │
-// │   L O C K   S C R E E N                                                  │
-// │   session lock · one surface per screen                                  │
-// │                                                                          │
-// │   github.com/andreumassanet/impasto                                      │
-// │                                                                          │
-// ╰──────────────────────────────────────────────────────────────────────────╯
-
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-
-import "../services"
-
-// The compositor's lock, through ext-session-lock. The compositor hides
-// everything else once locked and keeps it hidden if this process dies, so a
-// crash leaves the session locked rather than open. The protocol requires a
-// surface on every output before the session counts as locked.
-WlSessionLock {
+import Quickshell.Services.Pam
+import qs.services
+import "."
+Scope {
     id: root
 
-    locked: LockService.locked
+    property string password: ""
+    property string status: ""
+    property bool failed: false
+    property bool checking: false
+    property int failCount: 0
 
-    // Published so anything waiting for the screen to be covered has a real
-    // signal to wait on. A handler and not a `Binding` child: the lock's
-    // default property is its surface, and a child declared beside it binds
-    // nothing.
-    onSecureStateChanged: LockService.secure = root.secure
+    function submit(pw) {
+        if (checking || pam.active || pw === "") return
+        password = pw
+        checking = true
+        failed = false
+        status = ""
+        pam.start()
+    }
 
-    WlSessionLockSurface {
-        id: surface
+    // Password check with PAM (pam_unix only, see pam/password.conf)
+    PamContext {
+        id: pam
+        configDirectory: Quickshell.shellPath("pam")
+        config: "password.conf"
 
-        LockSurface {
-            anchors.fill: parent
-            output: surface.screen?.name ?? ""
+        onPamMessage: {
+            if (pam.responseRequired) pam.respond(root.password)
+        }
 
-            // The surface exists before it can hold the keyboard, so the field
-            // claims it once the surface is up rather than on its own
-            // completion.
-            Component.onCompleted: claim()
+        onCompleted: result => {
+            root.checking = false
+            root.password = ""
 
-            onSubmitted: password => LockService.submit(password)
+            if (result === PamResult.Success) {
+                root.failed = false
+                root.status = ""
+                UiState.lockTest = false
+                UiState.locked = false
+            } else {
+                root.failed = true
+                root.failCount++
+                root.status = (result === PamResult.Error) ? "Authentication error" : "Wrong password"
+            }
+        }
+    }
+
+    // Safe test: it unlocks by itself, whatever happens
+    Timer {
+        interval: 1000
+        repeat: true
+        running: UiState.locked && UiState.lockTest
+        onTriggered: {
+            UiState.lockTestLeft--
+            if (UiState.lockTestLeft <= 0) {
+                UiState.locked = false
+                UiState.lockTest = false
+            }
+        }
+    }
+
+    WlSessionLock {
+        id: lock
+        locked: UiState.locked
+
+        WlSessionLockSurface {
+            id: surface
+            color: "black"
+
+            LockView {
+                anchors.fill: parent
+                screenName: surface.screen ? surface.screen.name : ""
+                status: root.status
+                failed: root.failed
+                checking: root.checking
+                failCount: root.failCount
+                onSubmit: pw => root.submit(pw)
+            }
         }
     }
 }

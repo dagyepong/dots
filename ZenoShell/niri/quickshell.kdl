@@ -1,0 +1,40 @@
+// Shortcuts for the Quickshell shell (included by config.kdl)
+// IDENTICAL on Hyprland: the same keys live in ~/.config/hypr/quickshell-binds.lua
+// Mod = Super.  Alt = shell.
+binds {
+    // ── Menus ──
+    Mod+R         { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Alt+R         { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Mod+M         { spawn "qs" "ipc" "call" "power" "toggle"; }
+    Alt+P         { spawn "qs" "ipc" "call" "power" "toggle"; }
+    Alt+W         { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
+    Alt+L         { spawn "qs" "ipc" "call" "lock" "lock"; }
+    Alt+I         { spawn "qs" "ipc" "call" "system" "toggle"; }
+    Alt+O         { spawn "qs" "ipc" "call" "settings" "toggle"; }
+    Alt+Tab       { spawn "qs" "ipc" "call" "workspaces" "peek"; }
+
+    // ── Modes ──
+    Alt+G         { spawn "qs" "ipc" "call" "gamemode" "toggle"; }
+    Alt+E         { spawn "qs" "ipc" "call" "powersaver" "toggle"; }
+    Alt+D         { spawn "qs" "ipc" "call" "dnd" "toggle"; }
+    Mod+Space     { spawn "qs" "ipc" "call" "layout" "next"; }
+
+    // ── Styles ──
+    Alt+S         { spawn "qs" "ipc" "call" "style" "toggle"; }
+    Alt+T         { spawn "qs" "ipc" "call" "theme" "toggle"; }
+    Alt+V         { spawn "qs" "ipc" "call" "style" "variant"; }
+    Mod+Alt+T     { spawn "qs" "ipc" "call" "theme" "mode" "toggle"; }
+    Mod+Alt+1     { spawn "qs" "ipc" "call" "style" "set" "island"; }
+    Mod+Alt+2     { spawn "qs" "ipc" "call" "style" "set" "classic"; }
+    Mod+Alt+3     { spawn "qs" "ipc" "call" "style" "set" "dash"; }
+    Mod+Alt+4     { spawn "qs" "ipc" "call" "style" "set" "side"; }
+
+    // ── Screenshots and recording ──
+    Print         { spawn "qs" "ipc" "call" "capture" "toggle"; }
+    Mod+H         { spawn "qs" "ipc" "call" "capture" "shotscreen"; }
+    Mod+Shift+H   { spawn "qs" "ipc" "call" "capture" "shotarea"; }
+    Mod+Ctrl+H    { spawn "qs" "ipc" "call" "capture" "shotwindow"; }
+    Mod+Alt+H       { spawn "qs" "ipc" "call" "capture" "recscreen"; }
+    Mod+Alt+Shift+H { spawn "qs" "ipc" "call" "capture" "recarea"; }
+    Mod+Alt+P       { spawn "qs" "ipc" "call" "capture" "pause"; }
+}

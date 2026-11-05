@@ -1,0 +1,215 @@
+// niri 26.04 — config for the Quickshell shell (twin of ~/.config/hypr/hyprland.lua)
+// Windows shortcuts: here. Shell shortcuts (identical on Hyprland): quickshell.kdl
+// Monitors page writes quickshell-outputs.kdl, Game/Eco Mode write quickshell-tweaks.kdl
+
+// ───────────── Startup ─────────────
+spawn-sh-at-startup "mkdir -p ~/Screenshots"
+spawn-at-startup "quickshell"
+
+// awww: one daemon for the wallpaper and one for the overview backdrop (the blurred one)
+spawn-at-startup "awww-daemon"
+spawn-at-startup "awww-daemon" "-n" "backdrop"
+// restore the wallpaper and generate the blurred version for the backdrop
+spawn-sh-at-startup "sleep 1; sh ~/.config/quickshell/scripts/restore-wallpaper.sh"
+// Firefox colors follow the wallpaper (only if pywalfox + inotify-tools are installed)
+spawn-sh-at-startup "sh ~/.config/quickshell/scripts/pywalfox-watch.sh"
+
+// ───────────── General ─────────────
+hotkey-overlay { skip-at-startup; }
+prefer-no-csd
+screenshot-path "~/Screenshots/%Y-%m-%d_%H-%M-%S.png"
+cursor { xcursor-size 24; }
+
+input {
+    keyboard {
+        xkb {
+            layout "it,us,gb,fr,de"
+        }
+    }
+    touchpad {
+        tap
+    }
+    focus-follows-mouse max-scroll-amount="0%"
+}
+
+// ───────────── Layout ─────────────
+layout {
+    gaps 10
+    struts { left 5; right 5; top 5; bottom 5; }
+
+    focus-ring { off; }
+    border { off; }
+
+    shadow {
+        on
+        softness 20
+        spread 4
+        offset x=0 y=3
+        color "#00000066"
+    }
+
+    // each new window opens to the right of the active one and takes half the screen
+    default-column-width { proportion 0.5; }
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+}
+
+// ───────────── Overview ─────────────
+overview {
+    zoom 0.5
+    // fallback color if the blurred backdrop is not loaded yet
+    backdrop-color "#0b0d10"
+    workspace-shadow { off; }
+}
+
+// the blurred wallpaper ("backdrop" daemon) ends up behind the workspace strip
+layer-rule {
+    match namespace="backdrop$"
+    place-within-backdrop true
+}
+
+// blur on the shell's full-screen menus (wallpaper picker)
+layer-rule {
+    match namespace="shell-wallpaper"
+    background-effect { blur true; }
+}
+
+// blur behind the login welcome
+layer-rule {
+    match namespace="shell-hello"
+    background-effect { blur true; }
+}
+
+// ───────────── Windows ─────────────
+// base: rounded corners + blur
+window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+    background-effect { blur true; }
+}
+
+window-rule {
+    match is-active=false
+    opacity 0.95
+}
+
+// Firefox: never fullscreen on open (no automatic F11)
+window-rule {
+    match app-id=r#"^firefox$"#
+    open-fullscreen false
+}
+
+// Picture-in-Picture: floating, bottom right, no reduced opacity
+window-rule {
+    match app-id=r#"^firefox$"# title=r#"^Picture-in-Picture$"#
+    open-floating true
+    default-floating-position x=20 y=20 relative-to="bottom-right"
+    opacity 1.0
+}
+
+// Dialogs and utilities: open floating and centered
+window-rule {
+    match app-id=r#"^(pavucontrol|org\.pulseaudio\.pavucontrol|nm-connection-editor|blueman-manager|org\.gnome\.Calculator)$"#
+    open-floating true
+}
+window-rule {
+    match title=r#"^(Open File|Save File|Save As|Apri file|Salva con nome|Salva|Apri)"#
+    open-floating true
+}
+
+// ───────────── Animations ─────────────
+animations {
+    window-movement { spring damping-ratio=0.79 stiffness=238 epsilon=0.0001; }
+    window-resize { spring damping-ratio=0.79 stiffness=238 epsilon=0.0001; }
+    horizontal-view-movement { spring damping-ratio=0.79 stiffness=238 epsilon=0.0001; }
+    workspace-switch { spring damping-ratio=1.0 stiffness=800 epsilon=0.0001; }
+
+    window-open { duration-ms 200; curve "ease-out-expo"; }
+    window-close { duration-ms 150; curve "ease-out-quad"; }
+}
+
+// ───────────── Shortcuts ─────────────
+binds {
+    Mod+Shift+Slash { show-hotkey-overlay; }
+
+    // Applications
+    Mod+Return { spawn "kitty"; }
+    Mod+F { spawn "firefox"; }
+    Mod+E { spawn "nautilus"; }
+
+    // Windows
+    Mod+Q { close-window; }
+    Mod+V { toggle-window-floating; }
+    Mod+Ctrl+F { fullscreen-window; }         // true fullscreen (no bar)
+    Mod+Shift+F { maximize-column; }          // full screen with bar and gaps, press again to go back
+    Mod+C { center-column; }
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+W { set-column-width "+10%"; }
+    Mod+J { switch-preset-column-width; }     // cycle shape: 1/3, 1/2, 2/3
+    Mod+Comma { consume-window-into-column; }
+    Mod+Period { expel-window-from-column; }
+
+    // Focus and movement
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up    { focus-window-up; }
+    Mod+Down  { focus-window-down; }
+    Mod+Shift+Left  { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Shift+Up    { move-window-up; }
+    Mod+Shift+Down  { move-window-down; }
+
+    // Workspace 1-10
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+    Mod+0 { focus-workspace 10; }
+    Mod+Shift+1 { move-window-to-workspace 1; }
+    Mod+Shift+2 { move-window-to-workspace 2; }
+    Mod+Shift+3 { move-window-to-workspace 3; }
+    Mod+Shift+4 { move-window-to-workspace 4; }
+    Mod+Shift+5 { move-window-to-workspace 5; }
+    Mod+Shift+6 { move-window-to-workspace 6; }
+    Mod+Shift+7 { move-window-to-workspace 7; }
+    Mod+Shift+8 { move-window-to-workspace 8; }
+    Mod+Shift+9 { move-window-to-workspace 9; }
+    Mod+Shift+0 { move-window-to-workspace 10; }
+
+    Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp   cooldown-ms=150 { focus-workspace-up; }
+
+    Mod+Tab { toggle-overview; }
+
+    // Screenshots, recording, launcher, power, styles...: quickshell.kdl (same keys as on Hyprland)
+
+    // Volume and brightness
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"; }
+    XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "-e4" "-n2" "set" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "-e4" "-n2" "set" "5%-"; }
+
+    // Media
+    XF86AudioNext  allow-when-locked=true { spawn "playerctl" "next"; }
+    XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioPrev  allow-when-locked=true { spawn "playerctl" "previous"; }
+
+    Mod+Shift+E { quit; }
+}
+
+// ───────────── Quickshell ─────────────
+// shortcuts, monitors, and the tweaks last: Game/Eco Mode must be able to override the rest
+include "quickshell.kdl"
+include "quickshell-outputs.kdl"
+include "quickshell-tweaks.kdl"

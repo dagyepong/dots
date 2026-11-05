@@ -1,0 +1,13 @@
+// Layer rules of the shell (blur behind the wallpaper picker and the welcome screen, backdrop)
+layer-rule {
+    match namespace="backdrop$"
+    place-within-backdrop true
+}
+layer-rule {
+    match namespace="shell-wallpaper"
+    background-effect { blur true; }
+}
+layer-rule {
+    match namespace="shell-hello"
+    background-effect { blur true; }
+}
