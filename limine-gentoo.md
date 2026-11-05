@@ -367,7 +367,7 @@ vt = 7
 command = "tuigreet --time --remember --remember-user-session --sessions /usr/share/wayland-sessions:/usr/share/xsessions --asterisks"
 
 # Run the greeter as the greetd user
-user = "greeter"
+user = "greetd"
 EOF
 ```
 
