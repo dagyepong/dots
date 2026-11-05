@@ -266,6 +266,26 @@ emerge --ask=n sys-kernel/gentoo-kernel
 
 Verification: Verify that ls /efi/EFI/Gentoo/ contains limine.efi, limine.conf, vmlinuz, and initrd.
 
+Manual Fix:
+1.Check your /boot subvolume:2 min.Check what kernel and initramfs files are currently stored inside your /boot directory:
+
+```bash
+ls -l /boot/
+```
+
+1.Copy and rename kernel files:1 min.Copy the hardened kernel and initramfs files from /boot into your Limine EFI partition with the exact filenames expected by your config:
+
+```bash
+cp /boot/vmlinuz-7.3.1-gentoo-dist-hardened /efi/EFI/Gentoo/vmlinuz
+cp /boot/initramfs-7.3.1-gentoo-dist-hardened.img /efi/EFI/Gentoo/initrd
+```
+
+Verification: Run ls -l /efi/EFI/Gentoo/ to confirm vmlinuz and initrd now appear alongside limine.conf and limine.efi.
+
+
+
+
+
 7. System Finalization (Both Options)
 Configure persistent mount points, root password, and system services:
 
