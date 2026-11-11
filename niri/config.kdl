@@ -8,7 +8,7 @@ environment {
 }
 
 cursor {
-    xcursor-theme "Bibata-Modern-Ice"
+    xcursor-theme "BreezeX-Dark"
     xcursor-size 22
 
     hide-when-typing
