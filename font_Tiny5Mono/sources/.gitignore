@@ -1,0 +1,5 @@
+*.bdf
+*.ufo
+*.designspace
+.ninja*
+build.ninja

@@ -1,0 +1,12 @@
+fontmake
+gftools
+sh
+bumpfontversion
+diffenator2
+Pillow
+bdflib
+kbitfont
+mitsuba
+numpy
+ufoLib2
+unicodedata2
