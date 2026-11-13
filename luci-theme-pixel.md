@@ -4,7 +4,7 @@ if this command fails:
 wget https://github.com/Trendorin/luci-theme-pixel/releases/latest/download/luci-theme-pixel.apk
 
 ```
-```
+
 
 download the file and move to /downloads/
 
