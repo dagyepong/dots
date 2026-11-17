@@ -7,13 +7,24 @@ shopt -s autocd cdspell dirspell cdable_vars
 alias b='bash'
 alias v='vim'
 
-alias ls='ls --file-type --color=auto'
+# 🛠️ SYSTEM ALIASES & TOOLS
+# ------------------------------------------------------------------------------
+alias htop='ktop'
+alias l='ls -CF'
+alias b='bash'
+alias vim='nvim'
+alias ls='eza -lah --icons --git --group-directories-first --color=always'
 alias la='ls -A'
 alias ll='ls -l'
 alias cat="bat -p"
 alias pfetch="curl -s https://raw.githubusercontent.com/dylanaraps/pfetch/master/pfetch | sh"
-alias update="sudo emaint -a sync && sudo emerge -avuDN @world"
 alias rm='rm -fr'
+
+# Grep enhancements
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+
 
 # adding flags
 alias df='df -h'               # human-readable sizes
@@ -88,6 +99,4 @@ PS1="\[$userColor\]\$USER\[\e[m\]@\[\e[38;2;255;176;0m\]\$HOSTNAME\[\e[m\] \
 PS4="-[\e[33m${BASH_SOURCE[0]%.sh}\e[m: \e[32m$LINENO\e[m]\
   ${FUNCNAME:+${FUNCNAME[0]}(): }"
 
-  if [ -z "${WAYLAND_DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
-    dbus-run-session mango
-fi
+ export GPG_TTY=$(tty)
